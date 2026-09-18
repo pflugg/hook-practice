@@ -18,15 +18,8 @@ import {
 import { LOCATION_IDS } from "../engine/types";
 import { allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
 import { resolveBoardClick } from "./clicks";
+import { CREST, TITLE_SCENE, locationDecor } from "./decor";
 import "./styles.css";
-
-const CREST = `<svg class="crest" viewBox="0 0 92 92" aria-hidden="true">
-  <circle cx="46" cy="46" r="44" fill="#1b1408" stroke="#e8c36a" stroke-width="3"/>
-  <circle cx="46" cy="46" r="36" fill="none" stroke="#e8c36a" stroke-width="1.2" opacity=".55"/>
-  <path d="M30 30c14-10 34-6 38 12-10 1-17 8-18 16 1 11 10 18 10 18s-22 1-30-14c-5-8-4-22 0-32z" fill="#e8c36a"/>
-  <path d="M61 55c9 3 16 12 13 21-9-1-17-8-20-16 2-2 4-4 7-5z" fill="#d45a58"/>
-  <circle cx="34" cy="34" r="3" fill="#1b1408"/>
-</svg>`;
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]!));
@@ -48,11 +41,14 @@ function renderCard(
   const attachNote = attached.length ? `<p class="text">+ ${attached.map((a) => esc(def(a.defId).name)).join(", ")}</p>` : "";
   return `<button class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}">
     ${opts.legal && opts.size === "hand" && (state.pending?.kind === "playChooseCard" || state.pending?.kind === "cunningAlly") ? `<span class="playable-tag">Playable</span>` : ""}
-    <div class="meta"><span class="badge">${typeLabel(d.type)}</span><span>${d.deck === "villain" ? d.cost : ""}</span></div>
+    <div class="meta">
+      <span class="badge">${typeLabel(d.type)}</span>
+      ${d.deck === "villain" ? `<span class="cost" title="Power cost">${d.cost}</span>` : `<span class="fate-mark">Fate</span>`}
+    </div>
     <h3>${esc(d.name)}</h3>
     <p class="text">${esc(d.text)}</p>
     ${attachNote}
-    ${d.type === "hero" || d.type === "ally" ? `<div class="str">${str}</div>` : ""}
+    ${d.type === "hero" || d.type === "ally" ? `<div class="str" title="Strength">${str}</div>` : ""}
   </button>`;
 }
 
@@ -101,13 +97,15 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
 
   const moveLabel = state.phase === "move" ? "Move here" : "Choose this place";
   return `<section class="location ${id} ${current ? "is-current" : ""} ${legal ? "is-legal" : ""} ${locked ? "is-locked" : ""}" data-loc="${id}">
+    <div class="loc-atmos" aria-hidden="true">${locationDecor(id)}</div>
+    <div class="loc-vignette" aria-hidden="true"></div>
     ${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : ""}
     <div class="loc-head">
       <div>
         <h2>${esc(meta.name)} ${locked ? `<span class="lock-badge">Locked</span>` : ""}</h2>
         <p>${esc(meta.subtitle)}${locked ? " — play the Never Land Map to open the path" : ""}</p>
       </div>
-      ${current ? `<div class="hook-token" title="Captain">${CREST.replace('class="crest"', 'width="28" height="28"')}</div>` : ""}
+      ${current ? `<div class="hook-token" title="Captain">${CREST.replace('class="crest"', 'class="token-crest"')}</div>` : ""}
     </div>
     ${actBtns(top)}
     ${zone("Heroes", cards("Clear — top actions are open.", loc.heroes))}
@@ -119,9 +117,18 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
 }
 
 function titleView(difficulty: Difficulty): string {
-  return `<div class="stars"></div><div class="grain"></div>
+  return `<div class="sky" aria-hidden="true">
+    <div class="stars"></div>
+    <div class="stars dim"></div>
+    <div class="fog fog-a"></div>
+    <div class="fog fog-b"></div>
+    <div class="lantern-glow"></div>
+    ${TITLE_SCENE}
+  </div>
+  <div class="grain"></div>
   <main class="title-screen">
     <section class="title-card">
+      <div class="foil-frame" aria-hidden="true"></div>
       ${CREST}
       <p class="eyebrow">A solo practice duel</p>
       <h1 class="wordmark">Never Land Duel</h1>
@@ -147,7 +154,7 @@ function titleView(difficulty: Difficulty): string {
 }
 
 function helpView(fromPlay: boolean): string {
-  return `<div class="overlay"><div class="modal">
+  return `<div class="overlay"><div class="modal wood">
     <h2>How to play</h2>
     <p>Each turn you <b>must move</b> to a different unlocked location, then may use each uncovered action there once. Heroes cover the top row. End the turn to refill to 4 cards; the computer then Fates you.</p>
     <p><b>Win</b> by vanquishing Peter Pan at the Jolly Roger after unlocking Hangman’s Tree with the Never Land Map. Vanquishing him anywhere else loses the duel.</p>
@@ -159,7 +166,7 @@ function helpView(fromPlay: boolean): string {
 function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>): string {
   const p = state.pending;
   if (state.phase === "over") {
-    return `<div class="overlay"><div class="modal ${state.won ? "win" : "lose"}">
+    return `<div class="overlay"><div class="modal wood ${state.won ? "win celebrate" : "lose"}">
       <h2>${state.won ? "The ship is yours" : "The tide turns"}</h2>
       <p>${esc(state.won ? "Peter Pan is vanquished at the Jolly Roger. The objective chain is complete." : state.loseReason)}</p>
       <div class="actions-row">
@@ -169,11 +176,15 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>): string
     </div></div>`;
   }
   if (p?.kind === "fateReport") {
-    return `<div class="overlay"><div class="modal">
+    return `<div class="overlay fate-in"><div class="modal wood fate">
+      <p class="eyebrow">Across the table</p>
       <h2>Fate intervening</h2>
       <p>${esc(p.note)}</p>
       <div class="modal-cards">${p.drawn
-        .map((c) => renderCard(state, c, { size: "hand", legal: p.played?.instanceId === c.instanceId, selected: false }))
+        .map((c) => {
+          const focus = p.played?.instanceId === c.instanceId;
+          return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: "hand", legal: false, selected: focus })}</div>`;
+        })
         .join("")}</div>
       <div class="actions-row"><button class="btn primary" data-ack>Continue</button></div>
     </div></div>`;
@@ -256,7 +267,8 @@ function playView(state: GameState): string {
     promptButtons.push(`<button class="btn ghost" data-skip-cond>Skip discard</button>`);
   }
 
-  return `<div class="stars"></div><div class="grain"></div>
+  return `<div class="sky play-sky" aria-hidden="true"><div class="stars"></div><div class="fog fog-a"></div></div>
+  <div class="grain"></div>
   <div class="play">
     <header class="topbar">
       <div class="brand">${CREST}<div><h1>Never Land Duel</h1><small>Hook Practice</small></div></div>
