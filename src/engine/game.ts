@@ -1,0 +1,1234 @@
+import { def, fateCardIds, villainCardIds } from "./cards";
+import {
+  chooseAttachTarget,
+  chooseFateCard,
+  chooseHeadacheItem,
+  chooseHeroLocation,
+  chooseTinkerAlly,
+} from "./fateAi";
+import {
+  adjacentUnlocked,
+  allAllies,
+  allLocationItems,
+  allyStrength,
+  availableActions,
+  canPlayCunning,
+  canPlayObsession,
+  coveringHero,
+  findCard,
+  findCardLocation,
+  heroStrength,
+  isUnlocked,
+  legalMoveLocations,
+  legalPlayLocations,
+  mapInRealm,
+  movableAlliesAndItems,
+  movableHeroes,
+  playableHandCards,
+  unlockedLocations,
+  vanquishAllyPool,
+  vanquishableHeroes,
+} from "./queries";
+import { LOCATION_IDS, type CardInstance, type GameState, type Input, type LocationId, type Pending } from "./types";
+import { shuffle } from "./rng";
+
+function emptyLocations(): GameState["locations"] {
+  return {
+    jollyRoger: { id: "jollyRoger", heroes: [], allies: [], items: [] },
+    skullRock: { id: "skullRock", heroes: [], allies: [], items: [] },
+    mermaidLagoon: { id: "mermaidLagoon", heroes: [], allies: [], items: [] },
+    hangmansTree: { id: "hangmansTree", heroes: [], allies: [], items: [] },
+  };
+}
+
+export function titleState(): GameState {
+  return {
+    screen: "title",
+    difficulty: "normal",
+    seed: 1,
+    rng: 1,
+    instanceSeq: 1,
+    logSeq: 1,
+    turn: 1,
+    power: 0,
+    handSize: 4,
+    villainLocation: "jollyRoger",
+    hangmansUnlocked: false,
+    peterPanRevealed: false,
+    peterPanLocation: null,
+    won: false,
+    lost: false,
+    loseReason: "",
+    hand: [],
+    villainDeck: [],
+    villainDiscard: [],
+    fateDeck: [],
+    fateDiscard: [],
+    locations: emptyLocations(),
+    attachments: [],
+    phase: "title",
+    pending: null,
+    usedActions: [],
+    tempStrength: {},
+    defeatedHeroStrengthsThisTurn: [],
+    log: [],
+    lastComputerFateNote: "",
+  };
+}
+
+function mint(state: GameState, defId: string): CardInstance {
+  const instanceId = `${defId}-${state.instanceSeq++}`;
+  return { instanceId, defId };
+}
+
+function log(state: GameState, text: string, tone: GameState["log"]["0"]["tone"] = "info"): void {
+  state.log.unshift({ id: state.logSeq++, text, tone });
+  if (state.log.length > 80) state.log.pop();
+}
+
+function buildDeck(state: GameState, ids: string[]): CardInstance[] {
+  return ids.map((id) => mint(state, id));
+}
+
+function reshuffleVillain(state: GameState): void {
+  if (state.villainDeck.length > 0) return;
+  if (state.villainDiscard.length === 0) return;
+  const shuffled = shuffle(state.villainDiscard, state.rng);
+  state.rng = shuffled.rng;
+  state.villainDeck = shuffled.items;
+  state.villainDiscard = [];
+  log(state, "The villain discard is shuffled into a new deck.");
+}
+
+function reshuffleFate(state: GameState): void {
+  if (state.fateDeck.length > 0) return;
+  if (state.fateDiscard.length === 0) return;
+  const shuffled = shuffle(state.fateDiscard, state.rng);
+  state.rng = shuffled.rng;
+  state.fateDeck = shuffled.items;
+  state.fateDiscard = [];
+  log(state, "The Fate discard is shuffled into a new deck.", "fate");
+}
+
+function drawVillain(state: GameState, n: number): CardInstance[] {
+  const drawn: CardInstance[] = [];
+  for (let i = 0; i < n; i++) {
+    reshuffleVillain(state);
+    const card = state.villainDeck.shift();
+    if (!card) break;
+    drawn.push(card);
+  }
+  return drawn;
+}
+
+function drawFate(state: GameState, n: number): CardInstance[] {
+  const drawn: CardInstance[] = [];
+  for (let i = 0; i < n; i++) {
+    reshuffleFate(state);
+    const card = state.fateDeck.shift();
+    if (!card) break;
+    drawn.push(card);
+  }
+  return drawn;
+}
+
+function takeFromHand(state: GameState, instanceId: string): CardInstance | null {
+  const i = state.hand.findIndex((c) => c.instanceId === instanceId);
+  if (i < 0) return null;
+  return state.hand.splice(i, 1)[0];
+}
+
+function discardVillainCard(state: GameState, card: CardInstance): void {
+  state.villainDiscard.unshift(card);
+}
+
+function discardFateCard(state: GameState, card: CardInstance): void {
+  state.fateDiscard.unshift(card);
+}
+
+function detachAll(state: GameState, hostId: string): void {
+  const kept: GameState["attachments"] = [];
+  for (const a of state.attachments) {
+    if (a.attachedTo === hostId) {
+      if (def(a.item.defId).deck === "fate") discardFateCard(state, a.item);
+      else discardVillainCard(state, a.item);
+    } else {
+      kept.push(a);
+    }
+  }
+  state.attachments = kept;
+}
+
+function removeFromRealm(state: GameState, instanceId: string): CardInstance | null {
+  for (const id of LOCATION_IDS) {
+    const loc = state.locations[id];
+    for (const key of ["heroes", "allies", "items"] as const) {
+      const i = loc[key].findIndex((c) => c.instanceId === instanceId);
+      if (i >= 0) {
+        const [card] = loc[key].splice(i, 1);
+        return card;
+      }
+    }
+  }
+  const att = state.attachments.findIndex((a) => a.item.instanceId === instanceId);
+  if (att >= 0) {
+    const [row] = state.attachments.splice(att, 1);
+    return row.item;
+  }
+  return takeFromHand(state, instanceId);
+}
+
+function placeHero(state: GameState, hero: CardInstance, locationId: LocationId): void {
+  state.locations[locationId].heroes.push(hero);
+  if (hero.defId === "peterPan") {
+    state.peterPanRevealed = true;
+    state.peterPanLocation = locationId;
+  }
+}
+
+function placeAlly(state: GameState, ally: CardInstance, locationId: LocationId): void {
+  state.locations[locationId].allies.push(ally);
+}
+
+function placeItem(state: GameState, item: CardInstance, locationId: LocationId): void {
+  state.locations[locationId].items.push(item);
+}
+
+function updatePeterLoc(state: GameState): void {
+  for (const id of LOCATION_IDS) {
+    if (state.locations[id].heroes.some((h) => h.defId === "peterPan")) {
+      state.peterPanLocation = id;
+      state.peterPanRevealed = true;
+      return;
+    }
+  }
+}
+
+function discardHand(state: GameState): void {
+  while (state.hand.length) {
+    discardVillainCard(state, state.hand.shift()!);
+  }
+}
+
+function checkTickTock(state: GameState, dest: LocationId): void {
+  if (state.locations[dest].heroes.some((h) => h.defId === "tickTock")) {
+    discardHand(state);
+    log(state, "Tick Tock snaps — the whole hand is discarded.", "bad");
+  }
+}
+
+function markActionUsed(state: GameState, key: string): void {
+  if (!state.usedActions.includes(key)) state.usedActions.push(key);
+}
+
+function consumeCurrentAction(state: GameState): void {
+  if (state.actionKey) markActionUsed(state, state.actionKey);
+  state.actionKey = undefined;
+  state.heldCard = undefined;
+  state.pending = null;
+  state.phase = "actions";
+}
+
+function beginAction(state: GameState, key: string, pending: Pending): void {
+  state.actionKey = key;
+  state.phase = "resolving";
+  state.pending = pending;
+}
+
+function revealPeter(state: GameState, peter: CardInstance, extras: CardInstance[]): void {
+  placeHero(state, peter, "hangmansTree");
+  extras.forEach((c) => discardFateCard(state, c));
+  log(state, "Peter Pan is revealed and lands at Hangman's Tree.", "fate");
+}
+
+function spendPower(state: GameState, n: number): boolean {
+  if (state.power < n) return false;
+  state.power -= n;
+  return true;
+}
+
+function discardMap(state: GameState): boolean {
+  const map = mapInRealm(state);
+  if (!map) return false;
+  removeFromRealm(state, map.instanceId);
+  discardVillainCard(state, map);
+  log(state, "The Never Land Map is discarded to cover an Item's cost.");
+  return true;
+}
+
+function endIfOver(state: GameState): boolean {
+  return state.won || state.lost;
+}
+
+function finishVanquish(state: GameState, heroId: string, allyIds: string[]): void {
+  const loc = findCardLocation(state, heroId);
+  const hero = findCard(state, heroId);
+  if (!loc || !hero) return;
+  const strength = heroStrength(state, hero);
+  for (const id of allyIds) {
+    const ally = removeFromRealm(state, id);
+    if (ally) {
+      detachAll(state, ally.instanceId);
+      discardVillainCard(state, ally);
+    }
+  }
+  removeFromRealm(state, heroId);
+  detachAll(state, heroId);
+  discardFateCard(state, hero);
+  state.defeatedHeroStrengthsThisTurn.push(strength);
+  log(state, `${def(hero.defId).name} is vanquished at ${loc}.`, "good");
+  if (hero.defId === "peterPan") {
+    if (loc === "jollyRoger") {
+      state.won = true;
+      state.phase = "over";
+      state.pending = null;
+      log(state, "Peter Pan falls at the Jolly Roger. Victory!", "good");
+    } else {
+      state.lost = true;
+      state.loseReason = "Peter Pan was vanquished away from the Jolly Roger. The objective is lost.";
+      state.phase = "over";
+      state.pending = null;
+      log(state, state.loseReason, "bad");
+    }
+    state.peterPanLocation = null;
+  }
+}
+
+function startComputerFate(state: GameState): void {
+  state.tempStrength = {};
+  state.defeatedHeroStrengthsThisTurn = [];
+  const drawn = drawFate(state, 2);
+  if (drawn.length === 0) {
+    log(state, "Fate has no cards left to play.", "fate");
+    beginNextTurn(state);
+    return;
+  }
+  const peter = drawn.find((c) => c.defId === "peterPan");
+  if (peter) {
+    revealPeter(
+      state,
+      peter,
+      drawn.filter((c) => c.instanceId !== peter.instanceId),
+    );
+    state.pending = {
+      kind: "fateReport",
+      drawn,
+      played: peter,
+      discarded: drawn.filter((c) => c.instanceId !== peter.instanceId),
+      note: "Fate reveals Peter Pan. He is forced to Hangman's Tree.",
+    };
+    state.phase = "fateAdversary";
+    state.lastComputerFateNote = "Peter Pan arrives at Hangman's Tree.";
+    return;
+  }
+  const choice = chooseFateCard(state, drawn, state.difficulty);
+  state.rng = choice.rng;
+  const play = choice.card;
+  const discarded = drawn.filter((c) => c.instanceId !== play.instanceId);
+  discarded.forEach((c) => discardFateCard(state, c));
+  resolveComputerFateCard(state, play, drawn, discarded);
+}
+
+function resolveComputerFateCard(
+  state: GameState,
+  card: CardInstance,
+  drawn: CardInstance[],
+  discarded: CardInstance[],
+): void {
+  const d = def(card.defId);
+  let note = `Fate plays ${d.name}.`;
+  if (d.type === "hero") {
+    const dest = chooseHeroLocation(state, card, state.difficulty);
+    state.rng = dest.rng;
+    placeHero(state, card, dest.id);
+    note = `Fate seats ${d.name} at ${labelLoc(dest.id)}.`;
+    if (card.defId === "tinkerBell") {
+      const ally = chooseTinkerAlly(state, dest.id);
+      if (ally) {
+        removeFromRealm(state, ally.instanceId);
+        detachAll(state, ally.instanceId);
+        discardVillainCard(state, ally);
+        note += ` Tinker Bell dismisses ${def(ally.defId).name}.`;
+      }
+    }
+  } else if (d.id === "pixieDust" || d.id === "taunt") {
+    const target = chooseAttachTarget(state, state.difficulty);
+    state.rng = target.rng;
+    if (!target.hero) {
+      discardFateCard(state, card);
+      note = `${d.name} has no Hero to attach to, so it is discarded.`;
+    } else {
+      state.attachments.push({ item: card, attachedTo: target.hero.instanceId });
+      note = `${d.name} clings to ${def(target.hero.defId).name}.`;
+    }
+  } else if (d.id === "splittingHeadache") {
+    const item = chooseHeadacheItem(state);
+    if (!item) {
+      discardFateCard(state, card);
+      note = "Splitting Headache finds no Item and is discarded.";
+    } else {
+      removeFromRealm(state, item.instanceId);
+      discardVillainCard(state, item);
+      discardFateCard(state, card);
+      note = `Splitting Headache discards ${def(item.defId).name}.`;
+    }
+  } else {
+    discardFateCard(state, card);
+  }
+  log(state, note, "fate");
+  state.lastComputerFateNote = note;
+  state.pending = { kind: "fateReport", drawn, played: card, discarded, note };
+  state.phase = "fateAdversary";
+}
+
+function labelLoc(id: LocationId): string {
+  return {
+    jollyRoger: "the Jolly Roger",
+    skullRock: "Skull Rock",
+    mermaidLagoon: "Mermaid Lagoon",
+    hangmansTree: "Hangman's Tree",
+  }[id];
+}
+
+function beginNextTurn(state: GameState): void {
+  if (endIfOver(state)) return;
+  state.turn += 1;
+  state.usedActions = [];
+  state.tempStrength = {};
+  state.pending = null;
+  state.phase = "move";
+  log(state, `Turn ${state.turn}. Move the captain.`);
+}
+
+function refillHand(state: GameState): void {
+  const need = state.handSize - state.hand.length;
+  if (need > 0) {
+    const drawn = drawVillain(state, need);
+    state.hand.push(...drawn);
+    if (drawn.length) log(state, `Drew ${drawn.length} card${drawn.length === 1 ? "" : "s"} to refill the hand.`);
+  }
+}
+
+function playPeterIfPresent(state: GameState, cards: CardInstance[]): boolean {
+  const peter = cards.find((c) => c.defId === "peterPan");
+  if (!peter) return false;
+  revealPeter(
+    state,
+    peter,
+    cards.filter((c) => c.instanceId !== peter.instanceId),
+  );
+  return true;
+}
+
+function startPlayerFate(state: GameState): void {
+  const drawn = drawFate(state, 2);
+  if (drawn.length === 0) {
+    log(state, "The Fate deck is empty.");
+    consumeCurrentAction(state);
+    return;
+  }
+  if (playPeterIfPresent(state, drawn)) {
+    consumeCurrentAction(state);
+    return;
+  }
+  state.pending = { kind: "fateChooseCard", cards: drawn, actor: "player" };
+  state.phase = "resolving";
+}
+
+function afterPaymentPlay(
+  state: GameState,
+  card: CardInstance,
+  locationId?: LocationId,
+  attachTo?: string,
+): void {
+  const d = def(card.defId);
+  takeFromHand(state, card.instanceId);
+  if (d.id === "neverLandMap") {
+    if (!locationId) return;
+    placeItem(state, card, locationId);
+    state.hangmansUnlocked = true;
+    log(state, "The Never Land Map is spread open. Hangman's Tree is unlocked.", "good");
+    consumeCurrentAction(state);
+    return;
+  }
+  if (d.id === "cutlass") {
+    if (!attachTo) {
+      state.hand.push(card);
+      return;
+    }
+    state.attachments.push({ item: card, attachedTo: attachTo });
+    log(state, `Cutlass is strapped to ${def(findCard(state, attachTo)?.defId ?? "swashbuckler").name}.`);
+    consumeCurrentAction(state);
+    return;
+  }
+  if (d.type === "item") {
+    if (!locationId) return;
+    placeItem(state, card, locationId);
+    log(state, `${d.name} is placed at ${labelLoc(locationId)}.`);
+    consumeCurrentAction(state);
+    return;
+  }
+  if (d.type === "ally") {
+    if (!locationId) return;
+    placeAlly(state, card, locationId);
+    log(state, `${d.name} comes ashore at ${labelLoc(locationId)}.`);
+    if (d.id === "mrStarkey") {
+      const heroes = state.locations[locationId].heroes;
+      if (heroes.length && adjacentUnlocked(state, locationId).length) {
+        state.pending = { kind: "starkeyHero", starkeyId: card.instanceId };
+        return;
+      }
+    }
+    consumeCurrentAction(state);
+    return;
+  }
+  resolveEffect(state, card);
+}
+
+function resolveEffect(state: GameState, card: CardInstance): void {
+  discardVillainCard(state, card);
+  if (card.defId === "giveThemAScare") {
+    const peeked = drawFate(state, 2);
+    if (peeked.length === 0) {
+      log(state, "Give Them a Scare finds an empty Fate deck.");
+      consumeCurrentAction(state);
+      return;
+    }
+    state.pending = { kind: "scarePeek", cards: peeked };
+    return;
+  }
+  if (card.defId === "worthyOpponent") {
+    state.power += 2;
+    log(state, "Worthy Opponent: +2 Power.");
+    const extras: CardInstance[] = [];
+    let hero: CardInstance | undefined;
+    for (let i = 0; i < 20; i++) {
+      const [cardDrawn] = drawFate(state, 1);
+      if (!cardDrawn) break;
+      if (def(cardDrawn.defId).type === "hero") {
+        hero = cardDrawn;
+        break;
+      }
+      extras.push(cardDrawn);
+    }
+    extras.forEach((c) => discardFateCard(state, c));
+    if (!hero) {
+      log(state, "No Hero remained in Fate.");
+      consumeCurrentAction(state);
+      return;
+    }
+    if (hero.defId === "peterPan") {
+      revealPeter(state, hero, []);
+      consumeCurrentAction(state);
+      return;
+    }
+    state.heldCard = hero;
+    state.pending = { kind: "worthyLocation", heroId: hero.instanceId };
+    return;
+  }
+  if (card.defId === "ayeAyeSir") {
+    if (allAllies(state).length === 0) {
+      consumeCurrentAction(state);
+      return;
+    }
+    state.pending = { kind: "ayeAyeAlly" };
+    return;
+  }
+  consumeCurrentAction(state);
+}
+
+function maybeAskPayment(
+  state: GameState,
+  card: CardInstance,
+  locationId?: LocationId,
+  attachTo?: string,
+): void {
+  const d = def(card.defId);
+  const map = mapInRealm(state);
+  const canMap = Boolean(map && d.type === "item" && d.cost > 0 && d.id !== "neverLandMap");
+  if (canMap) {
+    state.pending = { kind: "playChoosePayment", cardId: card.instanceId, locationId, attachTo };
+    return;
+  }
+  if (!spendPower(state, d.cost)) {
+    log(state, `Not enough Power for ${d.name}.`, "bad");
+    state.pending = { kind: "playChooseCard" };
+    return;
+  }
+  playAfterCost(state, card, locationId, attachTo);
+}
+
+function playAfterCost(
+  state: GameState,
+  card: CardInstance,
+  locationId?: LocationId,
+  attachTo?: string,
+): void {
+  afterPaymentPlay(state, card, locationId, attachTo);
+}
+
+function playHeldHero(state: GameState, hero: CardInstance, locationId: LocationId, tinkerActor: "player" | "ai"): void {
+  placeHero(state, hero, locationId);
+  log(state, `${def(hero.defId).name} is played to ${labelLoc(locationId)}.`, "fate");
+  if (hero.defId === "tinkerBell" && state.locations[locationId].allies.length) {
+    state.pending = { kind: "tinkerDiscard", tinkerId: hero.instanceId, locationId, actor: tinkerActor };
+    return;
+  }
+  consumeCurrentAction(state);
+}
+
+export function createGame(difficulty: GameState["difficulty"] = "normal", seed = Date.now()): GameState {
+  const state = titleState();
+  state.screen = "play";
+  state.difficulty = difficulty;
+  state.seed = seed;
+  state.rng = seed >>> 0 || 1;
+  const villain = shuffle(buildDeck(state, villainCardIds()), state.rng);
+  state.rng = villain.rng;
+  state.villainDeck = villain.items;
+  const fate = shuffle(buildDeck(state, fateCardIds()), state.rng);
+  state.rng = fate.rng;
+  state.fateDeck = fate.items;
+  state.hand = drawVillain(state, 4);
+  state.phase = "move";
+  state.villainLocation = "jollyRoger";
+  log(state, "The realm is dealt. Move from the Jolly Roger to begin.", "info");
+  return state;
+}
+
+export function applyInput(prev: GameState, input: Input): GameState {
+  const state = structuredClone(prev);
+
+  if (input.type === "start") {
+    return createGame(input.difficulty, input.seed ?? Date.now());
+  }
+  if (input.type === "newGame") {
+    return titleState();
+  }
+  if (input.type === "openHelp") {
+    state.screen = "help";
+    return state;
+  }
+  if (input.type === "closeHelp") {
+    state.screen = state.phase === "title" ? "title" : "play";
+    return state;
+  }
+  if (input.type === "resign") {
+    state.lost = true;
+    state.loseReason = "You struck the colors.";
+    state.phase = "over";
+    state.pending = null;
+    log(state, "The captain resigns.", "bad");
+    return state;
+  }
+
+  if (state.phase === "over" || state.won || state.lost) return state;
+
+  if (input.type === "acknowledgeFate") {
+    if (state.pending?.kind === "fateReport") {
+      beginNextTurn(state);
+    }
+    return state;
+  }
+
+  if (input.type === "endTurn") {
+    if (state.phase === "actions" || (state.phase === "resolving" && !state.pending)) {
+      refillHand(state);
+      startComputerFate(state);
+    }
+    return state;
+  }
+
+  if (input.type === "cancel") {
+    if (state.pending?.kind === "starkeyHero" || state.pending?.kind === "tinkerDiscard") {
+      consumeCurrentAction(state);
+      return state;
+    }
+    if (state.phase === "resolving") {
+      if (state.pending?.kind === "scarePeek") return state;
+      if (state.pending?.kind === "fateChooseCard") return state;
+      state.pending = null;
+      state.phase = "actions";
+      state.actionKey = undefined;
+    }
+    return state;
+  }
+
+  if (input.type === "selectLocation") {
+    return handleLocation(state, input.locationId);
+  }
+  if (input.type === "selectAction") {
+    return handleAction(state, input.actionKey);
+  }
+  if (input.type === "selectCard") {
+    return handleCard(state, input.instanceId);
+  }
+  if (input.type === "confirm") {
+    return handleConfirm(state);
+  }
+  if (input.type === "scareDiscardBoth") {
+    if (state.pending?.kind === "scarePeek") {
+      state.pending.cards.forEach((c) => discardFateCard(state, c));
+      log(state, "Both peeked Fate cards are banished.");
+      consumeCurrentAction(state);
+    }
+    return state;
+  }
+  if (input.type === "scareReturn") {
+    if (state.pending?.kind === "scarePeek") {
+      const a = state.pending.cards.find((c) => c.instanceId === input.order[0]);
+      const b = state.pending.cards.find((c) => c.instanceId === input.order[1]);
+      if (a && b) {
+        state.fateDeck.unshift(b);
+        state.fateDeck.unshift(a);
+        log(state, "Peeked Fate cards return to the top of the deck.");
+      }
+      consumeCurrentAction(state);
+    }
+    return state;
+  }
+  if (input.type === "payWithMap" || input.type === "payWithPower") {
+    if (state.pending?.kind !== "playChoosePayment") return state;
+    const card = findCard(state, state.pending.cardId);
+    if (!card) return state;
+    if (input.type === "payWithMap") {
+      if (!discardMap(state)) return state;
+    } else if (!spendPower(state, def(card.defId).cost)) {
+      log(state, "Not enough Power.", "bad");
+      return state;
+    }
+    playAfterCost(state, card, state.pending.locationId, state.pending.attachTo);
+    return state;
+  }
+  if (input.type === "playOrDiscardHero") {
+    if (state.pending?.kind !== "obsessionDecide") return state;
+    const hero = state.heldCard;
+    if (!hero) return state;
+    if (!input.play) {
+      discardFateCard(state, hero);
+      log(state, `${def(hero.defId).name} is banished by Obsession.`);
+      consumeCurrentAction(state);
+      return state;
+    }
+    if (hero.defId === "peterPan") {
+      revealPeter(state, hero, []);
+      consumeCurrentAction(state);
+      return state;
+    }
+    state.pending = { kind: "obsessionLocation", heroId: hero.instanceId };
+    return state;
+  }
+  if (input.type === "skipCondition") {
+    if (state.pending?.kind === "conditionOffer") {
+      state.pending = null;
+      state.phase = "actions";
+    }
+    if (state.pending?.kind === "tinkerDiscard") consumeCurrentAction(state);
+    return state;
+  }
+  if (input.type === "acceptCondition") {
+    if (state.pending?.kind !== "conditionOffer") return state;
+    const cond = takeFromHand(state, state.pending.conditionId);
+    if (!cond) return state;
+    discardVillainCard(state, cond);
+    if (cond.defId === "cunning") {
+      const allies = state.hand.filter((c) => def(c.defId).type === "ally");
+      if (allies.length === 0) {
+        log(state, "Cunning finds no Ally in hand.");
+        state.pending = null;
+        state.phase = "actions";
+        return state;
+      }
+      state.phase = "resolving";
+      state.pending = { kind: "cunningAlly" };
+      return state;
+    }
+    if (cond.defId === "obsession") {
+      const extras: CardInstance[] = [];
+      let hero: CardInstance | undefined;
+      for (let i = 0; i < 20; i++) {
+        const [c] = drawFate(state, 1);
+        if (!c) break;
+        if (def(c.defId).type === "hero") {
+          hero = c;
+          break;
+        }
+        extras.push(c);
+      }
+      extras.forEach((c) => discardFateCard(state, c));
+      if (!hero) {
+        log(state, "Obsession finds no Hero.");
+        state.pending = null;
+        state.phase = "actions";
+        return state;
+      }
+      state.heldCard = hero;
+      state.phase = "resolving";
+      state.pending = { kind: "obsessionDecide", heroId: hero.instanceId, extras };
+      return state;
+    }
+  }
+
+  return state;
+}
+
+function handleLocation(state: GameState, locationId: LocationId): GameState {
+  if (state.phase === "move" && !state.pending) {
+    if (!legalMoveLocations(state).includes(locationId)) return state;
+    state.villainLocation = locationId;
+    state.usedActions = [];
+    checkTickTock(state, locationId);
+    state.phase = "actions";
+    const cover = coveringHero(state, locationId);
+    log(
+      state,
+      `The captain arrives at ${labelLoc(locationId)}${cover ? ` — ${def(cover.defId).name} covers the top actions` : ""}.`,
+    );
+    return state;
+  }
+  const p = state.pending;
+  if (!p) return state;
+  if (p.kind === "playChooseLocation") {
+    if (!legalPlayLocations(state).includes(locationId)) return state;
+    const card = findCard(state, p.cardId);
+    if (!card) return state;
+    maybeAskPayment(state, card, locationId);
+    return state;
+  }
+  if (p.kind === "cunningLocation") {
+    if (!legalPlayLocations(state).includes(locationId)) return state;
+    const ally = takeFromHand(state, p.allyId);
+    if (!ally) return state;
+    placeAlly(state, ally, locationId);
+    log(state, `Cunning slips ${def(ally.defId).name} onto ${labelLoc(locationId)} for free.`, "good");
+    if (ally.defId === "mrStarkey" && state.locations[locationId].heroes.length) {
+      state.pending = { kind: "starkeyHero", starkeyId: ally.instanceId };
+      return state;
+    }
+    state.pending = null;
+    state.phase = "actions";
+    return state;
+  }
+  if (p.kind === "ayeAyeDest") {
+    const from = findCardLocation(state, p.allyId);
+    if (!from || !adjacentUnlocked(state, from).includes(locationId)) return state;
+    const ally = removeFromRealm(state, p.allyId);
+    if (!ally) return state;
+    placeAlly(state, ally, locationId);
+    state.tempStrength[ally.instanceId] = (state.tempStrength[ally.instanceId] ?? 0) + 2;
+    log(state, `${def(ally.defId).name} shifts to ${labelLoc(locationId)} and is +2 until the turn ends.`);
+    consumeCurrentAction(state);
+    return state;
+  }
+  if (p.kind === "movePieceDest") {
+    const from = findCardLocation(state, p.pieceId);
+    if (!from || !adjacentUnlocked(state, from).includes(locationId)) return state;
+    const card = removeFromRealm(state, p.pieceId);
+    if (!card) return state;
+    if (def(card.defId).type === "ally") placeAlly(state, card, locationId);
+    else placeItem(state, card, locationId);
+    log(state, `${def(card.defId).name} moves to ${labelLoc(locationId)}.`);
+    consumeCurrentAction(state);
+    return state;
+  }
+  if (p.kind === "moveHeroDest" || p.kind === "starkeyDest") {
+    const heroId = p.kind === "moveHeroDest" ? p.heroId : p.heroId;
+    const from = findCardLocation(state, heroId);
+    if (!from || !adjacentUnlocked(state, from).includes(locationId)) return state;
+    const hero = removeFromRealm(state, heroId);
+    if (!hero) return state;
+    placeHero(state, hero, locationId);
+    updatePeterLoc(state);
+    log(state, `${def(hero.defId).name} is moved to ${labelLoc(locationId)}.`);
+    consumeCurrentAction(state);
+    return state;
+  }
+  if (p.kind === "fateChooseLocation" || p.kind === "worthyLocation" || p.kind === "obsessionLocation") {
+    if (!unlockedLocations(state).includes(locationId)) return state;
+    const hero = state.heldCard ?? findCard(state, p.kind === "fateChooseLocation" ? p.cardId : p.heroId);
+    if (!hero) return state;
+    playHeldHero(state, hero, locationId, "player");
+    return state;
+  }
+  return state;
+}
+
+function handleAction(state: GameState, actionKey: string): GameState {
+  if (state.phase !== "actions" && !(state.phase === "resolving" && !state.pending)) return state;
+  const slot = availableActions(state).find((a) => a.key === actionKey);
+  if (!slot || !slot.available) return state;
+
+  if (slot.kind === "gainPower") {
+    const amt = slot.amount ?? 1;
+    state.power += amt;
+    markActionUsed(state, slot.key);
+    log(state, `Gained ${amt} Power.`, "good");
+    return state;
+  }
+  if (slot.kind === "discard") {
+    beginAction(state, slot.key, { kind: "discardSelect", selected: [] });
+    return state;
+  }
+  if (slot.kind === "playCard") {
+    if (playableHandCards(state).length === 0) {
+      log(state, "No playable cards in hand.");
+      markActionUsed(state, slot.key);
+      return state;
+    }
+    beginAction(state, slot.key, { kind: "playChooseCard" });
+    return state;
+  }
+  if (slot.kind === "fate") {
+    state.actionKey = slot.key;
+    startPlayerFate(state);
+    return state;
+  }
+  if (slot.kind === "vanquish") {
+    if (vanquishableHeroes(state).length === 0) {
+      log(state, "No Hero can be vanquished right now.");
+      markActionUsed(state, slot.key);
+      return state;
+    }
+    beginAction(state, slot.key, { kind: "vanquishHero" });
+    return state;
+  }
+  if (slot.kind === "moveItemAlly") {
+    if (movableAlliesAndItems(state).length === 0) {
+      log(state, "Nothing can be moved.");
+      markActionUsed(state, slot.key);
+      return state;
+    }
+    beginAction(state, slot.key, { kind: "movePieceSelect" });
+    return state;
+  }
+  if (slot.kind === "moveHero") {
+    if (movableHeroes(state).length === 0) {
+      log(state, "No Hero can be moved from an unlocked location.");
+      markActionUsed(state, slot.key);
+      return state;
+    }
+    beginAction(state, slot.key, { kind: "moveHeroSelect" });
+    return state;
+  }
+  return state;
+}
+
+function handleCard(state: GameState, instanceId: string): GameState {
+  if (state.phase === "actions" && !state.pending) {
+    const card = state.hand.find((c) => c.instanceId === instanceId);
+    if (!card) return state;
+    if (card.defId === "cunning" && canPlayCunning(state)) {
+      state.pending = {
+        kind: "conditionOffer",
+        conditionId: card.instanceId,
+        reason: "A Strength 4+ Hero is ashore. Play Cunning to slip an Ally in for free?",
+      };
+      return state;
+    }
+    if (card.defId === "obsession" && canPlayObsession(state)) {
+      state.pending = {
+        kind: "conditionOffer",
+        conditionId: card.instanceId,
+        reason: "Peter is still hidden. Play Obsession to hunt the Fate deck for a Hero?",
+      };
+      return state;
+    }
+    return state;
+  }
+
+  const p = state.pending;
+  if (!p) return state;
+
+  if (p.kind === "playChooseCard") {
+    if (!playableHandCards(state).some((c) => c.instanceId === instanceId)) return state;
+    const card = findCard(state, instanceId)!;
+    const d = def(card.defId);
+    if (d.type === "effect") {
+      maybeAskPayment(state, card);
+      return state;
+    }
+    if (d.id === "cutlass") {
+      state.pending = { kind: "playChooseAllyAttach", cardId: instanceId };
+      return state;
+    }
+    state.pending = { kind: "playChooseLocation", cardId: instanceId };
+    return state;
+  }
+
+  if (p.kind === "playChooseAllyAttach") {
+    if (!allAllies(state).some((a) => a.ally.instanceId === instanceId)) return state;
+    const card = findCard(state, p.cardId)!;
+    maybeAskPayment(state, card, undefined, instanceId);
+    return state;
+  }
+
+  if (p.kind === "discardSelect") {
+    if (!state.hand.some((c) => c.instanceId === instanceId)) return state;
+    const selected = p.selected.includes(instanceId)
+      ? p.selected.filter((id) => id !== instanceId)
+      : [...p.selected, instanceId];
+    state.pending = { kind: "discardSelect", selected };
+    return state;
+  }
+
+  if (p.kind === "vanquishHero") {
+    if (!vanquishableHeroes(state).some((h) => h.hero.instanceId === instanceId)) return state;
+    state.pending = { kind: "vanquishAllies", heroId: instanceId, selected: [] };
+    return state;
+  }
+
+  if (p.kind === "vanquishAllies") {
+    const pool = vanquishAllyPool(state, p.heroId);
+    if (!pool.some((a) => a.ally.instanceId === instanceId)) return state;
+    const selected = p.selected.includes(instanceId)
+      ? p.selected.filter((id) => id !== instanceId)
+      : [...p.selected, instanceId];
+    state.pending = { kind: "vanquishAllies", heroId: p.heroId, selected };
+    return state;
+  }
+
+  if (p.kind === "movePieceSelect") {
+    if (!movableAlliesAndItems(state).some((c) => c.instanceId === instanceId)) return state;
+    state.pending = { kind: "movePieceDest", pieceId: instanceId };
+    return state;
+  }
+
+  if (p.kind === "moveHeroSelect") {
+    if (!movableHeroes(state).some((c) => c.instanceId === instanceId)) return state;
+    state.pending = { kind: "moveHeroDest", heroId: instanceId };
+    return state;
+  }
+
+  if (p.kind === "ayeAyeAlly") {
+    if (!allAllies(state).some((a) => a.ally.instanceId === instanceId && isUnlocked(state, a.location))) return state;
+    state.pending = { kind: "ayeAyeDest", allyId: instanceId };
+    return state;
+  }
+
+  if (p.kind === "starkeyHero") {
+    const loc = findCardLocation(state, p.starkeyId);
+    if (!loc) return state;
+    if (!state.locations[loc].heroes.some((h) => h.instanceId === instanceId)) return state;
+    state.pending = { kind: "starkeyDest", starkeyId: p.starkeyId, heroId: instanceId };
+    return state;
+  }
+
+  if (p.kind === "fateChooseCard") {
+    if (!p.cards.some((c) => c.instanceId === instanceId)) return state;
+    const play = p.cards.find((c) => c.instanceId === instanceId)!;
+    const rest = p.cards.filter((c) => c.instanceId !== instanceId);
+    rest.forEach((c) => discardFateCard(state, c));
+    return playPlayerFateCard(state, play);
+  }
+
+  if (p.kind === "fateChooseAttach") {
+    const heroes = LOCATION_IDS.flatMap((id) => state.locations[id].heroes);
+    if (!heroes.some((h) => h.instanceId === instanceId)) return state;
+    const held = state.heldCard ?? findCard(state, p.cardId);
+    if (!held) return state;
+    state.attachments.push({ item: held, attachedTo: instanceId });
+    log(state, `${def(held.defId).name} attaches to ${def(findCard(state, instanceId)!.defId).name}.`, "fate");
+    consumeCurrentAction(state);
+    return state;
+  }
+
+  if (p.kind === "fateChooseItem") {
+    if (!allLocationItems(state).some((i) => i.item.instanceId === instanceId)) return state;
+    const item = removeFromRealm(state, instanceId);
+    if (item) {
+      discardVillainCard(state, item);
+      log(state, `Splitting Headache discards ${def(item.defId).name}.`, "fate");
+    }
+    if (state.heldCard) discardFateCard(state, state.heldCard);
+    consumeCurrentAction(state);
+    return state;
+  }
+
+  if (p.kind === "tinkerDiscard") {
+    if (!state.locations[p.locationId].allies.some((a) => a.instanceId === instanceId)) return state;
+    const ally = removeFromRealm(state, instanceId);
+    if (ally) {
+      detachAll(state, ally.instanceId);
+      discardVillainCard(state, ally);
+      log(state, `Tinker Bell discards ${def(ally.defId).name}.`, "fate");
+    }
+    consumeCurrentAction(state);
+    return state;
+  }
+
+  if (p.kind === "cunningAlly") {
+    const card = state.hand.find((c) => c.instanceId === instanceId);
+    if (!card || def(card.defId).type !== "ally") return state;
+    if (card.defId === "cutlass") return state;
+    state.pending = { kind: "cunningLocation", allyId: instanceId };
+    return state;
+  }
+
+  return state;
+}
+
+function playPlayerFateCard(state: GameState, card: CardInstance): GameState {
+  const d = def(card.defId);
+  if (d.type === "hero") {
+    state.heldCard = card;
+    state.pending = { kind: "fateChooseLocation", cardId: card.instanceId, actor: "player" };
+    return state;
+  }
+  if (d.id === "pixieDust" || d.id === "taunt") {
+    const heroes = LOCATION_IDS.flatMap((id) => state.locations[id].heroes);
+    if (heroes.length === 0) {
+      discardFateCard(state, card);
+      log(state, `${d.name} has no Hero to attach to.`);
+      consumeCurrentAction(state);
+      return state;
+    }
+    state.heldCard = card;
+    state.pending = { kind: "fateChooseAttach", cardId: card.instanceId, actor: "player" };
+    return state;
+  }
+  if (d.id === "splittingHeadache") {
+    if (allLocationItems(state).length === 0) {
+      discardFateCard(state, card);
+      log(state, "Splitting Headache finds no Item.");
+      consumeCurrentAction(state);
+      return state;
+    }
+    state.heldCard = card;
+    state.pending = { kind: "fateChooseItem", cardId: card.instanceId, actor: "player" };
+    return state;
+  }
+  discardFateCard(state, card);
+  consumeCurrentAction(state);
+  return state;
+}
+
+function handleConfirm(state: GameState): GameState {
+  const p = state.pending;
+  if (!p) return state;
+  if (p.kind === "discardSelect") {
+    for (const id of p.selected) {
+      const card = takeFromHand(state, id);
+      if (card) discardVillainCard(state, card);
+    }
+    log(state, p.selected.length ? `Discarded ${p.selected.length} card(s).` : "Discarded nothing.");
+    consumeCurrentAction(state);
+    return state;
+  }
+  if (p.kind === "vanquishAllies") {
+    const hero = findCard(state, p.heroId);
+    if (!hero) return state;
+    const pool = vanquishAllyPool(state, p.heroId);
+    const chosen = pool.filter((a) => p.selected.includes(a.ally.instanceId));
+    if (hero.defId === "lostBoys" && chosen.length < 2) {
+      log(state, "Lost Boys require at least two Allies.", "bad");
+      return state;
+    }
+    const total = chosen.reduce((n, a) => n + allyStrength(state, a.ally), 0);
+    if (total < heroStrength(state, hero)) {
+      log(state, "Not enough Strength.", "bad");
+      return state;
+    }
+    finishVanquish(state, p.heroId, p.selected);
+    if (!endIfOver(state)) consumeCurrentAction(state);
+    return state;
+  }
+  return state;
+}
+
+export function highlightSet(state: GameState): Set<string> {
+  const set = new Set<string>();
+  if (state.phase === "move" && !state.pending) {
+    legalMoveLocations(state).forEach((id) => set.add(`loc:${id}`));
+    return set;
+  }
+  const p = state.pending;
+  if (!p) {
+    if (state.phase === "actions") {
+      availableActions(state)
+        .filter((a) => a.available)
+        .forEach((a) => set.add(`act:${a.key}`));
+      state.hand.forEach((c) => {
+        if (c.defId === "cunning" && canPlayCunning(state)) set.add(`card:${c.instanceId}`);
+        if (c.defId === "obsession" && canPlayObsession(state)) set.add(`card:${c.instanceId}`);
+      });
+    }
+    return set;
+  }
+  switch (p.kind) {
+    case "playChooseCard":
+      playableHandCards(state).forEach((c) => set.add(`card:${c.instanceId}`));
+      break;
+    case "playChooseLocation":
+    case "cunningLocation":
+    case "fateChooseLocation":
+    case "worthyLocation":
+    case "obsessionLocation":
+      legalPlayLocations(state).forEach((id) => set.add(`loc:${id}`));
+      break;
+    case "playChooseAllyAttach":
+    case "ayeAyeAlly":
+    case "cunningAlly":
+      allAllies(state).forEach((a) => set.add(`card:${a.ally.instanceId}`));
+      state.hand.filter((c) => def(c.defId).type === "ally").forEach((c) => set.add(`card:${c.instanceId}`));
+      break;
+    case "discardSelect":
+      state.hand.forEach((c) => set.add(`card:${c.instanceId}`));
+      p.selected.forEach((id) => set.add(`sel:${id}`));
+      break;
+    case "vanquishHero":
+      vanquishableHeroes(state).forEach((h) => set.add(`card:${h.hero.instanceId}`));
+      break;
+    case "vanquishAllies":
+      vanquishAllyPool(state, p.heroId).forEach((a) => set.add(`card:${a.ally.instanceId}`));
+      p.selected.forEach((id) => set.add(`sel:${id}`));
+      break;
+    case "movePieceSelect":
+      movableAlliesAndItems(state).forEach((c) => set.add(`card:${c.instanceId}`));
+      break;
+    case "moveHeroSelect":
+      movableHeroes(state).forEach((c) => set.add(`card:${c.instanceId}`));
+      break;
+    case "ayeAyeDest":
+    case "movePieceDest": {
+      const from = findCardLocation(state, p.kind === "ayeAyeDest" ? p.allyId : p.pieceId);
+      if (from) adjacentUnlocked(state, from).forEach((id) => set.add(`loc:${id}`));
+      break;
+    }
+    case "moveHeroDest":
+    case "starkeyDest": {
+      const from = findCardLocation(state, p.heroId);
+      if (from) adjacentUnlocked(state, from).forEach((id) => set.add(`loc:${id}`));
+      break;
+    }
+    case "starkeyHero": {
+      const loc = findCardLocation(state, p.starkeyId);
+      if (loc) state.locations[loc].heroes.forEach((h) => set.add(`card:${h.instanceId}`));
+      break;
+    }
+    case "fateChooseCard":
+    case "scarePeek":
+      p.cards.forEach((c) => set.add(`card:${c.instanceId}`));
+      break;
+    case "fateChooseAttach":
+      LOCATION_IDS.forEach((id) => state.locations[id].heroes.forEach((h) => set.add(`card:${h.instanceId}`)));
+      break;
+    case "fateChooseItem":
+      allLocationItems(state).forEach((i) => set.add(`card:${i.item.instanceId}`));
+      break;
+    case "tinkerDiscard":
+      state.locations[p.locationId].allies.forEach((a) => set.add(`card:${a.instanceId}`));
+      break;
+    default:
+      break;
+  }
+  return set;
+}
+
+export function selectedSet(state: GameState): Set<string> {
+  const p = state.pending;
+  if (p?.kind === "discardSelect" || p?.kind === "vanquishAllies") return new Set(p.selected);
+  return new Set();
+}
+
+/** Hidden fields live on the cloned object so mid-action context survives. */
+export type EngineState = GameState;
