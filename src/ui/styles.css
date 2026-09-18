@@ -248,6 +248,7 @@ h1.wordmark {
 
 .drop-hint {
   display: none;
+  width: 100%;
   margin: 0 0 8px;
   text-align: center;
   font-family: var(--display);
@@ -256,7 +257,8 @@ h1.wordmark {
   text-transform: uppercase;
   color: #1b1408;
   background: linear-gradient(180deg, #f0d48a, #c4922e);
-  padding: 5px 8px;
+  padding: 8px 8px;
+  cursor: pointer;
 }
 
 .lock-badge {
@@ -294,6 +296,11 @@ h1.wordmark {
 }
 .action.is-covered { opacity: 0.32; text-decoration: line-through; }
 .action.is-used { opacity: 0.4; }
+.action:disabled,
+.action.is-used,
+.action.is-covered {
+  pointer-events: none;
+}
 .action.is-legal {
   border-color: #f4b45a;
   background: linear-gradient(180deg, rgba(244, 180, 90, 0.28), rgba(20, 14, 8, 0.55));

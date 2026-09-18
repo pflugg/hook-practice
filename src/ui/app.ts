@@ -17,6 +17,7 @@ import {
 } from "../engine";
 import { LOCATION_IDS } from "../engine/types";
 import { allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
+import { resolveBoardClick } from "./clicks";
 import "./styles.css";
 
 const CREST = `<svg class="crest" viewBox="0 0 92 92" aria-hidden="true">
@@ -98,8 +99,9 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
           .join("")}</div>`
       : `<p class="empty">${empty}</p>`;
 
+  const moveLabel = state.phase === "move" ? "Move here" : "Choose this place";
   return `<section class="location ${id} ${current ? "is-current" : ""} ${legal ? "is-legal" : ""} ${locked ? "is-locked" : ""}" data-loc="${id}">
-    ${legal ? `<div class="drop-hint">Choose this place</div>` : ""}
+    ${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : ""}
     <div class="loc-head">
       <div>
         <h2>${esc(meta.name)} ${locked ? `<span class="lock-badge">Locked</span>` : ""}</h2>
@@ -354,12 +356,8 @@ export function mount(root: HTMLElement): void {
     if (t.closest("[data-play-hero]")) return dispatch({ type: "playOrDiscardHero", play: true });
     if (t.closest("[data-banish-hero]")) return dispatch({ type: "playOrDiscardHero", play: false });
 
-    const card = t.closest<HTMLElement>("[data-card]");
-    if (card) return dispatch({ type: "selectCard", instanceId: card.dataset.card! });
-    const act = t.closest<HTMLElement>("[data-act]");
-    if (act && !act.hasAttribute("disabled")) return dispatch({ type: "selectAction", actionKey: act.dataset.act! });
-    const loc = t.closest<HTMLElement>("[data-loc]");
-    if (loc) return dispatch({ type: "selectLocation", locationId: loc.dataset.loc as LocationId });
+    const boardInput = resolveBoardClick(t, state);
+    if (boardInput) dispatch(boardInput);
   });
 
   render();
