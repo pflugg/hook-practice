@@ -188,14 +188,14 @@ h1.wordmark {
 .board-wrap { overflow-x: auto; padding: 14px 18px 8px; }
 .board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(250px, 1fr));
-  gap: 12px;
-  min-width: 1080px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
 }
 
 .location {
   position: relative;
-  min-height: 540px;
+  min-height: 500px;
   padding: 14px 12px 12px;
   border: 1px solid rgba(232, 195, 106, 0.22);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);

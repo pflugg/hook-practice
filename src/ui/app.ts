@@ -46,7 +46,7 @@ function renderCard(
   const attached = attachmentsOn(state, card.instanceId);
   const attachNote = attached.length ? `<p class="text">+ ${attached.map((a) => esc(def(a.defId).name)).join(", ")}</p>` : "";
   return `<button class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}">
-    ${opts.legal && opts.size === "hand" ? `<span class="playable-tag">Playable</span>` : ""}
+    ${opts.legal && opts.size === "hand" && (state.pending?.kind === "playChooseCard" || state.pending?.kind === "cunningAlly") ? `<span class="playable-tag">Playable</span>` : ""}
     <div class="meta"><span class="badge">${typeLabel(d.type)}</span><span>${d.deck === "villain" ? d.cost : ""}</span></div>
     <h3>${esc(d.name)}</h3>
     <p class="text">${esc(d.text)}</p>
