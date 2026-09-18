@@ -296,9 +296,9 @@ export function promptText(state: GameState): string {
   }
   switch (p.kind) {
     case "playChooseCard":
-      return "Choose a card in hand to play.";
+      return "Click a glowing card in your hand. Affordable cards are outlined in gold.";
     case "playChooseLocation":
-      return `Where should ${cardName(findCard(state, p.cardId)!)} come ashore?`;
+      return `Click a glowing location to play ${cardName(findCard(state, p.cardId)!)}.`;
     case "playChooseAllyAttach":
       return "Strap the Cutlass to an Ally.";
     case "playChoosePayment":

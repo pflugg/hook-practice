@@ -20,10 +20,11 @@ import { allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
 import "./styles.css";
 
 const CREST = `<svg class="crest" viewBox="0 0 92 92" aria-hidden="true">
-  <circle cx="46" cy="46" r="43" fill="none" stroke="#e4c57a" stroke-width="2"/>
-  <circle cx="46" cy="46" r="36" fill="none" stroke="#e4c57a" stroke-width="1" opacity=".4"/>
-  <path d="M28 34c10-12 32-12 38 6-8 2-14 8-16 16 0 10 8 16 8 16s-20 2-28-12c-4-7-3-18-2-26z" fill="#e4c57a"/>
-  <path d="M58 52c8 2 16 10 14 20-8-2-16-8-18-16 2-2 3-3 4-4z" fill="#c24b54"/>
+  <circle cx="46" cy="46" r="44" fill="#1b1408" stroke="#e8c36a" stroke-width="3"/>
+  <circle cx="46" cy="46" r="36" fill="none" stroke="#e8c36a" stroke-width="1.2" opacity=".55"/>
+  <path d="M30 30c14-10 34-6 38 12-10 1-17 8-18 16 1 11 10 18 10 18s-22 1-30-14c-5-8-4-22 0-32z" fill="#e8c36a"/>
+  <path d="M61 55c9 3 16 12 13 21-9-1-17-8-20-16 2-2 4-4 7-5z" fill="#d45a58"/>
+  <circle cx="34" cy="34" r="3" fill="#1b1408"/>
 </svg>`;
 
 function esc(s: string): string {
@@ -44,7 +45,7 @@ function renderCard(
   const str = d.type === "hero" ? heroStrength(state, card) : d.type === "ally" ? allyStrength(state, card) : 0;
   const attached = attachmentsOn(state, card.instanceId);
   const attachNote = attached.length ? `<p class="text">+ ${attached.map((a) => esc(def(a.defId).name)).join(", ")}</p>` : "";
-  return `<button class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""}" data-card="${card.instanceId}">
+  return `<button class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}">
     <div class="meta"><span class="badge">${typeLabel(d.type)}</span><span>${d.deck === "villain" ? d.cost : ""}</span></div>
     <h3>${esc(d.name)}</h3>
     <p class="text">${esc(d.text)}</p>
@@ -83,7 +84,7 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
       })
       .join("")}</div>`;
 
-  const cards = (arr: CardInstance[]) =>
+  const cards = (empty: string, arr: CardInstance[]) =>
     arr.length
       ? `<div class="zone-cards">${arr
           .map((c) =>
@@ -94,21 +95,21 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
             }),
           )
           .join("")}</div>`
-      : `<p class="empty">None.</p>`;
+      : `<p class="empty">${empty}</p>`;
 
   return `<section class="location ${id} ${current ? "is-current" : ""} ${legal ? "is-legal" : ""} ${locked ? "is-locked" : ""}" data-loc="${id}">
-    <div class="lock-veil">${locked ? "Locked" : ""}</div>
+    ${legal ? `<div class="drop-hint">Choose this place</div>` : ""}
     <div class="loc-head">
       <div>
-        <h2>${esc(meta.name)}</h2>
-        <p>${esc(meta.subtitle)}${locked ? " — locked until the Map is played" : ""}</p>
+        <h2>${esc(meta.name)} ${locked ? `<span class="lock-badge">Locked</span>` : ""}</h2>
+        <p>${esc(meta.subtitle)}${locked ? " — play the Never Land Map to open the path" : ""}</p>
       </div>
       ${current ? `<div class="hook-token" title="Captain">${CREST.replace('class="crest"', 'width="28" height="28"')}</div>` : ""}
     </div>
     ${actBtns(top)}
-    ${zone("Heroes", cards(loc.heroes))}
-    ${zone("Allies", cards(loc.allies))}
-    ${zone("Items", cards(loc.items))}
+    ${zone("Heroes", cards("Clear — top actions are open.", loc.heroes))}
+    ${zone("Allies", cards("No crew stationed.", loc.allies))}
+    ${zone("Items", cards("No gear here.", loc.items))}
     ${actBtns(bottom)}
     ${extras.length ? `<div class="row">${extras.map((a) => `<button class="action ${hi.has(`act:${a.key}`) ? "is-legal" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}">${esc(a.label)}</button>`).join("")}</div>` : ""}
   </section>`;
@@ -273,7 +274,7 @@ function playView(state: GameState): string {
     <div class="prompt"><p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}</div></div>
     <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel)).join("")}</div></div>
     <footer class="dock">
-      <section class="hand">
+      <section class="hand ${state.pending?.kind === "playChooseCard" || state.pending?.kind === "discardSelect" ? "is-picking" : ""}">
         <h2>Hand · ${state.hand.length} · Deck ${state.villainDeck.length} · Discard ${state.villainDiscard.length}</h2>
         <div class="hand-row">
           ${
