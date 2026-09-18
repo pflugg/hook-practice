@@ -38,14 +38,15 @@ function typeLabel(t: string): string {
 function renderCard(
   state: GameState,
   card: CardInstance,
-  opts: { size?: "mini" | "hand"; legal: boolean; selected: boolean },
+  opts: { size?: "mini" | "hand"; legal: boolean; selected: boolean; dimmed?: boolean },
 ): string {
   const d = def(card.defId);
   const size = opts.size === "hand" ? "hand-card" : opts.size === "mini" ? "mini" : "";
   const str = d.type === "hero" ? heroStrength(state, card) : d.type === "ally" ? allyStrength(state, card) : 0;
   const attached = attachmentsOn(state, card.instanceId);
   const attachNote = attached.length ? `<p class="text">+ ${attached.map((a) => esc(def(a.defId).name)).join(", ")}</p>` : "";
-  return `<button class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}">
+  return `<button class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}">
+    ${opts.legal && opts.size === "hand" ? `<span class="playable-tag">Playable</span>` : ""}
     <div class="meta"><span class="badge">${typeLabel(d.type)}</span><span>${d.deck === "villain" ? d.cost : ""}</span></div>
     <h3>${esc(d.name)}</h3>
     <p class="text">${esc(d.text)}</p>
@@ -285,6 +286,7 @@ function playView(state: GameState): string {
                       size: "hand",
                       legal: hi.has(`card:${c.instanceId}`),
                       selected: sel.has(c.instanceId),
+                      dimmed: Boolean(state.pending && ["playChooseCard", "discardSelect", "cunningAlly"].includes(state.pending.kind) && !hi.has(`card:${c.instanceId}`)),
                     }),
                   )
                   .join("")
