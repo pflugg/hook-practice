@@ -13,7 +13,7 @@ export type {
 } from "./types";
 export { LOCATION_IDS } from "./types";
 export { CARDS, def } from "./cards";
-export { REALM, actionLabel, adjacentIds } from "./realm";
+export { REALM, actionLabel, adjacentIds, locName } from "./realm";
 export {
   allyStrength,
   availableActions,
@@ -24,6 +24,7 @@ export {
   legalMoveLocations,
   objectiveSteps,
   playableHandCards,
+  fateShowStillInPlay,
   promptText,
   vanquishClashMath,
   vanquishableHeroes,

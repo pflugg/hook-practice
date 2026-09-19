@@ -1,5 +1,5 @@
 import { def } from "./cards";
-import { LOCATION_IDS, type ActionSlot, type CardInstance, type GameState, type LocationId } from "./types";
+import { LOCATION_IDS, type ActionSlot, type CardInstance, type FateShow, type GameState, type LocationId } from "./types";
 import { REALM, actionLabel, adjacentIds } from "./realm";
 
 export function cardName(card: CardInstance): string {
@@ -114,6 +114,20 @@ export function mapInRealm(state: GameState): CardInstance | null {
     if (found) return found;
   }
   return null;
+}
+
+export function mapInHand(state: GameState): CardInstance | null {
+  return state.hand.find((c) => c.defId === "neverLandMap") ?? null;
+}
+
+/** True while the last computer Fate subject is still on the table (seated Hero or clinging attachment). */
+export function fateShowStillInPlay(state: GameState, show: FateShow | null | undefined): boolean {
+  const played = show?.played;
+  if (!played) return false;
+  const id = played.instanceId;
+  if (LOCATION_IDS.some((loc) => state.locations[loc].heroes.some((h) => h.instanceId === id))) return true;
+  if (state.attachments.some((a) => a.item.instanceId === id)) return true;
+  return false;
 }
 
 export function strongestHeroInRealm(state: GameState): number {
@@ -344,8 +358,13 @@ export function promptText(state: GameState): string {
       return `Click a glowing location to play ${cardName(findCard(state, p.cardId)!)}.`;
     case "playChooseAllyAttach":
       return "Use the picker to strap this to an Ally, or click that Ally on the board. Cancel returns to your hand.";
-    case "playChoosePayment":
-      return "Pay with Power, or discard the Never Land Map instead?";
+    case "playChoosePayment": {
+      const card = findCard(state, p.cardId);
+      const cost = card ? def(card.defId).cost : 0;
+      const name = card ? cardName(card) : "this card";
+      if (mapInRealm(state)) return "Pay with Power, or discard the Never Land Map instead?";
+      return `${name} costs ${cost}. You have ${state.power}. Pay ${cost} Power.`;
+    }
     case "starkeyHero":
       return "Mr. Starkey can nudge a Hero here. Choose one, or cancel.";
     case "starkeyDest":

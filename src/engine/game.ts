@@ -5,6 +5,7 @@ import {
   chooseHeadacheItem,
   chooseHeroLocation,
   chooseTinkerAlly,
+  explainFateChoice,
 } from "./fateAi";
 import {
   adjacentUnlocked,
@@ -29,6 +30,7 @@ import {
   vanquishAllyPool,
   vanquishableHeroes,
 } from "./queries";
+import { locName } from "./realm";
 import { LOCATION_IDS, type CardInstance, type GameState, type Input, type LocationId, type Pending } from "./types";
 import { shuffle } from "./rng";
 
@@ -239,6 +241,7 @@ function finishHeadacheWithoutItems(
     resume: "nextTurn" | "actions";
     drawn?: CardInstance[];
     discarded?: CardInstance[];
+    choiceReason?: string;
   },
 ): void {
   discardHeadacheIfNeeded(state, card);
@@ -249,6 +252,7 @@ function finishHeadacheWithoutItems(
     played: card,
     discarded: opts.discarded ?? [],
     note: HEADACHE_NO_ITEM_NOTE,
+    choiceReason: opts.choiceReason,
     resume: opts.resume,
     markAction: opts.resume === "actions",
   });
@@ -293,6 +297,7 @@ function openFateReport(
     played?: CardInstance;
     discarded?: CardInstance[];
     note: string;
+    choiceReason?: string;
     resume: "nextTurn" | "actions";
     markAction?: boolean;
   },
@@ -305,6 +310,7 @@ function openFateReport(
     discarded: opts.discarded ?? [],
     note: opts.note,
     abilityText: played ? abilityLine(played) : "",
+    choiceReason: opts.choiceReason,
     resume: opts.resume,
     markAction: opts.markAction,
   };
@@ -317,6 +323,7 @@ function openFateReport(
       discarded: opts.discarded ?? [],
       note: opts.note,
       abilityText: played ? abilityLine(played) : "",
+      choiceReason: opts.choiceReason,
     };
   }
 }
@@ -395,7 +402,7 @@ function finishVanquish(state: GameState, heroId: string, allyIds: string[]): vo
   detachAll(state, heroId);
   discardFateCard(state, hero);
   state.defeatedHeroStrengthsThisTurn.push(strength);
-  log(state, `${def(hero.defId).name} is vanquished at ${loc}.`, "good");
+  log(state, `${def(hero.defId).name} is vanquished at ${locName(loc)}.`, "good");
   if (hero.defId === "peterPan") {
     if (loc === "jollyRoger") {
       state.won = true;
@@ -426,6 +433,7 @@ function startComputerFate(state: GameState): void {
   state.rng = choice.rng;
   const play = choice.card;
   const discarded = drawn.filter((c) => c.instanceId !== play.instanceId);
+  const choiceReason = explainFateChoice(state, drawn, play, state.difficulty);
   if (play.defId === "peterPan") {
     revealPeter(state, play, discarded);
     openFateReport(state, {
@@ -433,12 +441,13 @@ function startComputerFate(state: GameState): void {
       played: play,
       discarded,
       note: "Fate plays Peter Pan. He is forced to Hangman's Tree.",
+      choiceReason,
       resume: "nextTurn",
     });
     return;
   }
   discarded.forEach((c) => discardFateCard(state, c));
-  resolveComputerFateCard(state, play, drawn, discarded);
+  resolveComputerFateCard(state, play, drawn, discarded, choiceReason);
 }
 
 function resolveComputerFateCard(
@@ -446,6 +455,7 @@ function resolveComputerFateCard(
   card: CardInstance,
   drawn: CardInstance[],
   discarded: CardInstance[],
+  choiceReason?: string,
 ): void {
   const d = def(card.defId);
   let note = `Fate plays ${d.name}.`;
@@ -453,7 +463,7 @@ function resolveComputerFateCard(
     const dest = chooseHeroLocation(state, card, state.difficulty);
     state.rng = dest.rng;
     placeHero(state, card, dest.id);
-    note = `Fate seats ${d.name} at ${labelLoc(dest.id)}.`;
+    note = `Fate seats ${d.name} at ${locName(dest.id)}.`;
     if (card.defId === "tinkerBell") {
       const ally = chooseTinkerAlly(state, dest.id);
       if (ally) {
@@ -476,7 +486,7 @@ function resolveComputerFateCard(
   } else if (d.id === "splittingHeadache") {
     const item = chooseHeadacheItem(state);
     if (!item) {
-      finishHeadacheWithoutItems(state, card, { resume: "nextTurn", drawn, discarded });
+      finishHeadacheWithoutItems(state, card, { resume: "nextTurn", drawn, discarded, choiceReason });
       return;
     }
     removeFromRealm(state, item.instanceId);
@@ -487,16 +497,7 @@ function resolveComputerFateCard(
     discardFateCard(state, card);
   }
   log(state, note, "fate");
-  openFateReport(state, { drawn, played: card, discarded, note, resume: "nextTurn" });
-}
-
-function labelLoc(id: LocationId): string {
-  return {
-    jollyRoger: "the Jolly Roger",
-    skullRock: "Skull Rock",
-    mermaidLagoon: "Mermaid Lagoon",
-    hangmansTree: "Hangman's Tree",
-  }[id];
+  openFateReport(state, { drawn, played: card, discarded, note, choiceReason, resume: "nextTurn" });
 }
 
 function beginNextTurn(state: GameState): void {
@@ -581,14 +582,14 @@ function afterPaymentPlay(
   if (d.type === "item") {
     if (!locationId) return;
     placeItem(state, card, locationId);
-    log(state, `${d.name} is placed at ${labelLoc(locationId)}.`);
+    log(state, `${d.name} is placed at ${locName(locationId)}.`);
     consumeCurrentAction(state);
     return;
   }
   if (d.type === "ally") {
     if (!locationId) return;
     placeAlly(state, card, locationId);
-    log(state, `${d.name} comes ashore at ${labelLoc(locationId)}.`);
+    log(state, `${d.name} comes ashore at ${locName(locationId)}.`);
     if (d.id === "mrStarkey") {
       const heroes = state.locations[locationId].heroes;
       if (heroes.length && adjacentUnlocked(state, locationId).length) {
@@ -668,18 +669,11 @@ function maybeAskPayment(
   attachTo?: string,
 ): void {
   const d = def(card.defId);
-  const map = mapInRealm(state);
-  const canMap = Boolean(map && d.type === "item" && d.cost > 0 && d.id !== "neverLandMap");
-  if (canMap) {
-    state.pending = { kind: "playChoosePayment", cardId: card.instanceId, locationId, attachTo };
+  if (d.cost <= 0) {
+    playAfterCost(state, card, locationId, attachTo);
     return;
   }
-  if (!spendPower(state, d.cost)) {
-    log(state, `Not enough Power for ${d.name}.`, "bad");
-    state.pending = { kind: "playChooseCard" };
-    return;
-  }
-  playAfterCost(state, card, locationId, attachTo);
+  state.pending = { kind: "playChoosePayment", cardId: card.instanceId, locationId, attachTo };
 }
 
 function playAfterCost(
@@ -693,7 +687,7 @@ function playAfterCost(
 
 function playHeldHero(state: GameState, hero: CardInstance, locationId: LocationId, tinkerActor: "player" | "ai"): void {
   placeHero(state, hero, locationId);
-  log(state, `${def(hero.defId).name} is played to ${labelLoc(locationId)}.`, "fate");
+  log(state, `${def(hero.defId).name} is played to ${locName(locationId)}.`, "fate");
   if (hero.defId === "tinkerBell" && state.locations[locationId].allies.length) {
     state.pending = { kind: "tinkerDiscard", tinkerId: hero.instanceId, locationId, actor: tinkerActor };
     return;
@@ -702,7 +696,7 @@ function playHeldHero(state: GameState, hero: CardInstance, locationId: Location
     drawn: [hero],
     played: hero,
     discarded: [],
-    note: `${def(hero.defId).name} is played to ${labelLoc(locationId)}.`,
+    note: `${def(hero.defId).name} is played to ${locName(locationId)}.`,
     resume: "actions",
     markAction: true,
   });
@@ -780,6 +774,17 @@ export function applyInput(prev: GameState, input: Input): GameState {
       consumeCurrentAction(state);
       return state;
     }
+    if (state.pending?.kind === "playChoosePayment") {
+      if (state.pending.attachTo) {
+        state.pending = { kind: "playChooseAllyAttach", cardId: state.pending.cardId };
+      } else if (state.pending.locationId) {
+        state.pending = { kind: "playChooseLocation", cardId: state.pending.cardId };
+      } else {
+        state.pending = { kind: "playChooseCard" };
+      }
+      state.phase = "resolving";
+      return state;
+    }
     if (state.pending?.kind === "playChooseAllyAttach" || state.pending?.kind === "playChooseLocation") {
       state.pending = { kind: "playChooseCard" };
       state.phase = "resolving";
@@ -845,9 +850,13 @@ export function applyInput(prev: GameState, input: Input): GameState {
     if (!card) return state;
     if (input.type === "payWithMap") {
       if (!discardMap(state)) return state;
-    } else if (!spendPower(state, def(card.defId).cost)) {
-      log(state, "Not enough Power.", "bad");
-      return state;
+    } else {
+      const cost = def(card.defId).cost;
+      if (!spendPower(state, cost)) {
+        log(state, "Not enough Power.", "bad");
+        return state;
+      }
+      log(state, `Spent ${cost} Power on ${def(card.defId).name}. ${state.power} Power left.`);
     }
     playAfterCost(state, card, state.pending.locationId, state.pending.attachTo);
     return state;
@@ -950,7 +959,7 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
     const cover = coveringHero(state, locationId);
     log(
       state,
-      `The captain arrives at ${labelLoc(locationId)}${cover ? ` — ${def(cover.defId).name} covers the top actions` : ""}.`,
+      `The captain arrives at ${locName(locationId)}${cover ? ` — ${def(cover.defId).name} covers the top actions` : ""}.`,
     );
     if (!snapped) state.phase = "actions";
     return state;
@@ -969,7 +978,7 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
     const ally = takeFromHand(state, p.allyId);
     if (!ally) return state;
     placeAlly(state, ally, locationId);
-    log(state, `Cunning slips ${def(ally.defId).name} onto ${labelLoc(locationId)} for free.`, "good");
+    log(state, `Cunning slips ${def(ally.defId).name} onto ${locName(locationId)} for free.`, "good");
     if (ally.defId === "mrStarkey" && state.locations[locationId].heroes.length) {
       state.pending = { kind: "starkeyHero", starkeyId: ally.instanceId };
       return state;
@@ -985,7 +994,7 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
     if (!ally) return state;
     placeAlly(state, ally, locationId);
     state.tempStrength[ally.instanceId] = (state.tempStrength[ally.instanceId] ?? 0) + 2;
-    log(state, `${def(ally.defId).name} shifts to ${labelLoc(locationId)} and is +2 until the turn ends.`);
+    log(state, `${def(ally.defId).name} shifts to ${locName(locationId)} and is +2 until the turn ends.`);
     consumeCurrentAction(state);
     return state;
   }
@@ -996,7 +1005,7 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
     if (!card) return state;
     if (def(card.defId).type === "ally") placeAlly(state, card, locationId);
     else placeItem(state, card, locationId);
-    log(state, `${def(card.defId).name} moves to ${labelLoc(locationId)}.`);
+    log(state, `${def(card.defId).name} moves to ${locName(locationId)}.`);
     consumeCurrentAction(state);
     return state;
   }
@@ -1008,7 +1017,7 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
     if (!hero) return state;
     placeHero(state, hero, locationId);
     updatePeterLoc(state);
-    log(state, `${def(hero.defId).name} is moved to ${labelLoc(locationId)}.`);
+    log(state, `${def(hero.defId).name} is moved to ${locName(locationId)}.`);
     consumeCurrentAction(state);
     return state;
   }

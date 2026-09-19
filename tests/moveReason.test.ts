@@ -38,10 +38,15 @@ describe("move reasons after selection", () => {
     expect(picked?.chose).toMatch(/Never Land Map/);
     expect(picked?.why).toMatch(/unlock|Hangman’s Tree|Hangman's Tree/i);
 
-    const placed = applyInput(mid, { type: "selectLocation", locationId: "jollyRoger" });
-    const reason = explainSelection(mid, { type: "selectLocation", locationId: "jollyRoger" }, placed);
-    expect(reason?.chose).toMatch(/Never Land Map/);
-    expect(reason?.why).toMatch(/unlock|key|Hangman’s Tree|Hangman's Tree/i);
+    const paying = applyInput(mid, { type: "selectLocation", locationId: "jollyRoger" });
+    expect(paying.pending?.kind).toBe("playChoosePayment");
+    const chosePlace = explainSelection(mid, { type: "selectLocation", locationId: "jollyRoger" }, paying);
+    expect(chosePlace?.chose).toMatch(/Never Land Map/);
+    expect(chosePlace?.why).toMatch(/cost|Power/i);
+
+    const placed = applyInput(paying, { type: "payWithPower" });
+    const reason = explainSelection(paying, { type: "payWithPower" }, placed);
+    expect(reason?.chose).toMatch(/Power/);
     expect(placed.hangmansUnlocked).toBe(true);
   });
 

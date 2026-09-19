@@ -431,6 +431,16 @@ h1.wordmark {
   min-height: 52px;
   flex-shrink: 0;
 }
+.prompt.is-clash {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.prompt.is-clash .clash-meter { order: 0; }
+.prompt.is-clash .prompt-actions { order: 1; margin-left: auto; }
+.prompt.is-clash p { order: 2; flex: 1 1 100%; }
 .prompt p { margin: 0; font-size: 18px; color: #fff6d8; flex: 1 1 220px; }
 .prompt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .clash-meter, .pay-meter {
@@ -438,10 +448,10 @@ h1.wordmark {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 8px 12px;
-  padding: 6px 10px;
+  padding: 8px 14px;
   border: 1px solid rgba(232, 195, 106, 0.45);
   background: rgba(8, 8, 10, 0.45);
-  min-width: 160px;
+  min-width: 200px;
 }
 .clash-meter .clash-kicker, .pay-meter {
   font-size: 12px;
@@ -449,24 +459,25 @@ h1.wordmark {
   text-transform: uppercase;
   color: var(--gold);
 }
-.clash-meter b { font-family: var(--display); font-size: 22px; color: #fff4d4; }
+.clash-meter b { font-family: var(--display); font-size: 20px; color: #fff4d4; }
 .clash-meter.is-ready { border-color: rgba(62, 196, 181, 0.7); }
 .clash-meter.is-short { border-color: rgba(212, 90, 88, 0.55); }
 .clash-hero { color: #d9c7a0; font-size: 14px; }
 .pay-meter { margin: 0 0 16px; color: #fff4d4; font-size: 15px; letter-spacing: 0; text-transform: none; }
-.card .clash-chip {
-  position: absolute;
-  left: 6px;
-  right: auto;
-  bottom: 6px;
-  padding: 2px 6px;
-  font-size: 11px;
-  font-weight: 700;
-  background: rgba(20, 12, 8, 0.88);
-  border: 1px solid rgba(232, 195, 106, 0.55);
-  color: #fff4d4;
+.fate-choice-why {
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  border-left: 3px solid #c4a0e8;
+  background: rgba(48, 28, 64, 0.35);
+  color: #f4e8ff;
+  font-size: 15px;
+  line-height: 1.4;
 }
-.card .clash-chip.is-ready { border-color: rgba(62, 196, 181, 0.75); color: #b8f3ea; }
+.fate-rail.is-spent {
+  opacity: 0.9;
+  border-color: rgba(180, 140, 220, 0.22);
+}
+.fate-rail.is-spent h2 { color: #d8cce8; }
 .teach-pane-head,
 .brief-head {
   display: flex;
@@ -1043,7 +1054,14 @@ h1.wordmark {
 .card.condition { --tint: #5c1f86; }
 .card.hero { --tint: #3a4a20; }
 .card h3 { margin: 8px 0 6px; font-family: var(--display); font-size: 14px; color: #1b1408; line-height: 1.15; }
-.card.mini h3 { font-size: 12px; margin: 6px 0 4px; }
+.card.mini h3 {
+  font-size: 11px;
+  margin: 6px 0 4px;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .card .text {
   margin: 0;
   color: #4a3824;

@@ -1,5 +1,5 @@
 import { def } from "./cards";
-import { REALM, adjacentIds } from "./realm";
+import { adjacentIds, locName } from "./realm";
 import {
   allAllies,
   allHeroes,
@@ -13,6 +13,8 @@ import {
   adjacentUnlocked,
   legalMoveLocations,
   legalPlayLocations,
+  mapInHand,
+  mapInRealm,
   movableAlliesAndItems,
   movableHeroes,
   playableHandCards,
@@ -26,10 +28,6 @@ export interface CoachAdvice {
   why: string;
   highlights: string[];
   warning?: string;
-}
-
-function locName(id: LocationId): string {
-  return REALM[id].name;
 }
 
 function towardRoger(from: LocationId): LocationId | null {
@@ -51,10 +49,6 @@ function jrStrength(state: GameState): number {
 
 function peterCard(state: GameState): { hero: CardInstance; location: LocationId } | null {
   return allHeroes(state).find((h) => h.hero.defId === "peterPan") ?? null;
-}
-
-function mapInHand(state: GameState): CardInstance | null {
-  return state.hand.find((c) => c.defId === "neverLandMap") ?? null;
 }
 
 function peterReadyToFinish(state: GameState): boolean {
@@ -84,8 +78,12 @@ function playableMap(state: GameState): CardInstance | null {
 function needPowerForMap(state: GameState): boolean {
   if (state.hangmansUnlocked) return false;
   const map = mapInHand(state);
-  if (map) return state.power < def(map.defId).cost;
-  return state.power < 4;
+  if (!map) return false;
+  return state.power < def(map.defId).cost;
+}
+
+function wantEarlyPower(state: GameState): boolean {
+  return !state.hangmansUnlocked && state.power < 4;
 }
 
 function diggingForMap(state: GameState): boolean {
@@ -169,7 +167,7 @@ function scoreMove(state: GameState, id: LocationId): number {
   const peter = peterCard(state);
   if (peter && state.hangmansUnlocked && peter.location !== "jollyRoger" && moveHero) score += 900;
   if (playableMap(state) && play) score += 700;
-  if (needPowerForMap(state)) score += gainAmt * 120;
+  if (needPowerForMap(state) || wantEarlyPower(state)) score += gainAmt * 120;
   if (diggingForMap(state) && discard) score += state.power >= 4 ? 380 : 70;
   if (!state.peterPanRevealed && fate) score += state.hangmansUnlocked ? 360 : 40;
   if (jrStrength(state) < 8 && play && state.hand.some((c) => def(c.defId).type === "ally" && def(c.defId).cost <= state.power + gainAmt)) {
@@ -202,7 +200,10 @@ function moveWhy(state: GameState, dest: LocationId): string {
     return "You are holding the Never Land Map with enough Power. Play it to unlock Hangman’s Tree so Peter can leave the hideout.";
   }
   if (needPowerForMap(state) && dest === "mermaidLagoon") {
-    return "Gain 3 Power here — you will want 4 to play the Never Land Map, the only key that unlocks Hangman’s Tree.";
+    return "Gain 3 Power here — you are holding the Never Land Map and still need 4 to play it.";
+  }
+  if (wantEarlyPower(state) && dest === "mermaidLagoon") {
+    return "Gain 3 here is the richest Power bank. Keep a reserve so the next Item or Ally you draw is playable.";
   }
   if (diggingForMap(state) && hasKind(state, dest, "discard")) {
     return "The Map is still in the deck. A Discard action lets you dig for it so the tree can open.";
@@ -263,7 +264,7 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
     if (play) return play;
   }
 
-  if (needPowerForMap(state)) {
+  if (needPowerForMap(state) || (wantEarlyPower(state) && !playableMap(state) && !usefulPlay(state))) {
     const gains = acts.filter((a) => a.kind === "gainPower").sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1));
     if (gains[0] && state.power + (gains[0].amount ?? 1) <= 12) return gains[0];
   }
@@ -323,9 +324,10 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
     }
   }
   if (slot.kind === "gainPower") {
-    return needPowerForMap(state)
-      ? "Bank Power now so the Never Land Map is affordable. Allies for the final clash will want a reserve too."
-      : "A little extra Power keeps Allies and escort cards ready as you close the chain.";
+    if (needPowerForMap(state)) {
+      return "Bank Power now so the Never Land Map is affordable. Allies for the final clash will want a reserve too.";
+    }
+    return "Bank Power as a reserve for the next Item or Ally you draw. That is why Gain still matters even when the Map is not in hand.";
   }
   if (slot.kind === "discard") {
     return "Toss cards you do not need so the deck can yield the Never Land Map — the tree stays locked without it.";
@@ -423,19 +425,32 @@ function advisePending(state: GameState): CoachAdvice {
       );
     }
     case "playChoosePayment": {
-      const keepMap = state.hangmansUnlocked;
-      if (keepMap || state.power >= (findCard(state, p.cardId) ? def(findCard(state, p.cardId)!.defId).cost : 0)) {
+      const card = findCard(state, p.cardId);
+      const cost = card ? def(card.defId).cost : 0;
+      const name = card ? cardName(card) : "this card";
+      const mapOut = mapInRealm(state);
+      if (state.power >= cost) {
         return say(
           "Pay with Power",
-          "Keep the Never Land Map in the realm. You already used it to open the tree, and later Items can still lean on it if you are short.",
+          mapOut
+            ? "Keep the Never Land Map in the realm. You already used it to open the tree, and later Items can still lean on it if you are short."
+            : `${name} costs ${cost}. You have ${state.power}. Pay with Power.`,
           ["btn:pay-power"],
           state,
         );
       }
+      if (mapOut) {
+        return say(
+          "Discard the Map to pay",
+          "Power is short. The tree is already open, so spending the Map keeps the plan moving.",
+          ["btn:pay-map"],
+          state,
+        );
+      }
       return say(
-        "Discard the Map to pay",
-        "Power is short. The tree is already open, so spending the Map keeps the plan moving.",
-        ["btn:pay-map"],
+        "Cancel — not enough Power",
+        `${name} costs ${cost} and you have ${state.power}. Cancel and Gain more Power before you play it.`,
+        ["btn:cancel"],
         state,
       );
     }

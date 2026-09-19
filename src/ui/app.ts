@@ -7,6 +7,7 @@ import {
   findCard,
   HEADACHE_NO_ITEM_BANNER,
   HEADACHE_NO_ITEM_NOTE,
+  fateShowStillInPlay,
   highlightSet,
   isNoItemFateDiscard,
   promptText,
@@ -38,7 +39,10 @@ import {
 import {
   cutlassAttachScene,
   dragHeroScene,
+  easyFizzleScene,
+  fateSpentScene,
   obsessionDecideScene,
+  payNoMapScene,
   tickTockReportScene,
   vanquishClashScene,
   vanquishLocalScene,
@@ -90,18 +94,6 @@ function renderCard(
     <p class="text">${esc(d.text)}</p>
     ${attachNote}
     ${d.type === "hero" || d.type === "ally" ? `<div class="str" title="Strength">${str}</div>` : ""}
-    ${
-      state.pending?.kind === "vanquishAllies" &&
-      state.pending.heroId === card.instanceId &&
-      d.type === "hero"
-        ? (() => {
-            const math = vanquishClashMath(state);
-            return math
-              ? `<div class="clash-chip ${math.ready ? "is-ready" : ""}" data-clash-chip>${math.selected}/${math.need}</div>`
-              : "";
-          })()
-        : ""
-    }
   </button>`;
 }
 
@@ -118,9 +110,9 @@ function clashMeter(
 ): string {
   if (!math) return "";
   const boys = math.lostBoys ? ` · Allies ${math.selectedAllies}/2` : "";
+  const status = math.ready ? "ready" : "short";
   return `<div class="clash-meter ${math.ready ? "is-ready" : "is-short"}" role="status" data-clash-meter>
-    <span class="clash-kicker">Vanquish Strength</span>
-    <b>${math.selected} / ${math.need}</b>
+    <b>Strength ${math.selected} / ${math.need} — ${status}</b>
     <span class="clash-hero">${esc(math.heroName)}${boys}</span>
   </div>`;
 }
@@ -267,7 +259,8 @@ function helpView(fromPlay: boolean): string {
     <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable. It lives in the right teaching rail with the Strategy brief and Why this move — each pane scrolls independently.</p>
     <p><b>Strategy brief:</b> a persistent right-rail pane that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
     <p><b>Move reasons:</b> a “Why this move” pane in that same right-hand stack. After each legal click it names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on. Below about 1100px the three panes tab under the board so type stays at the desktop floor.</p>
-    <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it. The <b>Across the table</b> strip keeps the last revealed Fate play visible — never the face-down deck.</p>
+    <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it. The <b>Across the table</b> strip keeps the last revealed Fate play visible while that card is still on the table — never the face-down deck.</p>
+    <p><b>Solo Conditions:</b> Cunning and Obsession are practice-only. Cunning is ready only when a Strength 4+ Hero is already ashore — then you may slip an Ally in for free. Obsession hunts Fate for a Hero while Peter is hidden. Neither is a printed two-player Condition. A grey Condition is not ready yet.</p>
     <p><b>Drag:</b> When a card can move or be played onto a place, grab it and slide onto a glowing location (or Ally, for the Cutlass). Drop outside to cancel the slide; clicking still works.</p>
     <p><b>Practice tips:</b> Discard aggressively for the Map. Fish Fate with Worthy Opponent and Give Them a Scare. Station strength at the ship before walking Peter across. Beware Tick Tock and Splitting Headache.</p>
     <div class="actions-row"><button class="btn primary" data-close-help>${fromPlay ? "Return to the realm" : "Back"}</button></div>
@@ -304,6 +297,7 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
       <h2>${heading}</h2>
       ${emptyShore ? noItemDiscardBanner() : ""}
       <p>${esc(p.note)}</p>
+      ${p.choiceReason ? `<p class="fate-choice-why" data-fate-choice>${esc(p.choiceReason)}</p>` : ""}
       ${abilityReadout("What it does", p.abilityText)}
       <div class="modal-cards">${p.drawn
         .map((c) => {
@@ -355,21 +349,25 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
   if (p?.kind === "playChoosePayment") {
     const card = findCard(state, p.cardId);
     const cost = card ? def(card.defId).cost : 0;
-    const name = card ? cardName(card) : "this Item";
+    const name = card ? cardName(card) : "this card";
     const canPay = state.power >= cost;
-    const mapOut = mapInRealm(state);
+    const mapOut = mapInRealm(state) && card?.defId !== "neverLandMap";
     return `<div class="overlay"><div class="modal">
       <h2>Pay the cost</h2>
       <p>${esc(name)} costs <b>${cost} Power</b>. You have <b>${state.power} Power</b>.</p>
       <p>${
         mapOut
           ? "The Never Land Map is in the realm and can cover this cost instead of Power."
-          : "Spend Power, or discard the Never Land Map if it is in the realm."
+          : `Pay ${cost} Power to play ${esc(name)}.`
       }</p>
       <div class="pay-meter" role="status">Power ${state.power} / cost ${cost}${mapOut ? " · Map available" : ""}</div>
       <div class="actions-row">
         <button class="btn primary${coachClass(coached, "btn:pay-power")}" data-pay-power ${canPay ? "" : "disabled"}>Pay ${cost} Power</button>
-        <button class="btn${coachClass(coached, "btn:pay-map")}" data-pay-map ${mapOut ? "" : "disabled"}>Discard the Map</button>
+        ${
+          mapOut
+            ? `<button class="btn${coachClass(coached, "btn:pay-map")}" data-pay-map>Discard the Map</button>`
+            : ""
+        }
       </div>
     </div></div>`;
   }
@@ -463,20 +461,13 @@ function fateRail(state: GameState): string {
   const show = state.lastFateShow;
   const live =
     state.pending?.kind === "fateReport" && state.pending.resume === "nextTurn" ? state.pending : null;
-  const drawn = live?.drawn ?? show?.drawn ?? [];
-  const played = live?.played ?? show?.played;
-  const note = live?.note ?? show?.note ?? "";
-  const ability = live?.abilityText ?? show?.abilityText ?? "";
-  if (!drawn.length && !show) {
-    return `<aside class="fate-rail is-empty" aria-label="Fate adversary">
-      <div class="fate-rail-copy">
-        <p class="fate-kicker">Across the table</p>
-        <h2>Fate adversary</h2>
-        <p>This strip is the practice stand-in for another player Fating you. Only cards that were just revealed or seated appear here — never the face-down Fate deck.</p>
-      </div>
-    </aside>`;
-  }
-  return `<aside class="fate-rail" aria-label="Fate adversary">
+  const active = live ?? (fateShowStillInPlay(state, show) ? show : null);
+  if (active) {
+    const drawn = active.drawn ?? [];
+    const played = active.played;
+    const note = active.note ?? "";
+    const ability = active.abilityText ?? "";
+    return `<aside class="fate-rail" aria-label="Fate adversary">
     <div class="fate-rail-copy">
       <p class="fate-kicker">Across the table</p>
       <h2>Fate adversary</h2>
@@ -491,6 +482,23 @@ function fateRail(state: GameState): string {
       })
       .join("")}</div>
   </aside>`;
+  }
+  if (show && !live) {
+    return `<aside class="fate-rail is-spent" aria-label="Fate adversary">
+      <div class="fate-rail-copy">
+        <p class="fate-kicker">Across the table</p>
+        <h2>That Fate is over</h2>
+        <p>That was last Fate; it is over. The card is no longer on the table.</p>
+      </div>
+    </aside>`;
+  }
+  return `<aside class="fate-rail is-empty" aria-label="Fate adversary">
+      <div class="fate-rail-copy">
+        <p class="fate-kicker">Across the table</p>
+        <h2>Fate adversary</h2>
+        <p>This strip is the practice stand-in for another player Fating you. Only cards that were just revealed or seated appear here — never the face-down Fate deck.</p>
+      </div>
+    </aside>`;
 }
 
 function inspectOverlay(state: GameState, instanceId: string): string {
@@ -698,7 +706,7 @@ function playView(
       </div>
     </header>
     <div class="stage">
-      <div class="prompt">${clashMeter(clash)}<p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}</div></div>
+      <div class="prompt${clash ? " is-clash" : ""}">${clashMeter(clash)}<p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}</div></div>
       ${fateRail(state)}
       <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
     </div>
@@ -784,6 +792,9 @@ function bootState(): GameState {
       if (scene === "clash") return vanquishClashScene();
       if (scene === "obsession") return obsessionDecideScene();
       if (scene === "vanquish") return vanquishLocalScene();
+      if (scene === "pay") return payNoMapScene();
+      if (scene === "fatepick") return easyFizzleScene();
+      if (scene === "fatespent") return fateSpentScene();
     }
   } catch {
     /* ignore */

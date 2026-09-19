@@ -1,11 +1,12 @@
 import { def } from "./cards";
-import { REALM } from "./realm";
+import { locName } from "./realm";
 import {
   availableActions,
   cardName,
   coveringHero,
   findCard,
   findCardLocation,
+  mapInRealm,
 } from "./queries";
 import { LOCATION_IDS, type CardInstance, type GameState, type Input, type LocationId } from "./types";
 
@@ -22,10 +23,6 @@ export const IDLE_MOVE_REASON: MoveReason = {
   next: "The practice chain is always the same: play the Never Land Map to unlock Hangman’s Tree, find Peter, walk him to the Jolly Roger, and vanquish him there. Fate will try to cover useful actions and park trouble on the path.",
   soft: true,
 };
-
-function locName(id: LocationId): string {
-  return REALM[id].name;
-}
 
 function tickTockAt(state: GameState): LocationId | null {
   for (const id of LOCATION_IDS) {
@@ -309,8 +306,10 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
   }
   if (input.type === "payWithPower") {
     return pack(
-      "You paid this Item with Power.",
-      "Spending Power keeps the Never Land Map in the realm if it is already unlocking the tree. Once Hangman’s Tree is open, keeping the Map is usually wiser than discarding it to cover a later Item.",
+      "You paid with Power.",
+      mapInRealm(after) || mapInRealm(before)
+        ? "Spending Power keeps the Never Land Map in the realm if it is already unlocking the tree. Once Hangman’s Tree is open, keeping the Map is usually wiser than discarding it to cover a later Item."
+        : "You spent Power equal to the card’s printed cost. Watch how much is left for the next Play.",
       `${chainLine(after)} Watch the remaining Power if another Play is still uncovered.`,
     );
   }
@@ -401,6 +400,16 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
   if (p.kind === "playChooseLocation" || p.kind === "cunningLocation") {
     const card = findCard(before, p.kind === "playChooseLocation" ? p.cardId : p.allyId);
     const name = card ? cardName(card) : "that card";
+    if (p.kind === "playChooseLocation" && after.pending?.kind === "playChoosePayment") {
+      const cost = card ? def(card.defId).cost : 0;
+      return pack(
+        `You chose ${locName(locationId)} for ${name}.`,
+        `${name} still needs its Power cost (${cost}). Pay it to finish the play — that is the printed price, not a silent spend.`,
+        mapInRealm(after)
+          ? "You may pay with Power or discard the Never Land Map if it is already unlocking the tree."
+          : `You have ${after.power} Power. Pay ${cost} to put ${name} on the table.`,
+      );
+    }
     const extra = card ? playCardWhy(card.defId, after) : { why: chainLine(after), next: crocWatch(after) };
     return pack(
       `You played ${name} to ${locName(locationId)}.`,

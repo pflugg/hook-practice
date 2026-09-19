@@ -24,6 +24,8 @@ describe("card drag targets", () => {
     ]);
     let next = choosing;
     for (const input of inputs) next = applyInput(next, input);
+    expect(next.pending?.kind).toBe("playChoosePayment");
+    next = applyInput(next, { type: "payWithPower" });
     expect(next.locations.jollyRoger.allies.some((c) => c.instanceId === smee.instanceId)).toBe(true);
   });
 
@@ -66,6 +68,8 @@ describe("card drag targets", () => {
     const inputs = inputsForDrop(choosing, cutlass.instanceId, { cardId: ally.instanceId });
     let next = choosing;
     for (const input of inputs) next = applyInput(next, input);
+    expect(next.pending?.kind).toBe("playChoosePayment");
+    next = applyInput(next, { type: "payWithPower" });
     expect(next.attachments.some((a) => a.item.defId === "cutlass" && a.attachedTo === ally.instanceId)).toBe(true);
   });
 });

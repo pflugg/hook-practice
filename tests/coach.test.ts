@@ -112,6 +112,33 @@ describe("coach suggestions", () => {
     expect(advice.warning ?? "").toMatch(/Tick Tock/);
   });
 
+  it("does not say the Map is affordable when it is absent from hand and realm", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    state.power = 1;
+    state.hangmansUnlocked = false;
+    expect(state.hand.some((c) => c.defId === "neverLandMap")).toBe(false);
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Gain 1/);
+    expect(advice.why).not.toMatch(/Map is affordable/i);
+    expect(advice.why).toMatch(/reserve|Item|Ally/i);
+  });
+
+  it("does say the Map is affordable when it is in hand and Power is short", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    state.power = 2;
+    state.hangmansUnlocked = false;
+    give(state, "neverLandMap");
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Gain 1/);
+    expect(advice.why).toMatch(/Map is affordable/);
+  });
+
   it("prefers paying Power so the Map stays in the realm", () => {
     const state = barePlayState();
     state.hangmansUnlocked = true;

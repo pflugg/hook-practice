@@ -26,7 +26,9 @@ describe("Cutlass attach", () => {
     expect(next.villainLocation).toBe("jollyRoger");
     expect(next.locations.skullRock.allies.some((c) => c.instanceId === ally.instanceId)).toBe(true);
 
-    const done = applyInput(next, { type: "selectCard", instanceId: ally.instanceId });
+    let done = applyInput(next, { type: "selectCard", instanceId: ally.instanceId });
+    expect(done.pending?.kind).toBe("playChoosePayment");
+    done = applyInput(done, { type: "payWithPower" });
     expect(done.attachments.some((a) => a.item.defId === "cutlass" && a.attachedTo === ally.instanceId)).toBe(true);
     expect(done.power).toBe(0);
     expect(done.pending).toBeNull();
@@ -50,7 +52,9 @@ describe("Cutlass attach", () => {
     const input = resolveBoardClick(card, next);
     expect(input).toEqual({ type: "selectCard", instanceId: ally.instanceId });
 
-    const done = applyInput(next, input!);
+    let done = applyInput(next, input!);
+    expect(done.pending?.kind).toBe("playChoosePayment");
+    done = applyInput(done, { type: "payWithPower" });
     expect(done.attachments.some((a) => a.attachedTo === ally.instanceId && a.item.defId === "cutlass")).toBe(true);
   });
 
