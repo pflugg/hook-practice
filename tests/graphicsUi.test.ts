@@ -85,21 +85,25 @@ describe("game graphics UI pass", () => {
     const css = readFileSync(join(process.cwd(), "src/ui/styles.css"), "utf8");
 
     const topbar = root.querySelector(".topbar");
+    const map = topbar?.querySelector("svg.topbar-map");
     expect(topbar?.hasAttribute("data-topbar-map")).toBe(true);
-    expect(topbar?.querySelector(".topbar-map")).toBeNull();
-    expect(css).toContain(".topbar::before");
-    expect(css).toMatch(/opacity:\s*0\.08/);
-    expect(css).toContain("linear-gradient(180deg, rgba(8, 10, 12, 0.88), rgba(8, 10, 12, 0.72))");
-    expect(css).toContain("%23c9a86a");
-    expect(css).toContain("%238a7340");
-    expect(css).not.toMatch(/Never Land|Peter|Disney|Hangman|Mermaid|Skull|Jolly/);
+    expect(map).toBeTruthy();
+    expect(map?.getAttribute("viewBox")).toBe("0 0 1600 56");
+    expect(css).toContain(".topbar-map");
+    expect(css).toMatch(/\.topbar-map[\s\S]*?opacity:\s*0\.12/);
+    expect(css).not.toContain(".topbar::before");
+    expect(css).not.toContain("linear-gradient(180deg, rgba(8, 10, 12, 0.88), rgba(8, 10, 12, 0.72))");
+    expect(map?.outerHTML).not.toMatch(/Never Land|Peter|Disney|Hangman|Mermaid|Skull|Jolly/);
+    expect(css).not.toMatch(/Never Land Map|Peter Pan|Disney/);
 
     const chrome = html.slice(html.indexOf('class="topbar"'), html.indexOf('class="stage"'));
     expect(chrome).toContain("data-topbar-map");
+    expect(chrome).toContain("topbar-map");
     expect(chrome).toContain("power is-loud");
     expect(chrome).toContain("Turn ");
     expect(chrome).toContain("Hand ");
     expect(chrome).not.toContain("topbar-chart");
+    expect(chrome).not.toContain("class=\"board\"");
   });
 
   it("prints full action labels and gold-CTA marks the coach suggestion", () => {

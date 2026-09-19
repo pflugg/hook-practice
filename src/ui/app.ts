@@ -42,6 +42,7 @@ import {
   dragHeroScene,
   easyFizzleScene,
   fateSpentScene,
+  lagoonCoverScene,
   obsessionDecideScene,
   payNoMapScene,
   peterSoftConfirmScene,
@@ -52,7 +53,7 @@ import {
 } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
 import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
-import { CAPTAIN_TOKEN, CREST, TITLE_SCENE, locationDecor } from "./decor";
+import { CAPTAIN_TOKEN, CREST, TITLE_SCENE, TOPBAR_MAP, locationDecor } from "./decor";
 import "./styles.css";
 
 function esc(s: string): string {
@@ -486,7 +487,7 @@ function fateRail(state: GameState): string {
     <div class="fate-rail-cards">${drawn
       .map((c) => {
         const focus = played?.instanceId === c.instanceId;
-        return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: focus ? "hand" : "mini", legal: false, selected: focus })}</div>`;
+        return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: "mini", legal: false, selected: false })}</div>`;
       })
       .join("")}</div>
   </aside>`;
@@ -705,8 +706,10 @@ function playView(
   <div class="grain"></div>
   <div class="play ${coachEnabled ? "has-coach" : ""} ${briefEnabled ? "has-brief" : ""} ${reasonsEnabled ? "has-reasons" : ""} ${teachOn ? "has-teach" : ""}">
     <div class="play-main" data-play-main>
+    <div class="play-chrome">
     <header class="topbar" data-topbar-map>
       <div class="brand">${CREST}<div><h1>Never Land Duel</h1><small>Hook Practice</small></div></div>
+      ${TOPBAR_MAP}
       <div class="meters">
         <div class="hud-core" aria-label="Voyage meters">
           <div class="power is-loud" title="Power"><span>Power</span><b>${state.power}</b></div>
@@ -724,6 +727,8 @@ function playView(
       </div>
     </header>
     <div class="prompt${clash ? " is-clash" : ""}" data-prompt>${clashMeter(clash)}<p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}${placeButtons.join("")}</div></div>
+    </div>
+    <div class="play-scroll" data-play-scroll>
     <div class="stage">
       ${fateRail(state)}
       <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
@@ -755,6 +760,7 @@ function playView(
         <ol>${state.log.map((e) => `<li class="${e.tone}">${esc(e.text)}</li>`).join("")}</ol>
       </aside>
     </footer>
+    </div>
     </div>
     ${teachRailHtml(briefHtml, coachHtml, reasonHtml, activeTab)}
   </div>
@@ -816,6 +822,7 @@ function bootState(): GameState {
       if (scene === "pay") return payNoMapScene();
       if (scene === "fatepick") return easyFizzleScene();
       if (scene === "fatespent") return fateSpentScene();
+      if (scene === "lagoon") return lagoonCoverScene();
     }
   } catch {
     /* ignore */
@@ -923,8 +930,8 @@ export function mount(root: HTMLElement): void {
   const captureScroll = () => {
     pageScrollX = window.scrollX;
     pageScrollY = window.scrollY;
-    const main = root.querySelector<HTMLElement>("[data-play-main]");
-    if (main) mainScroll = main.scrollTop;
+    const scroller = root.querySelector<HTMLElement>("[data-play-scroll]") ?? root.querySelector<HTMLElement>("[data-play-main]");
+    if (scroller) mainScroll = scroller.scrollTop;
     root.querySelectorAll<HTMLElement>("[data-teach-pane]").forEach((pane) => {
       const key = pane.dataset.teachPane as TeachTab | undefined;
       if (key && key in paneScroll) paneScroll[key] = pane.scrollTop;
@@ -936,8 +943,8 @@ export function mount(root: HTMLElement): void {
       const key = pane.dataset.teachPane as TeachTab | undefined;
       if (key && key in paneScroll) pane.scrollTop = paneScroll[key];
     });
-    const main = root.querySelector<HTMLElement>("[data-play-main]");
-    if (main) main.scrollTop = mainScroll;
+    const scroller = root.querySelector<HTMLElement>("[data-play-scroll]") ?? root.querySelector<HTMLElement>("[data-play-main]");
+    if (scroller) scroller.scrollTop = mainScroll;
     window.scrollTo(pageScrollX, pageScrollY);
   };
 
