@@ -124,11 +124,35 @@ function bestAllyHome(state: GameState): LocationId {
   return legal.includes(state.villainLocation) ? state.villainLocation : (legal[0] ?? "jollyRoger");
 }
 
+function crocCanSlideOnto(state: GameState, captainAt: LocationId): boolean {
+  const croc = tickTockAt(state);
+  if (!croc || croc === captainAt) return false;
+  return adjacentUnlocked(state, croc).includes(captainAt);
+}
+
+function heroSlideReady(state: GameState): boolean {
+  const kind = state.pending?.kind;
+  if (kind === "moveHeroSelect" || kind === "moveHeroDest" || kind === "starkeyHero" || kind === "starkeyDest") {
+    return true;
+  }
+  if (state.phase === "actions" && !state.pending) {
+    return availableActions(state).some((a) => a.kind === "moveHero" && a.available);
+  }
+  return false;
+}
+
 function warningFor(state: GameState, highlights: string[]): string | undefined {
   const notes: string[] = [];
   const croc = tickTockAt(state);
-  if (croc) {
-    notes.push(`Tick Tock waits at ${locName(croc)} — stepping there empties your hand.`);
+  const slideNow = Boolean(croc && crocCanSlideOnto(state, state.villainLocation) && heroSlideReady(state));
+  if (slideNow) {
+    notes.push(
+      "A Hero move can slide Tick Tock onto the captain this turn. That empties the hand the same as stepping onto him — park the crocodile elsewhere.",
+    );
+  } else if (croc) {
+    notes.push(
+      `Tick Tock waits at ${locName(croc)} — sharing that place (stepping there, or sliding the crocodile onto the captain) empties your hand.`,
+    );
   }
   const covering = coveringHero(state, state.villainLocation);
   if (covering && state.phase === "actions") {
@@ -142,7 +166,24 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
     }
   }
   if (highlights.some((h) => croc && h === `loc:${croc}`)) {
-    notes.push("That recommended step lands on Tick Tock. Only go if you accept an empty hand.");
+    notes.unshift("That recommended step lands on Tick Tock. Only go if you accept an empty hand.");
+  }
+  if (state.phase === "move" && !state.pending) {
+    const destHi = highlights.find((h) => h.startsWith("loc:"));
+    const dest = destHi?.slice(4) as LocationId | undefined;
+    if (dest && crocCanSlideOnto(state, dest)) {
+      notes.unshift(
+        `Stopping at ${locName(dest)} puts Tick Tock one Hero-move from the captain. Sliding him onto you empties the hand.`,
+      );
+    }
+  }
+  const movingCroc =
+    (state.pending?.kind === "moveHeroDest" || state.pending?.kind === "starkeyDest") &&
+    findCard(state, state.pending.heroId)?.defId === "tickTock";
+  if (movingCroc && highlights.some((h) => h === `loc:${state.villainLocation}`)) {
+    notes.unshift(
+      "That recommended step slides Tick Tock onto the captain. Only go if you accept an empty hand.",
+    );
   }
   return notes[0];
 }
@@ -599,7 +640,9 @@ function advisePending(state: GameState): CoachAdvice {
         toward && dests.includes(toward)
           ? toward
           : hero?.defId === "tickTock"
-            ? (dests.find((id) => id !== "mermaidLagoon" && id !== "hangmansTree") ?? dests[0])
+            ? (dests.find((id) => id !== "mermaidLagoon" && id !== "hangmansTree" && id !== state.villainLocation) ??
+              dests.find((id) => id !== state.villainLocation) ??
+              dests[0])
             : (awayFromCroc ?? dests[0]);
       if (!dest) return say("Cancel", "No adjacent unlocked step.", ["btn:cancel"], state);
       return say(

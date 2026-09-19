@@ -145,7 +145,7 @@ function whereYouAre(state: GameState): string {
     : ` No Hero is covering the top row at ${loc}, so both printed rows are usable if you have not spent them yet.`;
 
   const crocNote = croc
-    ? ` Tick Tock is at ${locName(croc)}. Stepping onto that place empties the whole hand — give it a wide berth unless you accept starting the next stretch with nothing.`
+      ? ` Tick Tock is at ${locName(croc)}. Sharing that place with the captain — stepping there, or sliding the crocodile onto him — empties the whole hand.`
     : " Tick Tock is not ashore, so movement is safer than it will be later.";
 
   return `The captain is at ${loc} with ${state.power} Power on turn ${state.turn}. ${tree}${coverNote}${crocNote} ${handNote} Allies already on the Jolly Roger total about ${jrStrength(state)} Strength — that number is the late-game clock.`;

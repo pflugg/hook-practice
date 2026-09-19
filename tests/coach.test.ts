@@ -112,6 +112,34 @@ describe("coach suggestions", () => {
     expect(advice.warning ?? "").toMatch(/Tick Tock/);
   });
 
+  it("warns the turn before a Hero move can slide Tick Tock onto the captain", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.villainLocation = "hangmansTree";
+    state.phase = "actions";
+    putHero(state, "tickTock", "mermaidLagoon");
+    putHero(state, "peterPan", "hangmansTree");
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Move a Hero/);
+    expect(advice.warning ?? "").toMatch(/slide Tick Tock onto the captain/i);
+    expect(advice.warning ?? "").toMatch(/empties the hand/i);
+  });
+
+  it("does not gold-CTA sliding Tick Tock onto the captain", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.villainLocation = "jollyRoger";
+    state.phase = "resolving";
+    const tick = putHero(state, "tickTock", "skullRock");
+    state.pending = { kind: "moveHeroDest", heroId: tick.instanceId };
+
+    const advice = advise(state);
+    expect(advice.highlights).not.toContain("loc:jollyRoger");
+    expect(advice.highlights.some((h) => h.startsWith("loc:"))).toBe(true);
+    expect(advice.warning ?? "").toMatch(/slide Tick Tock onto the captain/i);
+  });
+
   it("does not say the Map is affordable when it is absent from hand and realm", () => {
     const state = barePlayState();
     state.villainLocation = "jollyRoger";

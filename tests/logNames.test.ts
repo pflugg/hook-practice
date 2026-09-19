@@ -40,4 +40,14 @@ describe("player-facing log place names", () => {
     expect(next.log.some((e) => /arrives at Skull Rock/.test(e.text))).toBe(true);
     expect(next.log.some((e) => /skullRock/.test(e.text))).toBe(false);
   });
+
+  it("never leaks a raw location id into play or overlay copy", async () => {
+    const { renderOverlay, renderPlay } = await import("../src/ui/app");
+    const { peterSoftConfirmScene, tickTockOntoCaptainScene } = await import("../src/engine/scenes");
+    const leak = /jollyRoger|skullRock|mermaidLagoon|hangmansTree/;
+    const visible = (html: string) => html.replace(/<[^>]+>/g, " ");
+
+    expect(visible(renderPlay(tickTockOntoCaptainScene()))).not.toMatch(leak);
+    expect(visible(renderOverlay(peterSoftConfirmScene()))).not.toMatch(leak);
+  });
 });
