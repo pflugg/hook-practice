@@ -51,7 +51,7 @@ import {
 } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
 import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
-import { CAPTAIN_TOKEN, CREST, TITLE_SCENE, TOPBAR_MAP, locationDecor } from "./decor";
+import { CAPTAIN_TOKEN, CREST, TITLE_SCENE, locationDecor } from "./decor";
 import "./styles.css";
 
 function esc(s: string): string {
@@ -689,8 +689,7 @@ function playView(
   return `<div class="sky play-sky" aria-hidden="true"><div class="stars"></div><div class="fog fog-a"></div></div>
   <div class="grain"></div>
   <div class="play ${coachEnabled ? "has-coach" : ""} ${briefEnabled ? "has-brief" : ""} ${reasonsEnabled ? "has-reasons" : ""} ${teachOn ? "has-teach" : ""}">
-    <header class="topbar">
-      <div class="topbar-map" data-topbar-map aria-hidden="true">${TOPBAR_MAP}</div>
+    <header class="topbar" data-topbar-map>
       <div class="brand">${CREST}<div><h1>Never Land Duel</h1><small>Hook Practice</small></div></div>
       <div class="meters">
         <div class="hud-core" aria-label="Voyage meters">

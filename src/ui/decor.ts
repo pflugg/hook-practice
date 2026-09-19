@@ -75,51 +75,6 @@ export const TITLE_SCENE = `<svg class="title-scene" viewBox="0 0 1200 700" pres
   </g>
 </svg>`;
 
-/**
- * Wide chart strip for the play topbar. Original abstract aged-paper coastline,
- * faint compass, and a dotted voyage path — not a licensed map, not a realm
- * diagram, and it carries no place or character marks.
- */
-export const TOPBAR_MAP = `<svg class="topbar-chart" viewBox="0 0 1600 56" preserveAspectRatio="none" aria-hidden="true">
-  <defs>
-    <linearGradient id="topbarChartWash" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ead7a8" stop-opacity=".22"/>
-      <stop offset="100%" stop-color="#c4ae82" stop-opacity=".12"/>
-    </linearGradient>
-    <pattern id="topbarChartStipple" width="16" height="10" patternUnits="userSpaceOnUse">
-      <circle cx="2" cy="3" r=".55" fill="#ead7a8"/>
-      <circle cx="10" cy="7" r=".4" fill="#d8c49a"/>
-      <circle cx="14" cy="2" r=".35" fill="#c4ae82"/>
-    </pattern>
-  </defs>
-  <rect width="1600" height="56" fill="url(#topbarChartWash)"/>
-  <rect width="1600" height="56" fill="url(#topbarChartStipple)" opacity=".7"/>
-  <g class="chart-graticule" fill="none" stroke="#ead7a8" stroke-width=".55">
-    <path d="M0 14h1600M0 28h1600M0 42h1600"/>
-    <path d="M200 0v56M400 0v56M600 0v56M800 0v56M1000 0v56M1200 0v56M1400 0v56"/>
-  </g>
-  <g class="chart-rhumb" fill="none" stroke="#e6d3a4" stroke-width=".55">
-    <path d="M980 28 L1180 4M980 28 L1200 48M980 28 L780 4M980 28 L760 50"/>
-  </g>
-  <path class="chart-coast" d="M-16 40C70 36 120 22 196 26c70 4 112 16 188 12 64-4 108-16 170-10 58 6 96 16 162 10 70-6 116-18 188-10 64 8 104 6 168-2 58-8 112 6 188 6 54 0 104-10 168-2 36 4 80 10 136 6v20H-16z" fill="#d2b888"/>
-  <path class="chart-shore" d="M-8 38C76 32 136 18 200 24s120 18 196 10 118-18 176-10 112 18 176 8 124-18 196-8 118 10 184 0 132 8 208 6 118-8 188 0" fill="none" stroke="#f0e2c0" stroke-width="1.7" stroke-linecap="round"/>
-  <path class="chart-hatch" d="M72 44l6 6M140 42l6 6M248 44l6 6M356 46l5 5M488 44l6 6M632 46l6 5M788 42l6 6M936 44l6 6M1096 46l6 5M1256 42l6 6M1416 44l6 6" fill="none" stroke="#e6d3a4" stroke-width=".85"/>
-  <path class="chart-isle" d="M336 12c16-8 38-5 44 7 5 11-8 18-24 20-18 2-34-8-20-27z" fill="#d2b888" stroke="#f0e2c0" stroke-width="1"/>
-  <path class="chart-isle" d="M692 8c13-7 32-3 36 7 4 9-9 14-20 15-15 1-26-7-16-22z" fill="#d2b888" stroke="#f0e2c0" stroke-width=".95"/>
-  <path class="chart-isle" d="M508 22c8-4 17-1 19 5 2 6-6 8-12 8-8 0-14-4-7-13z" fill="#d2b888" stroke="#f0e2c0" stroke-width=".85"/>
-  <path class="chart-path" d="M64 36C148 26 226 16 336 14S458 24 508 24 612 14 692 12 812 20 888 18 960 30 980 28 1088 16 1200 26 1320 22" fill="none" stroke="#fff4d4" stroke-width="1.55" stroke-linecap="round" stroke-dasharray="2.4 4.8"/>
-  <g class="chart-compass" transform="translate(980 28)">
-    <circle r="15" fill="none" stroke="#f0e2c0" stroke-width=".9"/>
-    <circle r="9" fill="none" stroke="#e6d3a4" stroke-width=".55"/>
-    <path d="M0-13 L2.2-2.2 L13 0 L2.2 2.2 L0 13 L-2.2 2.2 L-13 0 L-2.2-2.2 Z" fill="#f0e2c0"/>
-    <path d="M0-13 L1-1 L13 0 L1 1 L0 13 L-1 1 L-13 0 L-1-1 Z" fill="#8a7048"/>
-    <circle r="1.5" fill="#fff6d2"/>
-  </g>
-  <g class="chart-ticks" fill="none" stroke="#ead7a8" stroke-width=".9">
-    <path d="M8 6h16M8 6v12M1576 6h16M1592 6v12M8 50h16M8 38v12M1576 50h16M1592 38v12"/>
-  </g>
-</svg>`;
-
 export function locationDecor(id: string): string {
   if (id === "jollyRoger") {
     return `<svg class="loc-art" viewBox="0 0 280 160" aria-hidden="true">

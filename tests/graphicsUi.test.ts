@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { advise } from "../src/engine/coach";
 import { createGame } from "../src/engine/game";
@@ -80,24 +82,24 @@ describe("game graphics UI pass", () => {
     const html = renderPlay(createGame("normal", 7));
     const root = document.createElement("div");
     root.innerHTML = html;
+    const css = readFileSync(join(process.cwd(), "src/ui/styles.css"), "utf8");
 
     const topbar = root.querySelector(".topbar");
-    const map = topbar?.querySelector("[data-topbar-map]");
-    expect(map).toBeTruthy();
-    expect(map?.getAttribute("aria-hidden")).toBe("true");
-    expect(map?.textContent?.trim()).toBe("");
-    expect(map?.querySelector(".topbar-chart")).toBeTruthy();
-    expect(map?.querySelector(".chart-coast")).toBeTruthy();
-    expect(map?.querySelector(".chart-path")).toBeTruthy();
-    expect(map?.querySelector(".chart-compass")).toBeTruthy();
-    expect(map?.innerHTML).not.toMatch(/Never Land|Peter|Disney|Hangman|Mermaid|Skull|Jolly|Peter Pan/i);
+    expect(topbar?.hasAttribute("data-topbar-map")).toBe(true);
+    expect(topbar?.querySelector(".topbar-map")).toBeNull();
+    expect(css).toContain(".topbar::before");
+    expect(css).toMatch(/opacity:\s*0\.08/);
+    expect(css).toContain("linear-gradient(180deg, rgba(8, 10, 12, 0.88), rgba(8, 10, 12, 0.72))");
+    expect(css).toContain("%23c9a86a");
+    expect(css).toContain("%238a7340");
+    expect(css).not.toMatch(/Never Land|Peter|Disney|Hangman|Mermaid|Skull|Jolly/);
 
     const chrome = html.slice(html.indexOf('class="topbar"'), html.indexOf('class="stage"'));
     expect(chrome).toContain("data-topbar-map");
     expect(chrome).toContain("power is-loud");
     expect(chrome).toContain("Turn ");
     expect(chrome).toContain("Hand ");
-    expect(chrome.indexOf("data-topbar-map")).toBeLessThan(chrome.indexOf("power is-loud"));
+    expect(chrome).not.toContain("topbar-chart");
   });
 
   it("prints full action labels and gold-CTA marks the coach suggestion", () => {
