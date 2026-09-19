@@ -249,7 +249,7 @@ function titleView(
         <button type="button" data-brief-toggle class="${briefEnabled ? "is-on" : ""}">${briefEnabled ? "Strategy brief on" : "Strategy brief off"}</button>
         <button type="button" data-reasons-toggle class="${reasonsEnabled ? "is-on" : ""}">${reasonsEnabled ? "Move reasons on" : "Move reasons off"}</button>
       </div>
-      <p class="coach-lede">Coach names the next click. The Strategy brief, Coach, and <b>Why this move</b> stack in the right teaching rail — each pane scrolls on its own. Move reasons names what you picked, why it helps the chain, and what to watch. Tutorial starts all three on. Hide any during play.</p>
+      <p class="coach-lede">Coach names the next click. Coach, <b>Why this move</b>, and the Strategy brief stack in the right teaching rail — each pane scrolls on its own. Move reasons names what you picked, why it helps the chain, and what to watch. Tutorial starts all three on. Hide any during play.</p>
       <div class="actions-row">
         <button class="btn primary" data-tutorial>Tutorial</button>
         <button class="btn" data-start>Set Sail</button>
@@ -537,19 +537,19 @@ function resolveTeachTab(
   coachOn: boolean,
   reasonsOn: boolean,
 ): TeachTab {
-  if (requested === "brief" && briefOn) return "brief";
   if (requested === "coach" && coachOn) return "coach";
   if (requested === "reasons" && reasonsOn) return "reasons";
-  if (briefOn) return "brief";
+  if (requested === "brief" && briefOn) return "brief";
   if (coachOn) return "coach";
-  return "reasons";
+  if (reasonsOn) return "reasons";
+  return "brief";
 }
 
 function teachTabBar(briefOn: boolean, coachOn: boolean, reasonsOn: boolean, active: TeachTab): string {
   const tabs: { id: TeachTab; label: string }[] = [];
-  if (briefOn) tabs.push({ id: "brief", label: "Brief" });
   if (coachOn) tabs.push({ id: "coach", label: "Coach" });
   if (reasonsOn) tabs.push({ id: "reasons", label: "Why this move" });
+  if (briefOn) tabs.push({ id: "brief", label: "Brief" });
   if (tabs.length < 2) return "";
   return `<div class="teach-tabs" role="tablist" aria-label="Teaching panes">
     ${tabs
@@ -565,7 +565,7 @@ function teachRailHtml(brief: string, coach: string, reasons: string, active: Te
   if (!brief && !coach && !reasons) return "";
   return `<aside class="teach-rail" data-teach-rail data-active-tab="${active}" aria-label="Teaching">
     ${teachTabBar(Boolean(brief), Boolean(coach), Boolean(reasons), active)}
-    ${brief}${coach}${reasons}
+    ${coach}${reasons}${brief}
   </aside>`;
 }
 
@@ -785,7 +785,7 @@ export function renderPlay(
   const briefEnabled = flags.briefEnabled ?? true;
   const reasonsEnabled = flags.reasonsEnabled ?? true;
   const reason = reasonsEnabled ? (flags.reason ?? IDLE_MOVE_REASON) : null;
-  const teachTab = flags.teachTab ?? "brief";
+  const teachTab = flags.teachTab ?? "coach";
   return playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, teachTab);
 }
 
@@ -837,7 +837,7 @@ export function mount(root: HTMLElement): void {
   let briefEnabled = readFlag("nld-brief");
   let reasonsEnabled = readFlag("nld-reasons");
   let lastReason: MoveReason = IDLE_MOVE_REASON;
-  let teachTab: TeachTab = "brief";
+  let teachTab: TeachTab = "coach";
   let inspectId: string | null = null;
   let suppressClick = false;
 

@@ -47,9 +47,9 @@ describe("game graphics UI pass", () => {
     expect(stageStart).toBeGreaterThan(topbarStart);
     expect(boardStart).toBeGreaterThan(stageStart);
     expect(railStart).toBeGreaterThan(boardStart);
-    expect(briefStart).toBeGreaterThan(railStart);
-    expect(coachStart).toBeGreaterThan(briefStart);
+    expect(coachStart).toBeGreaterThan(railStart);
     expect(reasonStart).toBeGreaterThan(coachStart);
+    expect(briefStart).toBeGreaterThan(reasonStart);
 
     const chrome = html.slice(topbarStart, stageStart);
     expect(chrome).not.toContain("coach-do");
@@ -61,9 +61,10 @@ describe("game graphics UI pass", () => {
     root.innerHTML = html;
     const rail = root.querySelector("[data-teach-rail]");
     expect(rail?.querySelectorAll(":scope > .teach-pane").length).toBe(3);
-    expect(rail?.querySelector(":scope > .strategy-brief")).toBeTruthy();
-    expect(rail?.querySelector(":scope > .coach-panel")).toBeTruthy();
-    expect(rail?.querySelector(":scope > .reason-dock")).toBeTruthy();
+    const panes = [...rail!.querySelectorAll(":scope > .teach-pane")].map((el) => el.getAttribute("data-teach-pane"));
+    expect(panes).toEqual(["coach", "reasons", "brief"]);
+    const tabs = [...rail!.querySelectorAll("[data-teach-tab]")].map((el) => el.getAttribute("data-teach-tab"));
+    expect(tabs).toEqual(["coach", "reasons", "brief"]);
   });
 
   it("keeps Power, Turn, and Hand/Deck/Discard as loud HUD chips", () => {
