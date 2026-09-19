@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { advise } from "../src/engine/coach";
 import { createGame } from "../src/engine/game";
@@ -9,7 +10,7 @@ import { IDLE_MOVE_REASON } from "../src/engine/moveReason";
 import { renderPlay } from "../src/ui/app";
 import { barePlayState, give } from "./helpers";
 
-const css = readFileSync(new URL("../src/ui/styles.css", import.meta.url), "utf8");
+const css = readFileSync(join(process.cwd(), "src/ui/styles.css"), "utf8");
 
 describe("game graphics UI pass", () => {
   it("docks Coach and Why this move in a shared teach-dock, not a floating overlay", () => {
@@ -62,12 +63,13 @@ describe("game graphics UI pass", () => {
     give(state, "neverLandMap");
 
     const html = renderPlay(state);
-    expect(html).toContain("Play a Card");
-    expect(html).toContain("Move Ally/Item");
-    expect(html).toContain("Gain 3");
-    expect(html).not.toContain("Play a C…");
-    expect(html).not.toContain("Play a C...");
-    expect(html).not.toContain("Move Ally/I");
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    const labels = [...root.querySelectorAll<HTMLButtonElement>(".action")].map((el) => el.textContent?.trim());
+    expect(labels).toContain("Play a Card");
+    expect(labels).toContain("Move Ally/Item");
+    expect(labels).toContain("Gain 3");
+    expect(labels.every((label) => label && !label.includes("…") && !/\w\.\.\.$/.test(label))).toBe(true);
 
     const advice = advise(state);
     const suggested = advice.highlights.find((h) => h.startsWith("act:"));
