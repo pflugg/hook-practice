@@ -427,12 +427,19 @@ h1.wordmark {
 }
 .prompt p { margin: 0; font-size: 18px; color: #fff6d8; }
 .prompt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.teach-pane-head {
+.teach-pane-head,
+.brief-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 2px 0 8px;
+  background:
+    linear-gradient(180deg, rgba(52, 36, 20, 0.98) 70%, rgba(36, 26, 16, 0.88));
 }
 .coach-panel {
   display: block;
@@ -478,12 +485,6 @@ h1.wordmark {
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-.brief-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
 }
 .brief-kicker {
   margin: 0 0 4px;
