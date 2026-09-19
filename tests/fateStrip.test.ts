@@ -42,7 +42,7 @@ describe("Fate adversary memory", () => {
 describe("captain pawn", () => {
   it("is an original silhouette with a You label hook, not a crest-only token", () => {
     expect(CAPTAIN_TOKEN).toContain("captain-figure");
-    expect(CAPTAIN_TOKEN).toMatch(/viewBox="0 0 64 80"/);
+    expect(CAPTAIN_TOKEN).toMatch(/viewBox="0 0 72 92"/);
     expect(CAPTAIN_TOKEN.toLowerCase()).not.toMatch(/disney|hook crest/);
   });
 });

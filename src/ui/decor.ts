@@ -1,20 +1,19 @@
 /** Original decorative SVGs — abstract atmosphere only, no character likenesses. */
 
 /** Generic pirate-captain pawn for the current location. Not a character likeness. */
-export const CAPTAIN_TOKEN = `<svg class="captain-figure" viewBox="0 0 64 80" aria-hidden="true">
-  <ellipse cx="32" cy="74" rx="16" ry="4" fill="rgba(8,6,4,.45)"/>
-  <path d="M20 44 L16 72 Q32 76 48 72 L44 44 Z" fill="#1c2830"/>
-  <path d="M22 46 L20 68 Q32 71 44 68 L42 46 Z" fill="#243844"/>
-  <path d="M28 48 L32 70 L36 48" fill="none" stroke="#c9a24a" stroke-width="1.2"/>
-  <circle cx="28" cy="56" r="1.3" fill="#e8c36a"/>
-  <circle cx="28" cy="62" r="1.3" fill="#e8c36a"/>
-  <path d="M14 50 Q8 54 10 62" fill="none" stroke="#d4c4a0" stroke-width="2.4" stroke-linecap="round"/>
-  <path d="M10 61 q4 6 -1 7" fill="none" stroke="#d4c4a0" stroke-width="2.2" stroke-linecap="round"/>
-  <path d="M50 52 L54 58" stroke="#3a2a18" stroke-width="2.2" stroke-linecap="round"/>
-  <ellipse cx="32" cy="34" rx="9" ry="10" fill="#2a2116"/>
-  <path d="M6 26 L32 12 L58 26 L42 24 Q32 28 22 24 Z" fill="#12100c"/>
-  <path d="M10 26 L32 16 L54 26" fill="none" stroke="#c9a24a" stroke-width="1.4"/>
-  <path d="M18 24 Q32 20 46 24" fill="#1a1812"/>
+export const CAPTAIN_TOKEN = `<svg class="captain-figure" viewBox="0 0 72 92" aria-hidden="true">
+  <ellipse cx="36" cy="86" rx="18" ry="4" fill="rgba(8,6,4,.4)"/>
+  <path d="M20 48 L14 82 Q36 88 58 82 L52 48 Z" fill="#152028" stroke="#e8c36a" stroke-width="1.4"/>
+  <path d="M24 50 L20 78 Q36 82 52 78 L48 50 Z" fill="#2a3c48"/>
+  <path d="M32 52 L36 80 L40 52" fill="none" stroke="#e8c36a" stroke-width="1.5"/>
+  <circle cx="30" cy="60" r="1.6" fill="#f4d48a"/>
+  <circle cx="30" cy="68" r="1.6" fill="#f4d48a"/>
+  <path d="M16 56 C6 58 4 70 8 76" fill="none" stroke="#f0e2c0" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M8 75 c6 8 -4 10 -6 4" fill="none" stroke="#f0e2c0" stroke-width="3" stroke-linecap="round"/>
+  <path d="M56 58 L62 66" stroke="#2a2116" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="36" cy="36" r="11" fill="#3a2e20" stroke="#e8c36a" stroke-width="1.2"/>
+  <path d="M4 30 L36 8 L68 30 L48 28 Q36 34 24 28 Z" fill="#0e0c08" stroke="#e8c36a" stroke-width="1.6"/>
+  <path d="M14 28 L36 14 L58 28" fill="none" stroke="#c9a24a" stroke-width="2"/>
 </svg>`;
 
 export const CREST = `<svg class="crest" viewBox="0 0 92 92" aria-hidden="true">

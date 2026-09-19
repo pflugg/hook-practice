@@ -367,7 +367,7 @@ function fateRail(state: GameState): string {
     <div class="fate-rail-cards">${drawn
       .map((c) => {
         const focus = played?.instanceId === c.instanceId;
-        return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: "mini", legal: false, selected: focus })}</div>`;
+        return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: focus ? "hand" : "mini", legal: false, selected: focus })}</div>`;
       })
       .join("")}</div>
   </aside>`;
@@ -638,6 +638,7 @@ export function mount(root: HTMLElement): void {
         if (event.button !== 0) return;
         const fromId = cardEl.dataset.card;
         if (!fromId || !isDraggableCard(state, fromId)) return;
+        cardEl.setPointerCapture?.(event.pointerId);
         const startX = event.clientX;
         const startY = event.clientY;
         let ghost: HTMLElement | null = null;
@@ -663,7 +664,7 @@ export function mount(root: HTMLElement): void {
         };
 
         const move = (ev: PointerEvent) => {
-          if (!started && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 8) return;
+          if (!started && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
           if (!started) {
             started = true;
             suppressClick = true;

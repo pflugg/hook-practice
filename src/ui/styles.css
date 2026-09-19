@@ -614,13 +614,16 @@ h1.wordmark {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-width: 52px;
-  filter: drop-shadow(0 0 10px rgba(232, 195, 106, 0.45));
+  gap: 3px;
+  min-width: 64px;
+  padding: 4px 6px 3px;
+  border-radius: 10px;
+  background: radial-gradient(circle at 40% 20%, rgba(246, 210, 122, 0.28), rgba(10, 8, 6, 0.2));
+  box-shadow: 0 0 16px rgba(232, 195, 106, 0.4);
 }
 .captain-figure {
-  width: 48px;
-  height: 60px;
+  width: 56px;
+  height: 72px;
   display: block;
 }
 .you-tag {
@@ -666,6 +669,11 @@ h1.wordmark {
 .fate-ability { color: #fff4d4 !important; }
 .fate-fine { font-size: 11px !important; opacity: 0.8; }
 .fate-rail-cards { display: flex; gap: 8px; flex-shrink: 0; align-items: flex-end; }
+.fate-rail .card .text {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
 
 .card.is-draggable { cursor: grab; }
 .card.is-drag-source { opacity: 0.35; }
