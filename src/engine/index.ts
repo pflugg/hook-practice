@@ -28,3 +28,4 @@ export {
 export { applyInput, createGame, highlightSet, selectedSet, titleState } from "./game";
 export { advise, type CoachAdvice } from "./coach";
 export { strategyBrief, type ObjectiveLine, type StrategyBrief } from "./strategyBrief";
+export { explainSelection, IDLE_MOVE_REASON, type MoveReason } from "./moveReason";

@@ -41,6 +41,25 @@ describe("location click routing", () => {
     expect(next.phase).toBe("actions");
   });
 
+  it("does not treat a board card click as a move so the UI can inspect", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "move";
+    state.pending = null;
+
+    const root = document.createElement("div");
+    root.innerHTML = `
+      <section class="location is-legal" data-loc="skullRock">
+        <button type="button" class="drop-hint" data-move="skullRock">Move here</button>
+        <button type="button" class="card mini hero" data-card="tickTock-1">Tick Tock</button>
+      </section>
+    `;
+    const card = root.querySelector<HTMLButtonElement>("[data-card]")!;
+    expect(resolveBoardClick(card, state)).toBeNull();
+    const hint = root.querySelector<HTMLButtonElement>("[data-move]")!;
+    expect(resolveBoardClick(hint, state)).toEqual({ type: "selectLocation", locationId: "skullRock" });
+  });
+
   it("moves via the explicit Move here button", () => {
     const state = barePlayState();
     state.villainLocation = "jollyRoger";

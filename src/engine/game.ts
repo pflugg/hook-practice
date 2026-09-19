@@ -210,11 +210,52 @@ function discardHand(state: GameState): void {
   }
 }
 
-function checkTickTock(state: GameState, dest: LocationId): void {
-  if (state.locations[dest].heroes.some((h) => h.defId === "tickTock")) {
-    discardHand(state);
-    log(state, "Tick Tock snaps — the whole hand is discarded.", "bad");
+function abilityLine(card: CardInstance): string {
+  const d = def(card.defId);
+  return `${d.name}: ${d.text}`;
+}
+
+function openFateReport(
+  state: GameState,
+  opts: {
+    drawn: CardInstance[];
+    played?: CardInstance;
+    discarded?: CardInstance[];
+    note: string;
+    resume: "nextTurn" | "actions";
+    markAction?: boolean;
+  },
+): void {
+  const played = opts.played;
+  state.pending = {
+    kind: "fateReport",
+    drawn: opts.drawn,
+    played,
+    discarded: opts.discarded ?? [],
+    note: opts.note,
+    abilityText: played ? abilityLine(played) : "",
+    resume: opts.resume,
+    markAction: opts.markAction,
+  };
+  state.phase = opts.resume === "nextTurn" ? "fateAdversary" : "resolving";
+  if (opts.resume === "nextTurn") {
+    state.lastComputerFateNote = opts.note;
   }
+}
+
+function checkTickTock(state: GameState, dest: LocationId): boolean {
+  const croc = state.locations[dest].heroes.find((h) => h.defId === "tickTock");
+  if (!croc) return false;
+  discardHand(state);
+  log(state, "Tick Tock snaps — the whole hand is discarded.", "bad");
+  openFateReport(state, {
+    drawn: [croc],
+    played: croc,
+    discarded: [],
+    note: "Tick Tock snaps — the whole hand is discarded. The crocodile stays in the realm; stepping here will empty the hand again.",
+    resume: "actions",
+  });
+  return true;
 }
 
 function markActionUsed(state: GameState, key: string): void {
@@ -310,15 +351,13 @@ function startComputerFate(state: GameState): void {
       peter,
       drawn.filter((c) => c.instanceId !== peter.instanceId),
     );
-    state.pending = {
-      kind: "fateReport",
+    openFateReport(state, {
       drawn,
       played: peter,
       discarded: drawn.filter((c) => c.instanceId !== peter.instanceId),
       note: "Fate reveals Peter Pan. He is forced to Hangman's Tree.",
-    };
-    state.phase = "fateAdversary";
-    state.lastComputerFateNote = "Peter Pan arrives at Hangman's Tree.";
+      resume: "nextTurn",
+    });
     return;
   }
   const choice = chooseFateCard(state, drawn, state.difficulty);
@@ -376,9 +415,7 @@ function resolveComputerFateCard(
     discardFateCard(state, card);
   }
   log(state, note, "fate");
-  state.lastComputerFateNote = note;
-  state.pending = { kind: "fateReport", drawn, played: card, discarded, note };
-  state.phase = "fateAdversary";
+  openFateReport(state, { drawn, played: card, discarded, note, resume: "nextTurn" });
 }
 
 function labelLoc(id: LocationId): string {
@@ -428,7 +465,15 @@ function startPlayerFate(state: GameState): void {
     return;
   }
   if (playPeterIfPresent(state, drawn)) {
-    consumeCurrentAction(state);
+    const peter = drawn.find((c) => c.defId === "peterPan")!;
+    openFateReport(state, {
+      drawn,
+      played: peter,
+      discarded: drawn.filter((c) => c.instanceId !== peter.instanceId),
+      note: "Peter Pan is revealed and lands at Hangman's Tree.",
+      resume: "actions",
+      markAction: true,
+    });
     return;
   }
   state.pending = { kind: "fateChooseCard", cards: drawn, actor: "player" };
@@ -519,7 +564,14 @@ function resolveEffect(state: GameState, card: CardInstance): void {
     }
     if (hero.defId === "peterPan") {
       revealPeter(state, hero, []);
-      consumeCurrentAction(state);
+      openFateReport(state, {
+        drawn: [hero],
+        played: hero,
+        discarded: [],
+        note: "Worthy Opponent finds Peter Pan. He is forced to Hangman's Tree.",
+        resume: "actions",
+        markAction: true,
+      });
       return;
     }
     state.heldCard = hero;
@@ -574,7 +626,14 @@ function playHeldHero(state: GameState, hero: CardInstance, locationId: Location
     state.pending = { kind: "tinkerDiscard", tinkerId: hero.instanceId, locationId, actor: tinkerActor };
     return;
   }
-  consumeCurrentAction(state);
+  openFateReport(state, {
+    drawn: [hero],
+    played: hero,
+    discarded: [],
+    note: `${def(hero.defId).name} is played to ${labelLoc(locationId)}.`,
+    resume: "actions",
+    markAction: true,
+  });
 }
 
 export function createGame(difficulty: GameState["difficulty"] = "normal", seed = Date.now()): GameState {
@@ -626,7 +685,14 @@ export function applyInput(prev: GameState, input: Input): GameState {
 
   if (input.type === "acknowledgeFate") {
     if (state.pending?.kind === "fateReport") {
-      beginNextTurn(state);
+      if (state.pending.resume === "nextTurn") {
+        beginNextTurn(state);
+      } else if (state.pending.markAction) {
+        consumeCurrentAction(state);
+      } else {
+        state.pending = null;
+        state.phase = "actions";
+      }
     }
     return state;
   }
@@ -640,6 +706,7 @@ export function applyInput(prev: GameState, input: Input): GameState {
   }
 
   if (input.type === "cancel") {
+    if (state.pending?.kind === "fateReport") return state;
     if (state.pending?.kind === "starkeyHero" || state.pending?.kind === "tinkerDiscard") {
       consumeCurrentAction(state);
       return state;
@@ -723,7 +790,14 @@ export function applyInput(prev: GameState, input: Input): GameState {
     }
     if (hero.defId === "peterPan") {
       revealPeter(state, hero, []);
-      consumeCurrentAction(state);
+      openFateReport(state, {
+        drawn: [hero],
+        played: hero,
+        discarded: [],
+        note: "Obsession finds Peter Pan. He is forced to Hangman's Tree.",
+        resume: "actions",
+        markAction: true,
+      });
       return state;
     }
     state.pending = { kind: "obsessionLocation", heroId: hero.instanceId };
@@ -734,7 +808,17 @@ export function applyInput(prev: GameState, input: Input): GameState {
       state.pending = null;
       state.phase = "actions";
     }
-    if (state.pending?.kind === "tinkerDiscard") consumeCurrentAction(state);
+    if (state.pending?.kind === "tinkerDiscard") {
+      const tinker = findCard(state, state.pending.tinkerId);
+      openFateReport(state, {
+        drawn: tinker ? [tinker] : [],
+        played: tinker ?? undefined,
+        discarded: [],
+        note: "Tinker Bell is seated. No Ally was dismissed.",
+        resume: "actions",
+        markAction: true,
+      });
+    }
     return state;
   }
   if (input.type === "acceptCondition") {
@@ -788,13 +872,13 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
     if (!legalMoveLocations(state).includes(locationId)) return state;
     state.villainLocation = locationId;
     state.usedActions = [];
-    checkTickTock(state, locationId);
-    state.phase = "actions";
+    const snapped = checkTickTock(state, locationId);
     const cover = coveringHero(state, locationId);
     log(
       state,
       `The captain arrives at ${labelLoc(locationId)}${cover ? ` — ${def(cover.defId).name} covers the top actions` : ""}.`,
     );
+    if (!snapped) state.phase = "actions";
     return state;
   }
   const p = state.pending;
@@ -1046,30 +1130,46 @@ function handleCard(state: GameState, instanceId: string): GameState {
     const held = state.heldCard ?? findCard(state, p.cardId);
     if (!held) return state;
     state.attachments.push({ item: held, attachedTo: instanceId });
-    log(state, `${def(held.defId).name} attaches to ${def(findCard(state, instanceId)!.defId).name}.`, "fate");
-    consumeCurrentAction(state);
-    return state;
+    const note = `${def(held.defId).name} attaches to ${def(findCard(state, instanceId)!.defId).name}.`;
+    log(state, note, "fate");
+    return finishPlayerFatePlay(state, held, note);
   }
 
   if (p.kind === "fateChooseItem") {
     if (!allLocationItems(state).some((i) => i.item.instanceId === instanceId)) return state;
     const item = removeFromRealm(state, instanceId);
+    const headache = state.heldCard;
     if (item) {
       discardVillainCard(state, item);
       log(state, `Splitting Headache discards ${def(item.defId).name}.`, "fate");
     }
-    if (state.heldCard) discardFateCard(state, state.heldCard);
+    if (headache) discardFateCard(state, headache);
+    if (headache) {
+      return finishPlayerFatePlay(
+        state,
+        headache,
+        item ? `Splitting Headache discards ${def(item.defId).name}.` : "Splitting Headache finds no Item.",
+      );
+    }
     consumeCurrentAction(state);
     return state;
   }
 
   if (p.kind === "tinkerDiscard") {
     if (!state.locations[p.locationId].allies.some((a) => a.instanceId === instanceId)) return state;
+    const tinker = findCard(state, p.tinkerId);
     const ally = removeFromRealm(state, instanceId);
     if (ally) {
       detachAll(state, ally.instanceId);
       discardVillainCard(state, ally);
       log(state, `Tinker Bell discards ${def(ally.defId).name}.`, "fate");
+    }
+    if (tinker) {
+      return finishPlayerFatePlay(
+        state,
+        tinker,
+        ally ? `Tinker Bell discards ${def(ally.defId).name}.` : "Tinker Bell is seated.",
+      );
     }
     consumeCurrentAction(state);
     return state;
@@ -1086,6 +1186,18 @@ function handleCard(state: GameState, instanceId: string): GameState {
   return state;
 }
 
+function finishPlayerFatePlay(state: GameState, card: CardInstance, note: string, extras: CardInstance[] = []): GameState {
+  openFateReport(state, {
+    drawn: [card, ...extras],
+    played: card,
+    discarded: extras,
+    note,
+    resume: "actions",
+    markAction: true,
+  });
+  return state;
+}
+
 function playPlayerFateCard(state: GameState, card: CardInstance): GameState {
   const d = def(card.defId);
   if (d.type === "hero") {
@@ -1098,8 +1210,7 @@ function playPlayerFateCard(state: GameState, card: CardInstance): GameState {
     if (heroes.length === 0) {
       discardFateCard(state, card);
       log(state, `${d.name} has no Hero to attach to.`);
-      consumeCurrentAction(state);
-      return state;
+      return finishPlayerFatePlay(state, card, `${d.name} has no Hero to attach to, so it is discarded.`);
     }
     state.heldCard = card;
     state.pending = { kind: "fateChooseAttach", cardId: card.instanceId, actor: "player" };
@@ -1109,16 +1220,14 @@ function playPlayerFateCard(state: GameState, card: CardInstance): GameState {
     if (allLocationItems(state).length === 0) {
       discardFateCard(state, card);
       log(state, "Splitting Headache finds no Item.");
-      consumeCurrentAction(state);
-      return state;
+      return finishPlayerFatePlay(state, card, "Splitting Headache finds no Item and is discarded.");
     }
     state.heldCard = card;
     state.pending = { kind: "fateChooseItem", cardId: card.instanceId, actor: "player" };
     return state;
   }
   discardFateCard(state, card);
-  consumeCurrentAction(state);
-  return state;
+  return finishPlayerFatePlay(state, card, `You play ${d.name}.`);
 }
 
 function handleConfirm(state: GameState): GameState {

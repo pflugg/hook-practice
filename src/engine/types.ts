@@ -97,7 +97,16 @@ export type Pending =
   | { kind: "obsessionLocation"; heroId: string }
   | { kind: "cunningAlly" }
   | { kind: "cunningLocation"; allyId: string }
-  | { kind: "fateReport"; drawn: CardInstance[]; played?: CardInstance; discarded: CardInstance[]; note: string }
+  | {
+      kind: "fateReport";
+      drawn: CardInstance[];
+      played?: CardInstance;
+      discarded: CardInstance[];
+      note: string;
+      abilityText: string;
+      resume: "nextTurn" | "actions";
+      markAction?: boolean;
+    }
   | { kind: "conditionOffer"; conditionId: string; reason: string };
 
 export type Phase = "title" | "move" | "actions" | "resolving" | "fateAdversary" | "over";

@@ -11,6 +11,8 @@ import {
   REALM,
   selectedSet,
   strategyBrief,
+  explainSelection,
+  IDLE_MOVE_REASON,
   titleState,
   type CardInstance,
   type CoachAdvice,
@@ -19,10 +21,11 @@ import {
   type Input,
   type LocationId,
   type StrategyBrief,
+  type MoveReason,
 } from "../engine";
 import { LOCATION_IDS } from "../engine/types";
 import { allAllies, allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
-import { cutlassAttachScene } from "../engine/scenes";
+import { cutlassAttachScene, tickTockReportScene } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
 import { CREST, TITLE_SCENE, locationDecor } from "./decor";
 import "./styles.css";
@@ -38,14 +41,22 @@ function typeLabel(t: string): string {
 function renderCard(
   state: GameState,
   card: CardInstance,
-  opts: { size?: "mini" | "hand"; legal: boolean; selected: boolean; dimmed?: boolean; coached?: boolean },
+  opts: {
+    size?: "mini" | "hand" | "reveal";
+    legal: boolean;
+    selected: boolean;
+    dimmed?: boolean;
+    coached?: boolean;
+    inspectable?: boolean;
+  },
 ): string {
   const d = def(card.defId);
-  const size = opts.size === "hand" ? "hand-card" : opts.size === "mini" ? "mini" : "";
+  const size = opts.size === "hand" ? "hand-card" : opts.size === "mini" ? "mini" : opts.size === "reveal" ? "reveal" : "";
   const str = d.type === "hero" ? heroStrength(state, card) : d.type === "ally" ? allyStrength(state, card) : 0;
   const attached = attachmentsOn(state, card.instanceId);
   const attachNote = attached.length ? `<p class="text">+ ${attached.map((a) => esc(def(a.defId).name)).join(", ")}</p>` : "";
-  return `<button class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}">
+  const inspectable = Boolean(opts.inspectable && !opts.legal && opts.size !== "reveal");
+  return `<button type="button" class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""} ${inspectable ? "is-inspectable" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}" aria-label="${esc(d.name)}. ${esc(d.text)}">
     ${opts.legal && opts.size === "hand" && (state.pending?.kind === "playChooseCard" || state.pending?.kind === "cunningAlly") ? `<span class="playable-tag">Playable</span>` : ""}
     <div class="meta">
       <span class="badge">${typeLabel(d.type)}</span>
@@ -56,6 +67,14 @@ function renderCard(
     ${attachNote}
     ${d.type === "hero" || d.type === "ally" ? `<div class="str" title="Strength">${str}</div>` : ""}
   </button>`;
+}
+
+function abilityReadout(title: string, text: string): string {
+  if (!text) return "";
+  return `<div class="ability-readout">
+    <h3>${esc(title)}</h3>
+    <p>${esc(text)}</p>
+  </div>`;
 }
 
 function zone(title: string, body: string): string {
@@ -98,6 +117,7 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
               legal: hi.has(`card:${c.instanceId}`),
               selected: sel.has(c.instanceId),
               coached: coached.has(`card:${c.instanceId}`),
+              inspectable: true,
             }),
           )
           .join("")}</div>`
@@ -125,7 +145,12 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
   </section>`;
 }
 
-function titleView(difficulty: Difficulty, coachEnabled: boolean, briefEnabled: boolean): string {
+function titleView(
+  difficulty: Difficulty,
+  coachEnabled: boolean,
+  briefEnabled: boolean,
+  reasonsEnabled: boolean,
+): string {
   return `<div class="sky" aria-hidden="true">
     <div class="stars"></div>
     <div class="stars dim"></div>
@@ -156,8 +181,9 @@ function titleView(difficulty: Difficulty, coachEnabled: boolean, briefEnabled: 
       <div class="diff coach-diff">
         <button type="button" data-coach-toggle class="${coachEnabled ? "is-on" : ""}">${coachEnabled ? "Coach on" : "Coach off"}</button>
         <button type="button" data-brief-toggle class="${briefEnabled ? "is-on" : ""}">${briefEnabled ? "Strategy brief on" : "Strategy brief off"}</button>
+        <button type="button" data-reasons-toggle class="${reasonsEnabled ? "is-on" : ""}">${reasonsEnabled ? "Move reasons on" : "Move reasons off"}</button>
       </div>
-      <p class="coach-lede">Coach names the next click. The Strategy brief is a longer sidebar: where you are, what this moment is, and what it sets up on the win chain. Tutorial starts both on. You can hide either during play.</p>
+      <p class="coach-lede">Coach names the next click. The Strategy brief is the voyage sidebar. <b>Move reasons</b> is a floating “Why this move” after each legal choice — what you picked, why it helps the chain, what to watch. Tutorial starts all three on. Hide any during play.</p>
       <div class="actions-row">
         <button class="btn primary" data-tutorial>Tutorial</button>
         <button class="btn" data-start>Set Sail</button>
@@ -174,7 +200,9 @@ function helpView(fromPlay: boolean): string {
     <p>Each turn you <b>must move</b> to a different unlocked location, then may use each uncovered action there once. Heroes cover the top row. End the turn to refill to 4 cards; the computer then Fates you.</p>
     <p><b>Win</b> by vanquishing Peter Pan at the Jolly Roger after unlocking Hangman’s Tree with the Never Land Map. Vanquishing him anywhere else loses the duel.</p>
     <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable.</p>
-    <p><b>Strategy brief:</b> a persistent sidebar that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach. Tutorial starts both on; hide either from the top bar.</p>
+    <p><b>Strategy brief:</b> a persistent sidebar that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
+    <p><b>Move reasons:</b> a floating “Why this move” panel that updates after each legal click. It names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on.</p>
+    <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it.</p>
     <p><b>Practice tips:</b> Discard aggressively for the Map. Fish Fate with Worthy Opponent and Give Them a Scare. Station strength at the ship before walking Peter across. Beware Tick Tock and Splitting Headache.</p>
     <div class="actions-row"><button class="btn primary" data-close-help>${fromPlay ? "Return to the realm" : "Back"}</button></div>
   </div></div>`;
@@ -197,17 +225,25 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
     </div></div>`;
   }
   if (p?.kind === "fateReport") {
+    const heading =
+      p.resume === "nextTurn"
+        ? "Fate intervening"
+        : p.played?.defId === "tickTock" && !p.markAction
+          ? "Tick Tock snaps"
+          : "Read this card";
+    const eyebrow = p.resume === "nextTurn" ? "Across the table" : "Before you continue";
     return `<div class="overlay fate-in"><div class="modal wood fate">
-      <p class="eyebrow">Across the table</p>
-      <h2>Fate intervening</h2>
+      <p class="eyebrow">${eyebrow}</p>
+      <h2>${heading}</h2>
       <p>${esc(p.note)}</p>
+      ${abilityReadout("What it does", p.abilityText)}
       <div class="modal-cards">${p.drawn
         .map((c) => {
           const focus = p.played?.instanceId === c.instanceId;
-          return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: "hand", legal: false, selected: focus })}</div>`;
+          return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: "reveal", legal: false, selected: focus })}</div>`;
         })
         .join("")}</div>
-      <div class="actions-row"><button class="btn primary${coachClass(coached, "btn:ack")}" data-ack>Continue</button></div>
+      <div class="actions-row"><button type="button" class="btn primary${coachClass(coached, "btn:ack")}" data-ack>Continue</button></div>
     </div></div>`;
   }
   if (p?.kind === "scarePeek") {
@@ -215,7 +251,7 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
       <h2>Give Them a Scare</h2>
       <p>Banish both, or return them with the first button’s card on top.</p>
       <div class="modal-cards">${p.cards
-        .map((c) => renderCard(state, c, { size: "hand", legal: true, selected: false }))
+        .map((c) => renderCard(state, c, { size: "reveal", legal: true, selected: false }))
         .join("")}</div>
       <div class="actions-row">
         <button class="btn${coachClass(coached, "btn:scare-discard")}" data-scare-discard>Banish both</button>
@@ -227,9 +263,9 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
   if (p?.kind === "fateChooseCard") {
     return `<div class="overlay"><div class="modal">
       <h2>Your Fate action</h2>
-      <p>Play one card; the other is discarded.</p>
+      <p>Play one card; the other is discarded. Read the full text before you choose.</p>
       <div class="modal-cards">${p.cards
-        .map((c) => renderCard(state, c, { size: "hand", legal: hi.has(`card:${c.instanceId}`), selected: sel.has(c.instanceId), coached: coached.has(`card:${c.instanceId}`) }))
+        .map((c) => renderCard(state, c, { size: "reveal", legal: hi.has(`card:${c.instanceId}`), selected: sel.has(c.instanceId), coached: coached.has(`card:${c.instanceId}`) }))
         .join("")}</div>
     </div></div>`;
   }
@@ -293,6 +329,25 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
   return "";
 }
 
+function inspectOverlay(state: GameState, instanceId: string): string {
+  const fromPending =
+    state.pending && "drawn" in state.pending
+      ? state.pending.drawn.find((c) => c.instanceId === instanceId)
+      : state.pending && "cards" in state.pending
+        ? state.pending.cards.find((c) => c.instanceId === instanceId)
+        : undefined;
+  const card = findCard(state, instanceId) ?? fromPending ?? state.heldCard;
+  if (!card || card.instanceId !== instanceId) return "";
+  const d = def(card.defId);
+  return `<div class="overlay inspect-in"><div class="modal wood inspect">
+    <p class="eyebrow">Inspect</p>
+    <h2>${esc(d.name)}</h2>
+    ${abilityReadout("What it does", `${d.name}: ${d.text}`)}
+    <div class="modal-cards">${renderCard(state, card, { size: "reveal", legal: false, selected: true })}</div>
+    <div class="actions-row"><button type="button" class="btn primary" data-inspect-close>Close</button></div>
+  </div></div>`;
+}
+
 function coachPanel(advice: CoachAdvice): string {
   return `<aside class="coach-panel" aria-live="polite">
     <div class="coach-copy">
@@ -342,7 +397,38 @@ function strategySidebar(brief: StrategyBrief): string {
   </aside>`;
 }
 
-function playView(state: GameState, coachEnabled: boolean, briefEnabled: boolean): string {
+function reasonFloat(reason: MoveReason): string {
+  return `<aside class="reason-float${reason.soft ? " is-soft" : ""}" data-reason-float aria-label="Why this move">
+    <header class="reason-head" data-reason-drag>
+      <div>
+        <p class="reason-kicker">Why this move</p>
+        <h2>Post-selection</h2>
+      </div>
+      <button type="button" class="btn ghost reason-hide" data-reasons-toggle>Hide</button>
+    </header>
+    <section class="reason-block">
+      <h3>What you chose</h3>
+      <p>${esc(reason.chose)}</p>
+    </section>
+    <section class="reason-block">
+      <h3>Why it helps the plan</h3>
+      <p>${esc(reason.why)}</p>
+    </section>
+    <section class="reason-block">
+      <h3>What it sets up</h3>
+      <p>${esc(reason.next)}</p>
+    </section>
+    <p class="reason-foot">Not Coach (next click) and not the Strategy brief (voyage status). Drag the title bar to park this out of the way.</p>
+  </aside>`;
+}
+
+function playView(
+  state: GameState,
+  coachEnabled: boolean,
+  briefEnabled: boolean,
+  reasonsEnabled: boolean,
+  reason: MoveReason | null,
+): string {
   const hi = highlightSet(state);
   const sel = selectedSet(state);
   const advice = coachEnabled ? advise(state) : null;
@@ -391,6 +477,7 @@ function playView(state: GameState, coachEnabled: boolean, briefEnabled: boolean
         <div class="chip">${state.difficulty === "easy" ? "Easy Fate" : "Normal Fate"}</div>
         <button type="button" class="chip ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
         <button type="button" class="chip ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
+        <button type="button" class="chip ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
         <button class="chip" data-help>Help</button>
         <button class="chip" data-resign>Resign</button>
       </div>
@@ -415,6 +502,7 @@ function playView(state: GameState, coachEnabled: boolean, briefEnabled: boolean
                       selected: sel.has(c.instanceId),
                       dimmed: Boolean(state.pending && ["playChooseCard", "discardSelect", "cunningAlly"].includes(state.pending.kind) && !hi.has(`card:${c.instanceId}`)),
                       coached: coached.has(`card:${c.instanceId}`),
+                      inspectable: true,
                     }),
                   )
                   .join("")
@@ -428,7 +516,12 @@ function playView(state: GameState, coachEnabled: boolean, briefEnabled: boolean
       </aside>
     </footer>
   </div>
+  ${reasonsEnabled && reason ? reasonFloat(reason) : ""}
   ${overlayFor(state, hi, sel, coached)}`;
+}
+
+export function renderOverlay(state: GameState): string {
+  return overlayFor(state, highlightSet(state), selectedSet(state), new Set());
 }
 
 function readFlag(key: string, fallback = true): boolean {
@@ -451,8 +544,10 @@ function writeFlag(key: string, on: boolean): void {
 
 function bootState(): GameState {
   try {
-    if (import.meta.env.DEV && new URLSearchParams(window.location.search).get("scene") === "cutlass") {
-      return cutlassAttachScene();
+    if (import.meta.env.DEV) {
+      const scene = new URLSearchParams(window.location.search).get("scene");
+      if (scene === "cutlass") return cutlassAttachScene();
+      if (scene === "ticktock") return tickTockReportScene();
     }
   } catch {
     /* ignore */
@@ -460,23 +555,93 @@ function bootState(): GameState {
   return titleState();
 }
 
+function readReasonPos(): { x: number; y: number } | null {
+  try {
+    const raw = sessionStorage.getItem("nld-reason-pos");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { x?: number; y?: number };
+    if (typeof parsed.x === "number" && typeof parsed.y === "number") return { x: parsed.x, y: parsed.y };
+  } catch {
+    /* sessionStorage can be unavailable */
+  }
+  return null;
+}
+
+function writeReasonPos(pos: { x: number; y: number }): void {
+  try {
+    sessionStorage.setItem("nld-reason-pos", JSON.stringify(pos));
+  } catch {
+    /* sessionStorage can be unavailable */
+  }
+}
+
 export function mount(root: HTMLElement): void {
   let state: GameState = bootState();
   let difficulty: Difficulty = "normal";
   let coachEnabled = readFlag("nld-coach");
   let briefEnabled = readFlag("nld-brief");
+  let reasonsEnabled = readFlag("nld-reasons");
+  let lastReason: MoveReason = IDLE_MOVE_REASON;
+  let inspectId: string | null = null;
+  let reasonPos = readReasonPos();
+
+  const bindReasonDrag = () => {
+    const el = root.querySelector<HTMLElement>("[data-reason-float]");
+    if (!el) return;
+    if (reasonPos) {
+      el.style.left = `${reasonPos.x}px`;
+      el.style.top = `${reasonPos.y}px`;
+      el.style.right = "auto";
+      el.style.bottom = "auto";
+    }
+    const handle = el.querySelector<HTMLElement>("[data-reason-drag]");
+    if (!handle) return;
+    handle.addEventListener("pointerdown", (event) => {
+      if ((event.target as HTMLElement).closest("button")) return;
+      event.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const dx = event.clientX - rect.left;
+      const dy = event.clientY - rect.top;
+      const move = (ev: PointerEvent) => {
+        const x = Math.max(8, Math.min(window.innerWidth - el.offsetWidth - 8, ev.clientX - dx));
+        const y = Math.max(8, Math.min(window.innerHeight - 48, ev.clientY - dy));
+        reasonPos = { x, y };
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+        el.style.right = "auto";
+        el.style.bottom = "auto";
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        if (reasonPos) writeReasonPos(reasonPos);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    });
+  };
 
   const render = () => {
-    if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled, briefEnabled);
+    const inspect = inspectId ? inspectOverlay(state, inspectId) : "";
+    const reason = reasonsEnabled ? lastReason : null;
+    if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled);
     else if (state.screen === "help") {
       root.innerHTML =
-        (state.phase === "title" ? titleView(difficulty, coachEnabled, briefEnabled) : playView(state, coachEnabled, briefEnabled)) +
-        helpView(state.phase !== "title");
-    } else root.innerHTML = playView(state, coachEnabled, briefEnabled);
+        (state.phase === "title"
+          ? titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled)
+          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason)) +
+        helpView(state.phase !== "title") +
+        inspect;
+    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason) + inspect;
+    bindReasonDrag();
   };
 
   const dispatch = (input: Input) => {
+    inspectId = null;
+    const before = state;
     state = applyInput(state, input);
+    const explained = explainSelection(before, input, state);
+    if (explained) lastReason = explained;
     render();
   };
 
@@ -494,12 +659,20 @@ export function mount(root: HTMLElement): void {
       render();
       return;
     }
+    if (t.closest("[data-reasons-toggle]")) {
+      reasonsEnabled = !reasonsEnabled;
+      writeFlag("nld-reasons", reasonsEnabled);
+      render();
+      return;
+    }
     const tutorial = t.closest<HTMLElement>("[data-tutorial]");
     if (tutorial) {
       coachEnabled = true;
       briefEnabled = true;
+      reasonsEnabled = true;
       writeFlag("nld-coach", true);
       writeFlag("nld-brief", true);
+      writeFlag("nld-reasons", true);
       return dispatch({ type: "start", difficulty });
     }
     const start = t.closest<HTMLElement>("[data-start]");
@@ -521,6 +694,11 @@ export function mount(root: HTMLElement): void {
     if (t.closest("[data-end]")) return dispatch({ type: "endTurn" });
     if (t.closest("[data-confirm]")) return dispatch({ type: "confirm" });
     if (t.closest("[data-cancel]")) return dispatch({ type: "cancel" });
+    if (t.closest("[data-inspect-close]")) {
+      inspectId = null;
+      render();
+      return;
+    }
     if (t.closest("[data-ack]")) return dispatch({ type: "acknowledgeFate" });
     if (t.closest("[data-scare-discard]")) return dispatch({ type: "scareDiscardBoth" });
     const order = t.closest<HTMLElement>("[data-scare-order]");
@@ -534,6 +712,17 @@ export function mount(root: HTMLElement): void {
     if (t.closest("[data-skip-cond]")) return dispatch({ type: "skipCondition" });
     if (t.closest("[data-play-hero]")) return dispatch({ type: "playOrDiscardHero", play: true });
     if (t.closest("[data-banish-hero]")) return dispatch({ type: "playOrDiscardHero", play: false });
+
+    const cardEl = t.closest<HTMLElement>("[data-card]");
+    if (cardEl && !t.closest(".overlay")) {
+      const id = cardEl.dataset.card;
+      const legal = Boolean(id && highlightSet(state).has(`card:${id}`));
+      if (id && !legal) {
+        inspectId = id;
+        render();
+        return;
+      }
+    }
 
     const boardInput = resolveBoardClick(t, state);
     if (boardInput) dispatch(boardInput);

@@ -39,6 +39,10 @@ export function resolveBoardClick(target: EventTarget | null, state: GameState):
     return { type: "selectCard", instanceId: card.dataset.card! };
   }
 
+  if (card && !pickingCard) {
+    return null;
+  }
+
   const actionEnabled = Boolean(act && !act.hasAttribute("disabled"));
   if (actionEnabled && hi.has(`act:${act!.dataset.act}`)) {
     return { type: "selectAction", actionKey: act!.dataset.act! };
@@ -54,7 +58,7 @@ export function resolveBoardClick(target: EventTarget | null, state: GameState):
   if (pickingCard) return null;
 
   if (card) {
-    return { type: "selectCard", instanceId: card.dataset.card! };
+    return null;
   }
   if (actionEnabled) {
     return { type: "selectAction", actionKey: act!.dataset.act! };

@@ -209,7 +209,13 @@ function thisMoment(state: GameState): string {
     case "worthyLocation":
       return "This is your Fate action — you are the one flipping the other deck. If Peter is in the pair, play him: he lands at Hangman’s Tree. Park Tick Tock off the lagoon and the tree if you can. Other Heroes should cover the fewest actions you still need. This beat exists so you can hunt Peter without waiting for the computer’s turn.";
     case "fateReport":
-      return "Fate has already acted. This modal is only an acknowledge. Read what landed: who is covering your next stop, whether Peter appeared, whether Tick Tock is now on a place you wanted to walk. Then continue. The next required move will use that new map of the realm.";
+      if (p.resume === "nextTurn") {
+        return "Fate has already acted. This modal stays up with the full paraphrased card text until you press Continue — it will not auto-dismiss. Read what landed: who is covering your next stop, whether Peter appeared, whether Tick Tock is now on a place you wanted to walk. Then acknowledge. The next required move will use that new map of the realm.";
+      }
+      if (p.played?.defId === "tickTock" && !p.markAction) {
+        return "You stepped onto Tick Tock. The hand wipe already happened; this modal is here so you can read the crocodile’s lasting text before you take any more actions. Continue is required. Click the board mini later to inspect the same wording again.";
+      }
+      return "The Fate card is already seated or spent. Stay on this modal and read the full paraphrased ability — hover titles are not enough — then press Continue before the board takes focus again.";
     case "scarePeek":
       return "You peeked at two Fate cards without revealing them. Looking is not finding Peter — a peek will not force him onto the tree. You may remove both from play, or put them back in either order. If Peter is in the peek, return him on top so the next real Fate flip can find him. If the crocodile or a headache is there, banishing both is often the kinder table.";
     case "obsessionDecide":

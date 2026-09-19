@@ -753,9 +753,25 @@ function advisePending(state: GameState): CoachAdvice {
       );
     }
     case "fateReport": {
+      if (p.resume === "nextTurn") {
+        return say(
+          "Continue",
+          "Fate has had its say. Read the full card text — especially Tick Tock — then take your next move. The modal stays until you acknowledge.",
+          ["btn:ack"],
+          state,
+        );
+      }
+      if (p.played?.defId === "tickTock" && !p.markAction) {
+        return say(
+          "Continue",
+          "The crocodile emptied your hand. Read the lasting trap on this card before you spend the rest of this stop.",
+          ["btn:ack"],
+          state,
+        );
+      }
       return say(
         "Continue",
-        "Fate has had its say. Check where Heroes landed — especially Tick Tock and Peter — then take your next move.",
+        "Read the full paraphrased ability on this card before you return to the board.",
         ["btn:ack"],
         state,
       );
