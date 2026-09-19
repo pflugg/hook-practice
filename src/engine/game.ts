@@ -644,6 +644,17 @@ export function applyInput(prev: GameState, input: Input): GameState {
       consumeCurrentAction(state);
       return state;
     }
+    if (state.pending?.kind === "playChooseAllyAttach" || state.pending?.kind === "playChooseLocation") {
+      state.pending = { kind: "playChooseCard" };
+      state.phase = "resolving";
+      return state;
+    }
+    if (state.pending?.kind === "playChooseCard") {
+      state.pending = null;
+      state.phase = "actions";
+      state.actionKey = undefined;
+      return state;
+    }
     if (state.phase === "resolving") {
       if (state.pending?.kind === "scarePeek") return state;
       if (state.pending?.kind === "fateChooseCard") return state;
@@ -948,6 +959,10 @@ function handleCard(state: GameState, instanceId: string): GameState {
       return state;
     }
     if (d.id === "cutlass") {
+      if (allAllies(state).length === 0) {
+        log(state, "The Cutlass needs an Ally already ashore. Play a crew member first.", "info");
+        return state;
+      }
       state.pending = { kind: "playChooseAllyAttach", cardId: instanceId };
       return state;
     }
@@ -957,7 +972,11 @@ function handleCard(state: GameState, instanceId: string): GameState {
 
   if (p.kind === "playChooseAllyAttach") {
     if (!allAllies(state).some((a) => a.ally.instanceId === instanceId)) return state;
-    const card = findCard(state, p.cardId)!;
+    const card = findCard(state, p.cardId);
+    if (!card) {
+      state.pending = { kind: "playChooseCard" };
+      return state;
+    }
     maybeAskPayment(state, card, undefined, instanceId);
     return state;
   }

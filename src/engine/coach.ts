@@ -414,11 +414,11 @@ function advisePending(state: GameState): CoachAdvice {
       const allies = allAllies(state);
       const atRoger = allies.find((a) => a.location === "jollyRoger");
       const pick = atRoger ?? allies.sort((a, b) => allyStrength(state, b.ally) - allyStrength(state, a.ally))[0];
-      if (!pick) return say("Cancel", "There is no Ally to arm.", ["btn:cancel"], state);
+      if (!pick) return say("Cancel", "There is no Ally to arm. Cancel and play a crew member first.", ["btn:cancel"], state);
       return say(
         `Strap the Cutlass to ${cardName(pick.ally)}`,
-        "A stronger Ally on the ship makes Peter’s clash safer.",
-        [`card:${pick.ally.instanceId}`],
+        `Use the picker — tap “Strap Cutlass to ${cardName(pick.ally)}” — or click that Ally on the board. A stronger Ally on the ship makes Peter’s clash safer.`,
+        [`card:${pick.ally.instanceId}`, `btn:attach:${pick.ally.instanceId}`],
         state,
       );
     }

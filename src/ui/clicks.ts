@@ -19,6 +19,21 @@ export function resolveBoardClick(target: EventTarget | null, state: GameState):
   const card = el.closest<HTMLElement>("[data-card]");
   const act = el.closest<HTMLElement>("[data-act]");
   const loc = el.closest<HTMLElement>("[data-loc]");
+  const pickingCard = Boolean(
+    state.pending &&
+      [
+        "playChooseAllyAttach",
+        "playChooseCard",
+        "cunningAlly",
+        "ayeAyeAlly",
+        "movePieceSelect",
+        "moveHeroSelect",
+        "vanquishHero",
+        "vanquishAllies",
+        "discardSelect",
+        "starkeyHero",
+      ].includes(state.pending.kind),
+  );
 
   if (card && hi.has(`card:${card.dataset.card}`)) {
     return { type: "selectCard", instanceId: card.dataset.card! };
@@ -32,6 +47,11 @@ export function resolveBoardClick(target: EventTarget | null, state: GameState):
   if (loc && hi.has(`loc:${loc.dataset.loc}`)) {
     return { type: "selectLocation", locationId: loc.dataset.loc as LocationId };
   }
+
+  if (pickingCard && card) {
+    return { type: "selectCard", instanceId: card.dataset.card! };
+  }
+  if (pickingCard) return null;
 
   if (card) {
     return { type: "selectCard", instanceId: card.dataset.card! };

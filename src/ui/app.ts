@@ -4,6 +4,7 @@ import {
   availableActions,
   cardName,
   def,
+  findCard,
   highlightSet,
   objectiveSteps,
   promptText,
@@ -20,7 +21,8 @@ import {
   type StrategyBrief,
 } from "../engine";
 import { LOCATION_IDS } from "../engine/types";
-import { allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
+import { allAllies, allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
+import { cutlassAttachScene } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
 import { CREST, TITLE_SCENE, locationDecor } from "./decor";
 import "./styles.css";
@@ -261,6 +263,33 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
       </div>
     </div></div>`;
   }
+  if (p?.kind === "playChooseAllyAttach") {
+    const item = findCard(state, p.cardId);
+    const itemName = item ? cardName(item) : "Cutlass";
+    const allies = allAllies(state);
+    return `<div class="overlay pass-through"><div class="modal wood attach-picker">
+      <p class="eyebrow">Arm an Ally</p>
+      <h2>Strap ${esc(itemName)}</h2>
+      <p>Choose any Ally in the realm. You can also click that Ally’s card on the board. Cancel returns to Play a Card.</p>
+      ${
+        allies.length
+          ? `<ul class="attach-list">${allies
+              .map((a) => {
+                const strapClass = coachClass(coached, `btn:attach:${a.ally.instanceId}`) || coachClass(coached, `card:${a.ally.instanceId}`);
+                return `<li>
+                <div class="attach-meta">
+                  <strong>${esc(cardName(a.ally))}</strong>
+                  <span>Strength ${allyStrength(state, a.ally)} · ${esc(REALM[a.location].name)}</span>
+                </div>
+                <button type="button" class="btn primary${strapClass}" data-card="${a.ally.instanceId}">Strap ${esc(itemName)} to ${esc(cardName(a.ally))}</button>
+              </li>`;
+              })
+              .join("")}</ul>`
+          : `<p class="empty">No Allies are ashore. Cancel and play a crew member first.</p>`
+      }
+      <div class="actions-row"><button class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel>Cancel</button></div>
+    </div></div>`;
+  }
   return "";
 }
 
@@ -326,12 +355,18 @@ function playView(state: GameState, coachEnabled: boolean, briefEnabled: boolean
   if (state.pending && ["discardSelect", "vanquishAllies"].includes(state.pending.kind)) {
     promptButtons.push(`<button class="btn primary${coachClass(coached, "btn:confirm")}" data-confirm>Confirm</button>`);
   }
-  if (
-    state.phase === "resolving" &&
+  const canCancelPlay =
     state.pending &&
-    !["scarePeek", "fateChooseCard", "fateReport"].includes(state.pending.kind)
+    ["playChooseCard", "playChooseLocation", "playChooseAllyAttach"].includes(state.pending.kind);
+  if (
+    canCancelPlay ||
+    (state.phase === "resolving" &&
+      state.pending &&
+      !["scarePeek", "fateChooseCard", "fateReport"].includes(state.pending.kind))
   ) {
-    promptButtons.push(`<button class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel>Cancel</button>`);
+    if (!promptButtons.some((b) => b.includes("data-cancel"))) {
+      promptButtons.push(`<button class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel>Cancel</button>`);
+    }
   }
   if (state.pending?.kind === "tinkerDiscard") {
     promptButtons.push(`<button class="btn ghost${coachClass(coached, "btn:skip-cond")}" data-skip-cond>Skip discard</button>`);
@@ -414,8 +449,19 @@ function writeFlag(key: string, on: boolean): void {
   }
 }
 
+function bootState(): GameState {
+  try {
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).get("scene") === "cutlass") {
+      return cutlassAttachScene();
+    }
+  } catch {
+    /* ignore */
+  }
+  return titleState();
+}
+
 export function mount(root: HTMLElement): void {
-  let state: GameState = titleState();
+  let state: GameState = bootState();
   let difficulty: Difficulty = "normal";
   let coachEnabled = readFlag("nld-coach");
   let briefEnabled = readFlag("nld-brief");

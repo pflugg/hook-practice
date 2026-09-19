@@ -17,6 +17,7 @@ export {
   allyStrength,
   availableActions,
   cardName,
+  findCard,
   heroStrength,
   isUnlocked,
   legalMoveLocations,

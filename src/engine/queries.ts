@@ -300,7 +300,7 @@ export function promptText(state: GameState): string {
     case "playChooseLocation":
       return `Click a glowing location to play ${cardName(findCard(state, p.cardId)!)}.`;
     case "playChooseAllyAttach":
-      return "Strap the Cutlass to an Ally.";
+      return "Use the picker to strap this to an Ally, or click that Ally on the board. Cancel returns to your hand.";
     case "playChoosePayment":
       return "Pay with Power, or discard the Never Land Map instead?";
     case "starkeyHero":

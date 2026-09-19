@@ -185,7 +185,7 @@ function thisMoment(state: GameState): string {
     case "playChoosePayment":
       return "An Item is asking for its cost. If the Never Land Map is already in the realm, you may spend Power or discard the Map instead. Once the tree is open, keeping the Map in play is usually wiser — it can still cover a later Item when Power is short. Spending the Map is a last resort after the hideout is unlocked.";
     case "playChooseAllyAttach":
-      return "The Cutlass wants an Ally to wear it. That is +2 Strength on that crew. Prefer someone already on the Jolly Roger, or the Ally you are about to walk there. You are not decorating the table; you are pre-building the clash.";
+      return "The Cutlass wants an Ally to wear it — that is +2 Strength on that crew. Use the picker and tap Strap Cutlass to the Ally you want, or click that Ally’s card on the board. Prefer someone already on the Jolly Roger, or the Ally you will walk there. Cancel puts you back on Play a Card if this was the wrong tool.";
     case "discardSelect":
       return "A Discard action lets you throw cards away so the deck can offer new ones. It still spends the action even if you toss nothing. Keep the Map. Keep hunt cards while Peter is hidden. Keep Allies you can still afford if the ship is light. Toss the rest — digging for the Map is how most opening voyages actually start.";
     case "vanquishHero":
