@@ -348,7 +348,7 @@ export function promptText(state: GameState): string {
     case "cunningLocation":
       return "Where should that Ally come ashore?";
     case "fateReport":
-      return p.note;
+      return p.abilityText ? `${p.note} ${p.abilityText}` : p.note;
     case "conditionOffer":
       return p.reason;
   }

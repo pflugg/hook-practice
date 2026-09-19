@@ -33,6 +33,14 @@ npm run build
 npm run preview
 ```
 
+If a host (including the Mac Muscle preview on **:4173**) is serving the production `dist/` folder, rebuild after pulling and restart that static server:
+
+```bash
+npm run build
+# restart the process that serves dist/ on :4173
+# example: npx serve dist -l 4173
+```
+
 ## How to play
 
 **Win** by completing this chain:
@@ -101,8 +109,12 @@ Hide it with the top-bar **Brief** chip or **Hide brief**. On narrower windows i
 | A glowing location | Move, or drop a card there |
 | A glowing action | Perform that action |
 | A glowing card | Play, attach, vanquish, or move it |
+| A non-glowing hand or board card | Inspect — full paraphrased text in a modal |
 | End turn | Draw, then face Fate |
+| Continue on a Fate report | Required. The reveal stays until you acknowledge; it does not auto-dismiss |
 | Resign | Concede and review the result |
+
+Fate intervening (and similar reveal moments) use a larger unclamped card face plus a **What it does** readout of the complete paraphrased ability. Hover titles are not the only way to read Tick Tock. If the engine already seated the card or wiped the hand, the modal still waits on Continue before the next move or action stretch.
 
 ## Legal
 
