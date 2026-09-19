@@ -49,12 +49,22 @@ npm run preview
 3. End the turn. Draw back up to 4 cards.
 4. The computer performs one Fate action against you.
 
-Heroes cover the **top** actions at their location. Gold outlines mark legal clicks. The prompt bar always says what to do next.
+Heroes cover the **top** actions at their location. Gold outlines mark legal clicks. A stronger teal outline marks the Coach’s suggested target when Coach is on. The prompt bar always says what the rules need next.
 
 **Difficulty**
 
 - **Easy** — Fate picks randomly among legal plays.
 - **Normal** (default) — Fate prefers Peter Pan, blocks useful actions, parks Tick Tock on rich locations, and spends Splitting Headache on your best Items.
+
+## Coach mode
+
+A heuristic advisor (not an LLM) sits beside the prompt and names the next concrete click — *Move to Skull Rock*, *Take Gain 3*, *Play Never Land Map to Mermaid Lagoon* — plus one or two sentences on why that step serves Hook’s chain: play the Map, unlock Hangman’s Tree, reveal Peter, walk him to the Jolly Roger, vanquish him there.
+
+- **Tutorial** on the title screen starts a game with Coach on.
+- **Set Sail** uses the title **Coach on/off** toggle (defaults on for a new session).
+- During play, the top-bar **Coach** chip or the panel’s **Hide coach** button turns it off without ending the game. The choice persists for the browser tab.
+- Coach only *highlights* a recommended legal target more strongly. Every other legal option stays clickable.
+- It covers the full loop: required move, actions (Gain / Discard / Play / Fate / Vanquish / Move), card and payment choices, Fate acknowledge, and win/loss awareness. It warns about Tick Tock and Heroes covering key actions.
 
 ## Practice tips
 
@@ -67,7 +77,7 @@ Heroes cover the **top** actions at their location. Gold outlines mark legal cli
 
 ## Project layout
 
-- `src/engine/` — pure rules engine (cards, realm, queries, Fate AI, reducer)
+- `src/engine/` — pure rules engine (cards, realm, queries, Fate AI, heuristic Coach, reducer)
 - `src/ui/` — original CSS/SVG interface
 - `tests/` — Vitest coverage for the objective chain
 - `RULES_NOTES.md` — intentional simplifications versus the full board game

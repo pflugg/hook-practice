@@ -25,3 +25,4 @@ export {
   promptText,
 } from "./queries";
 export { applyInput, createGame, highlightSet, selectedSet, titleState } from "./game";
+export { advise, type CoachAdvice } from "./coach";

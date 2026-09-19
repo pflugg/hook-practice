@@ -1,4 +1,5 @@
 import {
+  advise,
   applyInput,
   availableActions,
   cardName,
@@ -10,6 +11,7 @@ import {
   selectedSet,
   titleState,
   type CardInstance,
+  type CoachAdvice,
   type Difficulty,
   type GameState,
   type Input,
@@ -32,14 +34,14 @@ function typeLabel(t: string): string {
 function renderCard(
   state: GameState,
   card: CardInstance,
-  opts: { size?: "mini" | "hand"; legal: boolean; selected: boolean; dimmed?: boolean },
+  opts: { size?: "mini" | "hand"; legal: boolean; selected: boolean; dimmed?: boolean; coached?: boolean },
 ): string {
   const d = def(card.defId);
   const size = opts.size === "hand" ? "hand-card" : opts.size === "mini" ? "mini" : "";
   const str = d.type === "hero" ? heroStrength(state, card) : d.type === "ally" ? allyStrength(state, card) : 0;
   const attached = attachmentsOn(state, card.instanceId);
   const attachNote = attached.length ? `<p class="text">+ ${attached.map((a) => esc(def(a.defId).name)).join(", ")}</p>` : "";
-  return `<button class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}">
+  return `<button class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}">
     ${opts.legal && opts.size === "hand" && (state.pending?.kind === "playChooseCard" || state.pending?.kind === "cunningAlly") ? `<span class="playable-tag">Playable</span>` : ""}
     <div class="meta">
       <span class="badge">${typeLabel(d.type)}</span>
@@ -56,7 +58,7 @@ function zone(title: string, body: string): string {
   return `<div class="zone"><h3>${title}</h3>${body}</div>`;
 }
 
-function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: Set<string>): string {
+function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: Set<string>, coached: Set<string>): string {
   const meta = REALM[id];
   const loc = state.locations[id];
   const locked = id === "hangmansTree" && !state.hangmansUnlocked;
@@ -78,7 +80,8 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
     `<div class="row">${list
       .map((a) => {
         const legalAct = showLegalActs && hi.has(`act:${a.key}`);
-        return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : ""}" data-act="${a.key}" ${a.covered || a.used || !showLegalActs ? "disabled" : ""}>${esc(a.label)}</button>`;
+        const coachAct = legalAct && coached.has(`act:${a.key}`);
+        return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : ""} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${a.covered || a.used || !showLegalActs ? "disabled" : ""}>${esc(a.label)}</button>`;
       })
       .join("")}</div>`;
 
@@ -90,13 +93,15 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
               size: "mini",
               legal: hi.has(`card:${c.instanceId}`),
               selected: sel.has(c.instanceId),
+              coached: coached.has(`card:${c.instanceId}`),
             }),
           )
           .join("")}</div>`
       : `<p class="empty">${empty}</p>`;
 
   const moveLabel = state.phase === "move" ? "Move here" : "Choose this place";
-  return `<section class="location ${id} ${current ? "is-current" : ""} ${legal ? "is-legal" : ""} ${locked ? "is-locked" : ""}" data-loc="${id}">
+  const coachLoc = legal && coached.has(`loc:${id}`);
+  return `<section class="location ${id} ${current ? "is-current" : ""} ${legal ? "is-legal" : ""} ${coachLoc ? "is-coached" : ""} ${locked ? "is-locked" : ""}" data-loc="${id}">
     <div class="loc-atmos" aria-hidden="true">${locationDecor(id)}</div>
     <div class="loc-vignette" aria-hidden="true"></div>
     ${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : ""}
@@ -112,11 +117,11 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
     ${zone("Allies", cards("No crew stationed.", loc.allies))}
     ${zone("Items", cards("No gear here.", loc.items))}
     ${actBtns(bottom)}
-    ${extras.length ? `<div class="row">${extras.map((a) => `<button class="action ${hi.has(`act:${a.key}`) ? "is-legal" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}">${esc(a.label)}</button>`).join("")}</div>` : ""}
+    ${extras.length ? `<div class="row">${extras.map((a) => `<button class="action ${hi.has(`act:${a.key}`) ? "is-legal" : ""} ${coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}">${esc(a.label)}</button>`).join("")}</div>` : ""}
   </section>`;
 }
 
-function titleView(difficulty: Difficulty): string {
+function titleView(difficulty: Difficulty, coachEnabled: boolean): string {
   return `<div class="sky" aria-hidden="true">
     <div class="stars"></div>
     <div class="stars dim"></div>
@@ -144,8 +149,13 @@ function titleView(difficulty: Difficulty): string {
         <button data-diff="easy" class="${difficulty === "easy" ? "is-on" : ""}">Easy — random Fate</button>
         <button data-diff="normal" class="${difficulty === "normal" ? "is-on" : ""}">Normal — heuristic Fate</button>
       </div>
+      <div class="diff coach-diff">
+        <button type="button" data-coach-toggle class="${coachEnabled ? "is-on" : ""}">${coachEnabled ? "Coach on" : "Coach off"}</button>
+      </div>
+      <p class="coach-lede">Coach suggests the next click and why it serves the objective. Tutorial always starts with Coach on. Set Sail uses this toggle — you can hide Coach any time during play.</p>
       <div class="actions-row">
-        <button class="btn primary" data-start>Set Sail</button>
+        <button class="btn primary" data-tutorial>Tutorial</button>
+        <button class="btn" data-start>Set Sail</button>
         <button class="btn ghost" data-help>How to play</button>
       </div>
       <p class="fine">Original UI and paraphrased abilities. Personal practice tool — not an official product.</p>
@@ -158,19 +168,24 @@ function helpView(fromPlay: boolean): string {
     <h2>How to play</h2>
     <p>Each turn you <b>must move</b> to a different unlocked location, then may use each uncovered action there once. Heroes cover the top row. End the turn to refill to 4 cards; the computer then Fates you.</p>
     <p><b>Win</b> by vanquishing Peter Pan at the Jolly Roger after unlocking Hangman’s Tree with the Never Land Map. Vanquishing him anywhere else loses the duel.</p>
+    <p><b>Coach:</b> Tutorial starts with a warm advisor that names the next legal click and why it helps (Map → unlock the tree → reveal Peter → walk him to the ship → vanquish). Other legal options stay clickable. Toggle Coach off from the title screen or the top bar at any time.</p>
     <p><b>Practice tips:</b> Discard aggressively for the Map. Fish Fate with Worthy Opponent and Give Them a Scare. Station strength at the ship before walking Peter across. Beware Tick Tock and Splitting Headache.</p>
     <div class="actions-row"><button class="btn primary" data-close-help>${fromPlay ? "Return to the realm" : "Back"}</button></div>
   </div></div>`;
 }
 
-function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>): string {
+function coachClass(coached: Set<string>, key: string): string {
+  return coached.has(key) ? " is-coached" : "";
+}
+
+function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached: Set<string>): string {
   const p = state.pending;
   if (state.phase === "over") {
     return `<div class="overlay"><div class="modal wood ${state.won ? "win celebrate" : "lose"}">
       <h2>${state.won ? "The ship is yours" : "The tide turns"}</h2>
       <p>${esc(state.won ? "Peter Pan is vanquished at the Jolly Roger. The objective chain is complete." : state.loseReason)}</p>
       <div class="actions-row">
-        <button class="btn primary" data-again>Play again</button>
+        <button class="btn primary${coachClass(coached, "btn:again")}" data-again>Play again</button>
         <button class="btn ghost" data-home>Return to title</button>
       </div>
     </div></div>`;
@@ -186,7 +201,7 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>): string
           return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: "hand", legal: false, selected: focus })}</div>`;
         })
         .join("")}</div>
-      <div class="actions-row"><button class="btn primary" data-ack>Continue</button></div>
+      <div class="actions-row"><button class="btn primary${coachClass(coached, "btn:ack")}" data-ack>Continue</button></div>
     </div></div>`;
   }
   if (p?.kind === "scarePeek") {
@@ -197,9 +212,9 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>): string
         .map((c) => renderCard(state, c, { size: "hand", legal: true, selected: false }))
         .join("")}</div>
       <div class="actions-row">
-        <button class="btn" data-scare-discard>Banish both</button>
-        <button class="btn" data-scare-order="${p.cards[0].instanceId},${p.cards[1]?.instanceId ?? p.cards[0].instanceId}">${esc(cardName(p.cards[0]))} on top</button>
-        ${p.cards[1] ? `<button class="btn" data-scare-order="${p.cards[1].instanceId},${p.cards[0].instanceId}">${esc(cardName(p.cards[1]))} on top</button>` : ""}
+        <button class="btn${coachClass(coached, "btn:scare-discard")}" data-scare-discard>Banish both</button>
+        <button class="btn${coachClass(coached, `btn:scare-order:${p.cards[0].instanceId},${p.cards[1]?.instanceId ?? p.cards[0].instanceId}`)}" data-scare-order="${p.cards[0].instanceId},${p.cards[1]?.instanceId ?? p.cards[0].instanceId}">${esc(cardName(p.cards[0]))} on top</button>
+        ${p.cards[1] ? `<button class="btn${coachClass(coached, `btn:scare-order:${p.cards[1].instanceId},${p.cards[0].instanceId}`)}" data-scare-order="${p.cards[1].instanceId},${p.cards[0].instanceId}">${esc(cardName(p.cards[1]))} on top</button>` : ""}
       </div>
     </div></div>`;
   }
@@ -208,7 +223,7 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>): string
       <h2>Your Fate action</h2>
       <p>Play one card; the other is discarded.</p>
       <div class="modal-cards">${p.cards
-        .map((c) => renderCard(state, c, { size: "hand", legal: hi.has(`card:${c.instanceId}`), selected: sel.has(c.instanceId) }))
+        .map((c) => renderCard(state, c, { size: "hand", legal: hi.has(`card:${c.instanceId}`), selected: sel.has(c.instanceId), coached: coached.has(`card:${c.instanceId}`) }))
         .join("")}</div>
     </div></div>`;
   }
@@ -217,8 +232,8 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>): string
       <h2>Pay the cost</h2>
       <p>Spend Power, or discard the Never Land Map to cover this Item.</p>
       <div class="actions-row">
-        <button class="btn primary" data-pay-power>Pay Power</button>
-        <button class="btn" data-pay-map>Discard the Map</button>
+        <button class="btn primary${coachClass(coached, "btn:pay-power")}" data-pay-power>Pay Power</button>
+        <button class="btn${coachClass(coached, "btn:pay-map")}" data-pay-map>Discard the Map</button>
       </div>
     </div></div>`;
   }
@@ -227,8 +242,8 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>): string
       <h2>A Condition is ready</h2>
       <p>${esc(p.reason)}</p>
       <div class="actions-row">
-        <button class="btn primary" data-accept-cond>Play it</button>
-        <button class="btn ghost" data-skip-cond>Not now</button>
+        <button class="btn primary${coachClass(coached, "btn:accept-cond")}" data-accept-cond>Play it</button>
+        <button class="btn ghost${coachClass(coached, "btn:skip-cond")}" data-skip-cond>Not now</button>
       </div>
     </div></div>`;
   }
@@ -237,39 +252,53 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>): string
       <h2>Obsession</h2>
       <p>A Hero was found. Play them into the realm, or banish them?</p>
       <div class="actions-row">
-        <button class="btn primary" data-play-hero>Play the Hero</button>
-        <button class="btn" data-banish-hero>Banish</button>
+        <button class="btn primary${coachClass(coached, "btn:play-hero")}" data-play-hero>Play the Hero</button>
+        <button class="btn${coachClass(coached, "btn:banish-hero")}" data-banish-hero>Banish</button>
       </div>
     </div></div>`;
   }
   return "";
 }
 
-function playView(state: GameState): string {
+function coachPanel(advice: CoachAdvice): string {
+  return `<aside class="coach-panel" aria-live="polite">
+    <div class="coach-copy">
+      <p class="coach-kicker">Coach</p>
+      <p class="coach-do">${esc(advice.do)}</p>
+      <p class="coach-why">${esc(advice.why)}</p>
+      ${advice.warning ? `<p class="coach-warn">${esc(advice.warning)}</p>` : ""}
+    </div>
+    <button type="button" class="btn ghost coach-hide" data-coach-toggle>Hide coach</button>
+  </aside>`;
+}
+
+function playView(state: GameState, coachEnabled: boolean): string {
   const hi = highlightSet(state);
   const sel = selectedSet(state);
+  const advice = coachEnabled ? advise(state) : null;
+  const coached = new Set(advice?.highlights ?? []);
   const steps = objectiveSteps(state);
   const promptButtons: string[] = [];
   if (state.phase === "actions" && !state.pending) {
-    promptButtons.push(`<button class="btn primary" data-end>End turn</button>`);
+    promptButtons.push(`<button class="btn primary${coachClass(coached, "btn:end")}" data-end>End turn</button>`);
   }
   if (state.pending && ["discardSelect", "vanquishAllies"].includes(state.pending.kind)) {
-    promptButtons.push(`<button class="btn primary" data-confirm>Confirm</button>`);
+    promptButtons.push(`<button class="btn primary${coachClass(coached, "btn:confirm")}" data-confirm>Confirm</button>`);
   }
   if (
     state.phase === "resolving" &&
     state.pending &&
     !["scarePeek", "fateChooseCard", "fateReport"].includes(state.pending.kind)
   ) {
-    promptButtons.push(`<button class="btn ghost" data-cancel>Cancel</button>`);
+    promptButtons.push(`<button class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel>Cancel</button>`);
   }
   if (state.pending?.kind === "tinkerDiscard") {
-    promptButtons.push(`<button class="btn ghost" data-skip-cond>Skip discard</button>`);
+    promptButtons.push(`<button class="btn ghost${coachClass(coached, "btn:skip-cond")}" data-skip-cond>Skip discard</button>`);
   }
 
   return `<div class="sky play-sky" aria-hidden="true"><div class="stars"></div><div class="fog fog-a"></div></div>
   <div class="grain"></div>
-  <div class="play">
+  <div class="play ${coachEnabled ? "has-coach" : ""}">
     <header class="topbar">
       <div class="brand">${CREST}<div><h1>Never Land Duel</h1><small>Hook Practice</small></div></div>
       <div class="stepper">
@@ -282,12 +311,16 @@ function playView(state: GameState): string {
         <div class="power"><span>Power</span><b>${state.power}</b></div>
         <div class="chip">Turn ${state.turn}</div>
         <div class="chip">${state.difficulty === "easy" ? "Easy Fate" : "Normal Fate"}</div>
+        <button type="button" class="chip ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
         <button class="chip" data-help>Help</button>
         <button class="chip" data-resign>Resign</button>
       </div>
     </header>
-    <div class="prompt"><p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}</div></div>
-    <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel)).join("")}</div></div>
+    <div class="prompt-stack">
+      <div class="prompt"><p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}</div></div>
+      ${advice ? coachPanel(advice) : ""}
+    </div>
+    <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
     <footer class="dock">
       <section class="hand ${state.pending?.kind === "playChooseCard" || state.pending?.kind === "discardSelect" ? "is-picking" : ""}">
         <h2>Hand · ${state.hand.length} · Deck ${state.villainDeck.length} · Discard ${state.villainDiscard.length}</h2>
@@ -301,6 +334,7 @@ function playView(state: GameState): string {
                       legal: hi.has(`card:${c.instanceId}`),
                       selected: sel.has(c.instanceId),
                       dimmed: Boolean(state.pending && ["playChooseCard", "discardSelect", "cunningAlly"].includes(state.pending.kind) && !hi.has(`card:${c.instanceId}`)),
+                      coached: coached.has(`card:${c.instanceId}`),
                     }),
                   )
                   .join("")
@@ -314,18 +348,39 @@ function playView(state: GameState): string {
       </aside>
     </footer>
   </div>
-  ${overlayFor(state, hi, sel)}`;
+  ${overlayFor(state, hi, sel, coached)}`;
+}
+
+function readCoachPref(): boolean {
+  try {
+    const stored = sessionStorage.getItem("nld-coach");
+    if (stored === null) return true;
+    return stored === "1";
+  } catch {
+    return true;
+  }
+}
+
+function writeCoachPref(on: boolean): void {
+  try {
+    sessionStorage.setItem("nld-coach", on ? "1" : "0");
+  } catch {
+    /* sessionStorage can be unavailable */
+  }
 }
 
 export function mount(root: HTMLElement): void {
   let state: GameState = titleState();
   let difficulty: Difficulty = "normal";
+  let coachEnabled = readCoachPref();
 
   const render = () => {
-    if (state.screen === "title") root.innerHTML = titleView(difficulty);
+    if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled);
     else if (state.screen === "help") {
-      root.innerHTML = (state.phase === "title" ? titleView(difficulty) : playView(state)) + helpView(state.phase !== "title");
-    } else root.innerHTML = playView(state);
+      root.innerHTML =
+        (state.phase === "title" ? titleView(difficulty, coachEnabled) : playView(state, coachEnabled)) +
+        helpView(state.phase !== "title");
+    } else root.innerHTML = playView(state, coachEnabled);
   };
 
   const dispatch = (input: Input) => {
@@ -335,6 +390,18 @@ export function mount(root: HTMLElement): void {
 
   root.addEventListener("click", (event) => {
     const t = event.target as HTMLElement;
+    if (t.closest("[data-coach-toggle]")) {
+      coachEnabled = !coachEnabled;
+      writeCoachPref(coachEnabled);
+      render();
+      return;
+    }
+    const tutorial = t.closest<HTMLElement>("[data-tutorial]");
+    if (tutorial) {
+      coachEnabled = true;
+      writeCoachPref(true);
+      return dispatch({ type: "start", difficulty });
+    }
     const start = t.closest<HTMLElement>("[data-start]");
     if (start) return dispatch({ type: "start", difficulty });
     const diff = t.closest<HTMLElement>("[data-diff]");

@@ -177,6 +177,15 @@ h1.wordmark {
 
 .diff, .actions-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
 .diff { margin: 28px 0 16px; }
+.diff.coach-diff { margin: 0 0 10px; }
+.coach-lede {
+  max-width: 52ch;
+  margin: 0 auto 18px;
+  text-align: center;
+  color: #d9c7a0;
+  font-size: 15px;
+  line-height: 1.45;
+}
 
 .diff button, .btn {
   border: 1px solid #c9a14a;
@@ -250,9 +259,24 @@ h1.wordmark {
 }
 .power b { font-family: var(--display); font-size: 22px; }
 .chip { border: 1px solid rgba(232, 195, 106, 0.25); padding: 6px 10px; color: #d7c7a2; font-size: 12px; background: rgba(8, 8, 10, 0.38); }
+.chip.is-on {
+  border-color: rgba(62, 196, 181, 0.7);
+  color: #fff4d4;
+  background: rgba(16, 52, 48, 0.62);
+}
 
-.prompt {
+.prompt-stack {
   margin: 10px 16px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.has-coach .prompt-stack {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 38%);
+  align-items: stretch;
+}
+.prompt {
+  margin: 0;
   padding: 12px 16px;
   border: 1px solid rgba(232, 195, 106, 0.45);
   background:
@@ -266,6 +290,49 @@ h1.wordmark {
 }
 .prompt p { margin: 0; font-size: 18px; color: #fff6d8; }
 .prompt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.coach-panel {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(126, 231, 212, 0.45);
+  background:
+    linear-gradient(180deg, rgba(18, 56, 52, 0.82), rgba(10, 16, 18, 0.92));
+  box-shadow: inset 0 0 22px rgba(62, 196, 181, 0.08), 0 8px 20px rgba(0, 0, 0, 0.22);
+}
+.coach-kicker {
+  margin: 0 0 4px;
+  font-family: var(--display);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #7ee7d4;
+}
+.coach-do {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #fff8e4;
+  font-weight: 700;
+}
+.coach-why {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #d7e8e2;
+}
+.coach-warn {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #f0c3a0;
+}
+.coach-hide {
+  min-width: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
 
 .board-wrap { overflow-x: auto; padding: 12px 14px 8px; min-width: 0; max-width: 100%; }
 .board {
@@ -345,6 +412,11 @@ h1.wordmark {
   border-color: #f4b45a;
   animation: pulse 1.35s ease-in-out infinite;
 }
+.location.is-legal.is-coached {
+  border-color: #7ee7d4;
+  box-shadow: 0 0 0 3px rgba(126, 231, 212, 0.55), 0 0 28px rgba(62, 196, 181, 0.42);
+  animation: coach-pulse 1.2s ease-in-out infinite;
+}
 .location.is-legal .drop-hint { display: block; }
 .location.is-locked { outline: 1px dashed rgba(201, 189, 154, 0.28); }
 
@@ -418,6 +490,12 @@ h1.wordmark {
   color: #fff4d4;
   font-weight: 600;
 }
+.action.is-legal.is-coached {
+  border-color: #7ee7d4;
+  background: linear-gradient(180deg, rgba(126, 231, 212, 0.42), rgba(12, 28, 28, 0.7));
+  box-shadow: 0 0 18px rgba(62, 196, 181, 0.45);
+  color: #f4fff9;
+}
 
 .zone {
   min-height: 78px;
@@ -483,6 +561,12 @@ h1.wordmark {
 .card:active { transform: translateY(-2px); }
 .card.is-legal {
   box-shadow: 0 0 0 3px #f4b45a, 0 0 24px rgba(244, 180, 90, 0.55);
+}
+.card.is-legal.is-coached {
+  box-shadow: 0 0 0 4px #7ee7d4, 0 0 28px rgba(62, 196, 181, 0.65);
+}
+.btn.is-coached {
+  box-shadow: 0 0 0 2px #7ee7d4, 0 0 18px rgba(62, 196, 181, 0.4);
 }
 .card.is-selected { outline: 3px solid #d45a58; transform: translateY(-8px); }
 .card .meta {
@@ -603,6 +687,10 @@ h1.wordmark {
   0%, 100% { box-shadow: 0 0 0 1px rgba(244, 180, 90, 0.3); }
   50% { box-shadow: 0 0 0 4px rgba(244, 180, 90, 0.5); }
 }
+@keyframes coach-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(126, 231, 212, 0.4), 0 0 16px rgba(62, 196, 181, 0.28); }
+  50% { box-shadow: 0 0 0 4px rgba(126, 231, 212, 0.7), 0 0 28px rgba(62, 196, 181, 0.5); }
+}
 @keyframes shine {
   0% { box-shadow: 0 0 12px rgba(244, 180, 90, 0.25); }
   50% { box-shadow: 0 0 22px rgba(244, 180, 90, 0.5); }
@@ -629,6 +717,7 @@ h1.wordmark {
 @media (max-width: 900px) {
   .topbar, .dock { display: flex; flex-direction: column; }
   .objective-row { grid-template-columns: 1fr 1fr; }
+  .has-coach .prompt-stack { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
