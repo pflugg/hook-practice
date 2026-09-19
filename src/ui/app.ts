@@ -918,10 +918,13 @@ export function mount(root: HTMLElement): void {
   const paneScroll: Record<TeachTab, number> = { brief: 0, coach: 0, reasons: 0 };
   let pageScrollX = 0;
   let pageScrollY = 0;
+  let mainScroll = 0;
 
   const captureScroll = () => {
     pageScrollX = window.scrollX;
     pageScrollY = window.scrollY;
+    const main = root.querySelector<HTMLElement>("[data-play-main]");
+    if (main) mainScroll = main.scrollTop;
     root.querySelectorAll<HTMLElement>("[data-teach-pane]").forEach((pane) => {
       const key = pane.dataset.teachPane as TeachTab | undefined;
       if (key && key in paneScroll) paneScroll[key] = pane.scrollTop;
@@ -933,6 +936,8 @@ export function mount(root: HTMLElement): void {
       const key = pane.dataset.teachPane as TeachTab | undefined;
       if (key && key in paneScroll) pane.scrollTop = paneScroll[key];
     });
+    const main = root.querySelector<HTMLElement>("[data-play-main]");
+    if (main) main.scrollTop = mainScroll;
     window.scrollTo(pageScrollX, pageScrollY);
   };
 

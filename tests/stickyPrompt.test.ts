@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { applyInput } from "../src/engine/game";
-import { renderPlay } from "../src/ui/app";
+import { mount, renderPlay } from "../src/ui/app";
 import { barePlayState, give } from "./helpers";
 
 describe("sticky command / prompt bar", () => {
@@ -16,6 +16,8 @@ describe("sticky command / prompt bar", () => {
     expect(promptBlock).toMatch(/top:\s*0/);
     expect(promptBlock).toMatch(/z-index:\s*12/);
     expect(css).toContain(".play-main");
+    expect(css).toMatch(/\.play-main\s*\{[^}]*overflow:\s*auto/);
+    expect(css).toMatch(/overflow-x:\s*clip/);
     expect(css).not.toMatch(/\.prompt\.is-clash\s*\{[^}]*position:\s*sticky/);
   });
 
@@ -58,5 +60,24 @@ describe("sticky command / prompt bar", () => {
     const prompt = root.querySelector("[data-prompt]");
     expect(prompt?.querySelector("[data-confirm]")?.textContent).toMatch(/Confirm/);
     expect(prompt?.querySelector("[data-cancel]")).toBeTruthy();
+  });
+
+  it("keeps play-main scroll when the board remounts after a hand click", () => {
+    window.history.replaceState({}, "", "/?scene=clash");
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    window.scrollTo = (() => undefined) as typeof window.scrollTo;
+    mount(root);
+
+    const main = root.querySelector<HTMLElement>("[data-play-main]");
+    expect(main).toBeTruthy();
+    main!.scrollTop = 220;
+    const prompt = root.querySelector("[data-prompt]");
+    expect(prompt).toBeTruthy();
+
+    const hide = root.querySelector<HTMLButtonElement>("[data-coach-toggle]");
+    hide?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    expect(root.querySelector<HTMLElement>("[data-play-main]")?.scrollTop).toBe(220);
+    root.remove();
   });
 });

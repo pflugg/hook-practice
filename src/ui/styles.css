@@ -23,7 +23,7 @@ html, body {
   background: #05070a;
   color: var(--cream);
   font-family: var(--serif);
-  overflow-x: hidden;
+  overflow-x: clip;
   overflow-anchor: none;
 }
 
@@ -253,6 +253,9 @@ h1.wordmark {
 
 .play {
   min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   overflow-anchor: none;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -275,6 +278,11 @@ h1.wordmark {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
 }
 
 .stage {
@@ -1318,11 +1326,17 @@ h1.wordmark {
 @media (max-width: 1100px) {
   .play,
   .play.has-teach {
+    height: auto;
+    overflow: visible;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto;
     grid-template-areas:
       "main"
       "rail";
+  }
+  .play-main {
+    height: auto;
+    overflow: visible;
   }
   .teach-rail {
     position: static;
