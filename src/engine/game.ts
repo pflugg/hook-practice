@@ -328,18 +328,41 @@ function openFateReport(
   }
 }
 
-function checkTickTock(state: GameState, dest: LocationId): boolean {
-  const croc = state.locations[dest].heroes.find((h) => h.defId === "tickTock");
-  if (!croc) return false;
+const TICK_TOCK_SNAP_NOTE =
+  "Tick Tock snaps — the whole hand is discarded. The crocodile stays in the realm; sharing this place with the captain empties the hand again.";
+
+function tickTockAt(state: GameState, dest: LocationId): CardInstance | undefined {
+  return state.locations[dest].heroes.find((h) => h.defId === "tickTock");
+}
+
+function snapTickTockHand(state: GameState): boolean {
+  if (!tickTockAt(state, state.villainLocation)) return false;
   discardHand(state);
   log(state, "Tick Tock snaps — the whole hand is discarded.", "bad");
+  return true;
+}
+
+function openTickTockSnapReport(state: GameState, opts?: { markAction?: boolean }): void {
+  const croc = tickTockAt(state, state.villainLocation);
+  if (!croc) return;
   openFateReport(state, {
     drawn: [croc],
     played: croc,
     discarded: [],
-    note: "Tick Tock snaps — the whole hand is discarded. The crocodile stays in the realm; stepping here will empty the hand again.",
+    note: TICK_TOCK_SNAP_NOTE,
     resume: "actions",
+    markAction: opts?.markAction,
   });
+}
+
+/** Captain stepped onto Tick Tock, or Tick Tock was moved/seated onto the captain. */
+function checkTickTock(state: GameState, dest: LocationId, moved?: CardInstance | "captain"): boolean {
+  if (dest !== state.villainLocation) return false;
+  const croc = tickTockAt(state, dest);
+  if (!croc) return false;
+  if (moved && moved !== "captain" && moved.defId !== "tickTock") return false;
+  snapTickTockHand(state);
+  openTickTockSnapReport(state);
   return true;
 }
 
@@ -464,6 +487,9 @@ function resolveComputerFateCard(
     state.rng = dest.rng;
     placeHero(state, card, dest.id);
     note = `Fate seats ${d.name} at ${locName(dest.id)}.`;
+    if (card.defId === "tickTock" && dest.id === state.villainLocation && snapTickTockHand(state)) {
+      note += " Tick Tock snaps — the whole hand is discarded.";
+    }
     if (card.defId === "tinkerBell") {
       const ally = chooseTinkerAlly(state, dest.id);
       if (ally) {
@@ -688,6 +714,10 @@ function playAfterCost(
 function playHeldHero(state: GameState, hero: CardInstance, locationId: LocationId, tinkerActor: "player" | "ai"): void {
   placeHero(state, hero, locationId);
   log(state, `${def(hero.defId).name} is played to ${locName(locationId)}.`, "fate");
+  if (hero.defId === "tickTock" && locationId === state.villainLocation && snapTickTockHand(state)) {
+    openTickTockSnapReport(state, { markAction: true });
+    return;
+  }
   if (hero.defId === "tinkerBell" && state.locations[locationId].allies.length) {
     state.pending = { kind: "tinkerDiscard", tinkerId: hero.instanceId, locationId, actor: tinkerActor };
     return;
@@ -955,7 +985,7 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
     if (!legalMoveLocations(state).includes(locationId)) return state;
     state.villainLocation = locationId;
     state.usedActions = [];
-    const snapped = checkTickTock(state, locationId);
+    const snapped = checkTickTock(state, locationId, "captain");
     const cover = coveringHero(state, locationId);
     log(
       state,
@@ -1019,6 +1049,7 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
     updatePeterLoc(state);
     log(state, `${def(hero.defId).name} is moved to ${locName(locationId)}.`);
     consumeCurrentAction(state);
+    checkTickTock(state, locationId, hero);
     return state;
   }
   if (p.kind === "fateChooseLocation" || p.kind === "worthyLocation" || p.kind === "obsessionLocation") {

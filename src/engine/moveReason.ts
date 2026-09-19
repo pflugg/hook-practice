@@ -41,7 +41,7 @@ function coverNote(state: GameState, id: LocationId): string {
 function crocWatch(state: GameState): string {
   const croc = tickTockAt(state);
   return croc
-    ? ` Tick Tock waits at ${locName(croc)} — stepping there empties the whole hand.`
+    ? ` Tick Tock waits at ${locName(croc)} — sharing that place with the captain (stepping there, or sliding the crocodile onto him) empties the whole hand.`
     : " Tick Tock is not ashore yet, so movement is safer than it will be later.";
 }
 
@@ -386,7 +386,7 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
   const p = before.pending;
   if (before.phase === "move" && !p) {
     if (after.villainLocation !== locationId) return null;
-    const snap = after.pending?.kind === "fateReport" && after.pending.played?.defId === "tickTock" && !after.pending.markAction;
+    const snap = after.pending?.kind === "fateReport" && after.pending.played?.defId === "tickTock" && /snaps/i.test(after.pending.note);
     return pack(
       `You moved the captain to ${locName(locationId)}.`,
       `Every turn the captain must leave the current unlocked place before actions fire. ${locationToolbox(locationId)}${coverNote(after, locationId)} ${chainLine(after)}`,
@@ -432,16 +432,21 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
     const hero = findCard(after, p.heroId) ?? findCard(before, p.heroId);
     const name = hero ? cardName(hero) : "that Hero";
     const towardShip = LOCATION_IDS.indexOf(locationId) < LOCATION_IDS.indexOf(findCardLocation(before, p.heroId) ?? locationId);
+    const snap = after.pending?.kind === "fateReport" && after.pending.played?.defId === "tickTock" && /snaps/i.test(after.pending.note);
     return pack(
       `You moved ${name} to ${locName(locationId)}.`,
-      hero?.defId === "peterPan"
-        ? towardShip
-          ? "That step is west toward the Jolly Roger. Peter only counts as a win on the ship. Walking him closer is the escort you are practicing."
-          : "That step is away from the Jolly Roger. In this practice duel you almost never want that — the lesson is the walk toward the ship, never a mid-path clash."
-        : `Moving ${name} can uncover a top row you still need, or ease Tick Tock off a square you must visit.`,
-      hero?.defId === "peterPan"
-        ? "Keep Allies stacking on the Jolly Roger so the clash is honest when he arrives. Do not vanquish him anywhere else."
-        : `${chainLine(after)}${crocWatch(after)}`,
+      snap
+        ? "You slid Tick Tock onto the captain. Sharing a place with the crocodile empties the whole hand — same trap as stepping onto him."
+        : hero?.defId === "peterPan"
+          ? towardShip
+            ? "That step is west toward the Jolly Roger. Peter only counts as a win on the ship. Walking him closer is the escort you are practicing."
+            : "That step is away from the Jolly Roger. In this practice duel you almost never want that — the lesson is the walk toward the ship, never a mid-path clash."
+          : `Moving ${name} can uncover a top row you still need, or ease Tick Tock off a square you must visit.`,
+      snap
+        ? "Tick Tock already emptied the hand. Read the crocodile’s lasting text in the modal, then Continue. Ending the turn is how you draw back to four."
+        : hero?.defId === "peterPan"
+          ? "Keep Allies stacking on the Jolly Roger so the clash is honest when he arrives. Do not vanquish him anywhere else."
+          : `${chainLine(after)}${crocWatch(after)}`,
     );
   }
   if (p.kind === "ayeAyeDest" || p.kind === "movePieceDest") {

@@ -8,6 +8,7 @@ import {
   fateSpentScene,
   obsessionDecideScene,
   payNoMapScene,
+  peterSoftConfirmScene,
   vanquishClashScene,
   vanquishLocalScene,
 } from "../src/engine/scenes";
@@ -128,6 +129,27 @@ describe("teaching UI for Must fixes", () => {
     expect(html).not.toContain("Banish both");
   });
 
+  it("DEV peterloss scene exercises Continue anyway through to a loss", () => {
+    const scene = peterSoftConfirmScene();
+    expect(scene.pending?.kind).toBe("vanquishConfirmLoss");
+    const html = renderOverlay(scene);
+    expect(html).toContain("Continue anyway");
+    expect(html).toContain("Peter Pan");
+    expect(html).toContain("data-confirm");
+    expect(html).not.toMatch(/mermaidLagoon|jollyRoger/);
+
+    let next = applyInput(scene, { type: "confirm" });
+    expect(next.pending?.kind).toBe("vanquishAllies");
+    const crew = next.locations.mermaidLagoon.allies;
+    expect(crew.length).toBeGreaterThanOrEqual(2);
+    next = applyInput(next, { type: "selectCard", instanceId: crew[0].instanceId });
+    next = applyInput(next, { type: "selectCard", instanceId: crew[1].instanceId });
+    next = applyInput(next, { type: "confirm" });
+    expect(next.lost).toBe(true);
+    expect(next.won).toBe(false);
+    expect(next.loseReason).toMatch(/away from the Jolly Roger/);
+  });
+
   it("shows a soft-loss confirm when Peter is named off the ship", () => {
     const state = barePlayState();
     state.villainLocation = "mermaidLagoon";
@@ -143,6 +165,18 @@ describe("teaching UI for Must fixes", () => {
     expect(html).toContain("Peter Pan");
     expect(html).toContain("data-cancel");
     expect(html).toContain("Continue anyway");
+  });
+
+  it("marks teach panes so remounts can restore independent scroll", () => {
+    const html = renderPlay(barePlayState(), {
+      coachEnabled: true,
+      briefEnabled: true,
+      reasonsEnabled: true,
+    });
+    expect(html).toContain('data-teach-pane="brief"');
+    expect(html).toContain('data-teach-pane="coach"');
+    expect(html).toContain('data-teach-pane="reasons"');
+    expect(html).toContain('data-teach-tab="coach"');
   });
 
   it("DEV clash / Obsession / local-vanquish scenes paint the new teaching chrome", () => {

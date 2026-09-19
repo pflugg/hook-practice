@@ -43,6 +43,8 @@ import {
   fateSpentScene,
   obsessionDecideScene,
   payNoMapScene,
+  peterSoftConfirmScene,
+  tickTockOntoCaptainScene,
   tickTockReportScene,
   vanquishClashScene,
   vanquishLocalScene,
@@ -561,7 +563,7 @@ function teachRailHtml(brief: string, coach: string, reasons: string, active: Te
 }
 
 function coachPanel(advice: CoachAdvice): string {
-  return `<section class="teach-pane coach-panel" aria-live="polite">
+  return `<section class="teach-pane coach-panel" data-teach-pane="coach" aria-live="polite">
     <header class="teach-pane-head">
       <p class="coach-kicker">Coach</p>
       <button type="button" class="btn ghost coach-hide" data-coach-toggle>Hide coach</button>
@@ -575,7 +577,7 @@ function coachPanel(advice: CoachAdvice): string {
 }
 
 function strategySidebar(brief: StrategyBrief): string {
-  return `<section class="teach-pane strategy-brief" aria-label="Strategy brief">
+  return `<section class="teach-pane strategy-brief" data-teach-pane="brief" aria-label="Strategy brief">
     <header class="brief-head">
       <div>
         <p class="brief-kicker">Strategy brief</p>
@@ -612,7 +614,7 @@ function strategySidebar(brief: StrategyBrief): string {
 }
 
 function reasonDock(reason: MoveReason): string {
-  return `<section class="teach-pane reason-dock${reason.soft ? " is-soft" : ""}" data-reason-dock aria-label="Why this move">
+  return `<section class="teach-pane reason-dock${reason.soft ? " is-soft" : ""}" data-teach-pane="reasons" data-reason-dock aria-label="Why this move">
     <header class="teach-pane-head">
       <div>
         <p class="reason-kicker">Why this move</p>
@@ -788,6 +790,8 @@ function bootState(): GameState {
       const scene = new URLSearchParams(window.location.search).get("scene");
       if (scene === "cutlass") return cutlassAttachScene();
       if (scene === "ticktock") return tickTockReportScene();
+      if (scene === "crocmove") return tickTockOntoCaptainScene();
+      if (scene === "peterloss") return peterSoftConfirmScene();
       if (scene === "drag") return dragHeroScene();
       if (scene === "clash") return vanquishClashScene();
       if (scene === "obsession") return obsessionDecideScene();
@@ -894,7 +898,29 @@ export function mount(root: HTMLElement): void {
 
   const activeTeachTab = () => resolveTeachTab(teachTab, briefEnabled, coachEnabled, reasonsEnabled);
 
+  const paneScroll: Record<TeachTab, number> = { brief: 0, coach: 0, reasons: 0 };
+  let pageScrollX = 0;
+  let pageScrollY = 0;
+
+  const captureScroll = () => {
+    pageScrollX = window.scrollX;
+    pageScrollY = window.scrollY;
+    root.querySelectorAll<HTMLElement>("[data-teach-pane]").forEach((pane) => {
+      const key = pane.dataset.teachPane as TeachTab | undefined;
+      if (key && key in paneScroll) paneScroll[key] = pane.scrollTop;
+    });
+  };
+
+  const restoreScroll = () => {
+    root.querySelectorAll<HTMLElement>("[data-teach-pane]").forEach((pane) => {
+      const key = pane.dataset.teachPane as TeachTab | undefined;
+      if (key && key in paneScroll) pane.scrollTop = paneScroll[key];
+    });
+    window.scrollTo(pageScrollX, pageScrollY);
+  };
+
   const render = () => {
+    captureScroll();
     const inspect = inspectId ? inspectOverlay(state, inspectId) : "";
     const reason = reasonsEnabled ? lastReason : null;
     const tab = activeTeachTab();
@@ -908,6 +934,8 @@ export function mount(root: HTMLElement): void {
         inspect;
     } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab) + inspect;
     bindCardDrag();
+    restoreScroll();
+    requestAnimationFrame(restoreScroll);
   };
 
   const dispatch = (input: Input) => {
@@ -928,8 +956,13 @@ export function mount(root: HTMLElement): void {
     const t = event.target as HTMLElement;
     const tabBtn = t.closest<HTMLElement>("[data-teach-tab]");
     if (tabBtn?.dataset.teachTab) {
+      event.preventDefault();
+      pageScrollX = window.scrollX;
+      pageScrollY = window.scrollY;
       teachTab = tabBtn.dataset.teachTab as TeachTab;
       render();
+      window.scrollTo(pageScrollX, pageScrollY);
+      requestAnimationFrame(() => window.scrollTo(pageScrollX, pageScrollY));
       return;
     }
     if (t.closest("[data-coach-toggle]")) {

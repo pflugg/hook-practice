@@ -222,6 +222,48 @@ export function fateSpentScene(): GameState {
   return state;
 }
 
+/** Tick Tock already selected for Move a Hero, one step from the captain — click the ship to snap. */
+export function tickTockOntoCaptainScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.power = 3;
+  state.hangmansUnlocked = true;
+  state.villainLocation = "jollyRoger";
+  state.phase = "resolving";
+  const tick = inst(state, "tickTock");
+  const device = inst(state, "ingeniousDevice");
+  const map = inst(state, "neverLandMap");
+  const smee = inst(state, "smee");
+  state.locations.skullRock.heroes.push(tick);
+  state.locations.jollyRoger.items.push(device);
+  state.hand.push(map, smee);
+  state.pending = { kind: "moveHeroDest", heroId: tick.instanceId };
+  state.actionKey = `extra:${device.instanceId}`;
+  return state;
+}
+
+/** Peter named off the ship — soft-loss confirm with Continue anyway. */
+export function peterSoftConfirmScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.power = 4;
+  state.hangmansUnlocked = true;
+  state.villainLocation = "mermaidLagoon";
+  const peter = inst(state, "peterPan");
+  const brute = inst(state, "pirateBrute");
+  const brute2 = inst(state, "pirateBrute");
+  const cannon = inst(state, "cannon");
+  state.locations.mermaidLagoon.heroes.push(peter);
+  state.locations.mermaidLagoon.allies.push(brute, brute2);
+  state.locations.mermaidLagoon.items.push(cannon);
+  state.peterPanRevealed = true;
+  state.peterPanLocation = "mermaidLagoon";
+  state.pending = { kind: "vanquishConfirmLoss", heroId: peter.instanceId };
+  state.phase = "resolving";
+  state.actionKey = `extra:${cannon.instanceId}`;
+  return state;
+}
+
 /** Scripted Vanquish pick: local Hero legal, remote Hero with Allies is not. */
 export function vanquishLocalScene(): GameState {
   const state = createGame("normal", 1);

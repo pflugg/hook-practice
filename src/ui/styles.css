@@ -24,6 +24,7 @@ html, body {
   color: var(--cream);
   font-family: var(--serif);
   overflow-x: hidden;
+  overflow-anchor: none;
 }
 
 body {
@@ -252,6 +253,7 @@ h1.wordmark {
 
 .play {
   min-height: 100vh;
+  overflow-anchor: none;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto auto;
@@ -391,6 +393,7 @@ h1.wordmark {
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  scroll-margin: 0;
 }
 .teach-tab:last-child { border-right: 0; }
 .teach-tab.is-on {
@@ -409,6 +412,7 @@ h1.wordmark {
   scrollbar-width: thin;
   scrollbar-color: rgba(232, 195, 106, 0.55) rgba(8, 8, 10, 0.35);
   overscroll-behavior: contain;
+  overflow-anchor: none;
 }
 .strategy-brief,
 .coach-panel,
