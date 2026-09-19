@@ -16,6 +16,8 @@ describe("Never Land Map unlocks Hangman's Tree", () => {
     next = applyInput(next, { type: "selectCard", instanceId: map.instanceId });
     expect(next.pending?.kind).toBe("playChooseLocation");
     next = applyInput(next, { type: "selectLocation", locationId: "jollyRoger" });
+    expect(next.pending?.kind).toBe("playChoosePayment");
+    next = applyInput(next, { type: "payWithPower" });
 
     expect(next.hangmansUnlocked).toBe(true);
     expect(isUnlocked(next, "hangmansTree")).toBe(true);

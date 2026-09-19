@@ -1,5 +1,5 @@
 import { def } from "./cards";
-import { REALM } from "./realm";
+import { locName } from "./realm";
 import {
   allHeroes,
   allyStrength,
@@ -7,6 +7,7 @@ import {
   cardName,
   coveringHero,
   heroStrength,
+  mapInRealm,
   playableHandCards,
   vanquishableHeroes,
 } from "./queries";
@@ -24,10 +25,6 @@ export interface StrategyBrief {
   where: string;
   moment: string;
   setup: string;
-}
-
-function locName(id: LocationId): string {
-  return REALM[id].name;
 }
 
 function peterCard(state: GameState): { hero: CardInstance; location: LocationId } | null {
@@ -183,7 +180,9 @@ function thisMoment(state: GameState): string {
     case "playChooseLocation":
       return "The card is chosen; now it needs a place. Allies and ship gear want the Jolly Roger so the final clash is stocked. The Map can sit anywhere unlocked — playing it is what opens the tree, not the square you drop it on. Items that add extra actions belong where you will actually stand to use them.";
     case "playChoosePayment":
-      return "An Item is asking for its cost. If the Never Land Map is already in the realm, you may spend Power or discard the Map instead. Once the tree is open, keeping the Map in play is usually wiser — it can still cover a later Item when Power is short. Spending the Map is a last resort after the hideout is unlocked.";
+      return mapInRealm(state)
+        ? "An Item is asking for its cost. The Never Land Map is in the realm, so you may spend Power or discard the Map instead. Once the tree is open, keeping the Map is usually wiser."
+        : "This card is asking for its printed Power cost. Pay with Power to finish the play — there is no Map in the realm to substitute.";
     case "playChooseAllyAttach":
       return "The Cutlass wants an Ally to wear it — that is +2 Strength on that crew. Use the picker and tap Strap Cutlass to the Ally you want, or click that Ally’s card on the board. Prefer someone already on the Jolly Roger, or the Ally you will walk there. Cancel puts you back on Play a Card if this was the wrong tool.";
     case "discardSelect":

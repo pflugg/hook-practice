@@ -155,3 +155,60 @@ export function chooseAttachTarget(
   }
   return { hero: chooseAttachHero(state, true), rng: state.rng };
 }
+
+function fateCardWouldFizzle(state: GameState, card: CardInstance): boolean {
+  const d = def(card.defId);
+  if (d.id === "pixieDust" || d.id === "taunt") {
+    return !LOCATION_IDS.some((id) => state.locations[id].heroes.length > 0);
+  }
+  if (d.id === "splittingHeadache") return allLocationItems(state).length === 0;
+  return false;
+}
+
+function normalHeuristicClause(state: GameState, played: CardInstance): string {
+  const d = def(played.defId);
+  if (d.id === "peterPan") return "Normal Fate always plays Peter when he is drawn.";
+  if (d.id === "splittingHeadache") {
+    return fateCardWouldFizzle(state, played)
+      ? "Normal Fate discarded Splitting Headache — no Item was ashore."
+      : "Normal Fate played Splitting Headache to strip an Item.";
+  }
+  if (d.id === "tickTock") return "Normal Fate parked Tick Tock to threaten the hand.";
+  if (d.id === "tinkerBell") return "Normal Fate seated Tinker Bell to dismiss crew.";
+  if (d.id === "wendy") return "Normal Fate seated Wendy to raise every other Hero's Strength.";
+  if (d.id === "lostBoys") return "Normal Fate seated Lost Boys to tax the crew.";
+  if (d.id === "taunt") {
+    return fateCardWouldFizzle(state, played)
+      ? "Normal Fate discarded Taunt — no Hero was ashore to cling to."
+      : "Normal Fate attached Taunt so you must clash that Hero first.";
+  }
+  if (d.id === "pixieDust") {
+    return fateCardWouldFizzle(state, played)
+      ? "Normal Fate discarded Pixie Dust — no Hero was ashore to cling to."
+      : "Normal Fate attached Pixie Dust to raise a Hero's Strength.";
+  }
+  if (d.type === "hero") return "Normal Fate seated a Hero to cover a useful action.";
+  return `Normal Fate played ${d.name}.`;
+}
+
+/** One-line lesson for the intervening Fate modal: Easy = random; Normal = short heuristic. */
+export function explainFateChoice(
+  state: GameState,
+  drawn: CardInstance[],
+  played: CardInstance,
+  difficulty: "easy" | "normal",
+): string {
+  if (difficulty === "easy") {
+    const other = drawn.find((c) => c.instanceId !== played.instanceId);
+    let line = "Easy Fate picked at random among the legal cards.";
+    if (other) line += ` ${def(other.defId).name} stays down.`;
+    if (fateCardWouldFizzle(state, played)) {
+      const normalPick = chooseFateCard(state, drawn, "normal").card;
+      if (normalPick.instanceId !== played.instanceId) {
+        line += ` A Normal pick would have played ${def(normalPick.defId).name}.`;
+      }
+    }
+    return line;
+  }
+  return normalHeuristicClause(state, played);
+}

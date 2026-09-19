@@ -105,6 +105,7 @@ export type Pending =
       discarded: CardInstance[];
       note: string;
       abilityText: string;
+      choiceReason?: string;
       resume: "nextTurn" | "actions";
       markAction?: boolean;
     }
@@ -160,6 +161,7 @@ export interface FateShow {
   discarded: CardInstance[];
   note: string;
   abilityText: string;
+  choiceReason?: string;
 }
 
 export type Input =

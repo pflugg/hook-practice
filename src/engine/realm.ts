@@ -60,6 +60,11 @@ export const REALM: Record<LocationId, LocationMeta> = {
   },
 };
 
+/** Player-facing place name. Use this in logs, prompts, and coach copy — never interpolate a location id. */
+export function locName(id: LocationId): string {
+  return REALM[id].name;
+}
+
 export function locationIndex(id: LocationId): number {
   return LOCATION_IDS.indexOf(id);
 }

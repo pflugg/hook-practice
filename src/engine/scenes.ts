@@ -145,6 +145,83 @@ export function obsessionDecideScene(): GameState {
   return state;
 }
 
+/** Hook's Case asking for Power with no Map in the realm. */
+export function payNoMapScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.power = 3;
+  state.villainLocation = "jollyRoger";
+  const pack = inst(state, "hooksCase");
+  state.hand.push(pack);
+  state.pending = { kind: "playChoosePayment", cardId: pack.instanceId, locationId: "jollyRoger" };
+  state.phase = "resolving";
+  state.actionKey = "jr-play";
+  return state;
+}
+
+/** Easy Fate fizzle so the intervening modal can show the random-vs-Normal lesson. */
+export function easyFizzleScene(): GameState {
+  const state = createGame("easy", 1);
+  emptyRealm(state);
+  state.power = 2;
+  state.difficulty = "easy";
+  state.villainLocation = "jollyRoger";
+  const dust = inst(state, "pixieDust");
+  const michael = inst(state, "michael");
+  state.fateDiscard.push(dust, michael);
+  state.pending = {
+    kind: "fateReport",
+    drawn: [dust, michael],
+    played: dust,
+    discarded: [michael],
+    note: "Pixie Dust has no Hero to attach to, so it is discarded.",
+    abilityText: `${def(dust.defId).name}: ${def(dust.defId).text}`,
+    choiceReason:
+      "Easy Fate picked at random among the legal cards. Michael stays down. A Normal pick would have played Michael.",
+    resume: "nextTurn",
+  };
+  state.phase = "fateAdversary";
+  state.lastComputerFateNote = "Pixie Dust has no Hero to attach to, so it is discarded.";
+  state.lastFateShow = {
+    drawn: [dust, michael],
+    played: dust,
+    discarded: [michael],
+    note: "Pixie Dust has no Hero to attach to, so it is discarded.",
+    abilityText: `${def(dust.defId).name}: ${def(dust.defId).text}`,
+    choiceReason:
+      "Easy Fate picked at random among the legal cards. Michael stays down. A Normal pick would have played Michael.",
+  };
+  return state;
+}
+
+/** Stale Fate memory after the clinging Hero was vanquished — strip should read “That Fate is over.” */
+export function fateSpentScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.power = 2;
+  state.villainLocation = "jollyRoger";
+  state.phase = "actions";
+  const taunt = inst(state, "taunt");
+  const tinker = inst(state, "tinkerBell");
+  state.fateDiscard.push(taunt, tinker);
+  state.lastFateShow = {
+    drawn: [taunt, inst(state, "michael")],
+    played: taunt,
+    discarded: [],
+    note: "Taunt clings to Tinker Bell.",
+    abilityText: `${def(taunt.defId).name}: ${def(taunt.defId).text}`,
+  };
+  state.lastComputerFateNote = "Taunt clings to Tinker Bell.";
+  const party = inst(state, "boardingParty");
+  state.locations.jollyRoger.allies.push(party);
+  state.log.unshift({
+    id: state.logSeq++,
+    text: "Tinker Bell is vanquished at Jolly Roger.",
+    tone: "good",
+  });
+  return state;
+}
+
 /** Scripted Vanquish pick: local Hero legal, remote Hero with Allies is not. */
 export function vanquishLocalScene(): GameState {
   const state = createGame("normal", 1);

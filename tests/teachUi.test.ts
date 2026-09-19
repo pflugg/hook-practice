@@ -3,7 +3,14 @@
  */
 import { describe, expect, it } from "vitest";
 import { applyInput } from "../src/engine/game";
-import { obsessionDecideScene, vanquishClashScene, vanquishLocalScene } from "../src/engine/scenes";
+import {
+  easyFizzleScene,
+  fateSpentScene,
+  obsessionDecideScene,
+  payNoMapScene,
+  vanquishClashScene,
+  vanquishLocalScene,
+} from "../src/engine/scenes";
 import { renderOverlay, renderPlay } from "../src/ui/app";
 import { barePlayState, give, inst, putAlly, putHero, putItem } from "./helpers";
 
@@ -22,8 +29,9 @@ describe("teaching UI for Must fixes", () => {
 
     const html = renderPlay(next, { coachEnabled: false, briefEnabled: false, reasonsEnabled: false });
     expect(html).toContain("data-clash-meter");
-    expect(html).toMatch(/4 \/ 8/);
-    expect(html).toContain("data-clash-chip");
+    expect(html).toMatch(/Strength 4 \/ 8 — short/);
+    expect(html).not.toContain("data-clash-chip");
+    expect(html).toContain("is-clash");
     expect(html).toMatch(/data-confirm[^>]*disabled|disabled[^>]*data-confirm/);
   });
 
@@ -65,6 +73,33 @@ describe("teaching UI for Must fixes", () => {
     expect(html).toContain("Worthy Opponent");
     expect(html).toContain("Wendy");
     expect(html).toMatch(/class="card[^"]*reveal/);
+  });
+
+  it("always opens the payment modal for a paid card, even with no Map in the realm", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    state.power = 3;
+    const pack = give(state, "hooksCase");
+    let next = applyInput(state, { type: "selectAction", actionKey: "jr-play" });
+    next = applyInput(next, { type: "selectCard", instanceId: pack.instanceId });
+    next = applyInput(next, { type: "selectLocation", locationId: "jollyRoger" });
+    expect(next.pending?.kind).toBe("playChoosePayment");
+    expect(next.power).toBe(3);
+    expect(next.locations.jollyRoger.items.some((c) => c.defId === "hooksCase")).toBe(false);
+
+    const html = renderOverlay(next);
+    expect(html).toContain("Hook");
+    expect(html).toContain("2 Power");
+    expect(html).toContain("You have");
+    expect(html).toContain("3 Power");
+    expect(html).not.toContain("data-pay-map");
+    expect(html).not.toContain("Map available");
+
+    const paid = applyInput(next, { type: "payWithPower" });
+    expect(paid.power).toBe(1);
+    expect(paid.locations.jollyRoger.items.some((c) => c.defId === "hooksCase")).toBe(true);
+    expect(paid.log.some((e) => /Spent 2 Power on Hook/.test(e.text) && /1 Power left/.test(e.text))).toBe(true);
   });
 
   it("shows Power, cost, and Map availability on the payment modal", () => {
@@ -117,7 +152,7 @@ describe("teaching UI for Must fixes", () => {
       reasonsEnabled: false,
     });
     expect(clash).toContain("data-clash-meter");
-    expect(clash).toMatch(/4 \/ 8/);
+    expect(clash).toMatch(/Strength 4 \/ 8 — short/);
 
     const obsession = renderOverlay(obsessionDecideScene());
     expect(obsession).toContain("Tick Tock");
@@ -137,5 +172,24 @@ describe("teaching UI for Must fixes", () => {
       local.indexOf(`data-card="${wendy.instanceId}"`) + 40,
     );
     expect(wendyBit).not.toMatch(/is-legal/);
+  });
+
+  it("DEV pay / fate-pick / spent-strip scenes paint the Should-loop chrome", () => {
+    const pay = renderOverlay(payNoMapScene());
+    expect(pay).toContain("Pay the cost");
+    expect(pay).toContain("Hook");
+    expect(pay).not.toContain("data-pay-map");
+
+    const pick = renderOverlay(easyFizzleScene());
+    expect(pick).toContain("data-fate-choice");
+    expect(pick).toMatch(/Easy Fate picked at random/);
+
+    const spent = renderPlay(fateSpentScene(), {
+      coachEnabled: false,
+      briefEnabled: false,
+      reasonsEnabled: false,
+    });
+    expect(spent).toContain("That Fate is over");
+    expect(spent).not.toContain("Taunt clings to Tinker Bell");
   });
 });
