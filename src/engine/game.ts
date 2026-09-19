@@ -725,7 +725,6 @@ export function applyInput(prev: GameState, input: Input): GameState {
     if (state.phase === "resolving") {
       if (state.pending?.kind === "scarePeek") return state;
       if (state.pending?.kind === "fateChooseCard") return state;
-      if (state.pending?.kind === "fateReport") return state;
       state.pending = null;
       state.phase = "actions";
       state.actionKey = undefined;

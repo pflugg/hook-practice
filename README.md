@@ -85,6 +85,16 @@ A persistent sidebar (default on, especially from **Tutorial**) teaches the voya
 
 Hide it with the top-bar **Brief** chip or **Hide brief**. On narrower windows it becomes a scrollable strip above the four-location board so the realm stays full width.
 
+## Move reasons
+
+A floating **Why this move** panel (default on, especially from **Tutorial**) explains the choice you just made. It is not Coach (the next suggested click) and not the Strategy brief (voyage status). After each legal location, action, card, confirm, or Fate Continue it names:
+
+- **What you chose** — the place, action, or card in plain language
+- **Why it helps the plan** — how that click serves Map → unlock Hangman’s Tree → find Peter → walk to the Jolly Roger → vanquish there
+- **What it sets up** — Fate pressure, covered top rows, Power, Tick Tock, the next gate
+
+Cancel softens the panel (nothing committed). Acknowledging computer Fate explains why that card hurts — or, for Peter, why the find actually helps — and what to do about it. Drag the title bar to park the window; hide it with the **Reasons** chip or **Hide**. The choice persists for the browser tab (`nld-reasons`).
+
 ## Practice tips
 
 - Discard often until the Map appears. Hangman’s Tree stays locked without it, so Peter cannot leave.
@@ -96,7 +106,7 @@ Hide it with the top-bar **Brief** chip or **Hide brief**. On narrower windows i
 
 ## Project layout
 
-- `src/engine/` — pure rules engine (cards, realm, queries, Fate AI, heuristic Coach, strategy brief, reducer)
+- `src/engine/` — pure rules engine (cards, realm, queries, Fate AI, heuristic Coach, strategy brief, post-selection move reasons, reducer)
 - `src/ui/` — original CSS/SVG interface
 - `tests/` — Vitest coverage for the objective chain
 - `RULES_NOTES.md` — intentional simplifications versus a full table game
@@ -112,6 +122,7 @@ Hide it with the top-bar **Brief** chip or **Hide brief**. On narrower windows i
 | A non-glowing hand or board card | Inspect — full paraphrased text in a modal |
 | End turn | Draw, then face Fate |
 | Continue on a Fate report | Required. The reveal stays until you acknowledge; it does not auto-dismiss |
+| Why this move float | Updates after each legal click; drag the title bar; Reasons chip hides it |
 | Resign | Concede and review the result |
 
 Fate intervening (and similar reveal moments) use a larger unclamped card face plus a **What it does** readout of the complete paraphrased ability. Hover titles are not the only way to read Tick Tock. If the engine already seated the card or wiped the hand, the modal still waits on Continue before the next move or action stretch.

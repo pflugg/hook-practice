@@ -11,6 +11,8 @@ import {
   REALM,
   selectedSet,
   strategyBrief,
+  explainSelection,
+  IDLE_MOVE_REASON,
   titleState,
   type CardInstance,
   type CoachAdvice,
@@ -19,6 +21,7 @@ import {
   type Input,
   type LocationId,
   type StrategyBrief,
+  type MoveReason,
 } from "../engine";
 import { LOCATION_IDS } from "../engine/types";
 import { allAllies, allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
@@ -142,7 +145,12 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
   </section>`;
 }
 
-function titleView(difficulty: Difficulty, coachEnabled: boolean, briefEnabled: boolean): string {
+function titleView(
+  difficulty: Difficulty,
+  coachEnabled: boolean,
+  briefEnabled: boolean,
+  reasonsEnabled: boolean,
+): string {
   return `<div class="sky" aria-hidden="true">
     <div class="stars"></div>
     <div class="stars dim"></div>
@@ -173,8 +181,9 @@ function titleView(difficulty: Difficulty, coachEnabled: boolean, briefEnabled: 
       <div class="diff coach-diff">
         <button type="button" data-coach-toggle class="${coachEnabled ? "is-on" : ""}">${coachEnabled ? "Coach on" : "Coach off"}</button>
         <button type="button" data-brief-toggle class="${briefEnabled ? "is-on" : ""}">${briefEnabled ? "Strategy brief on" : "Strategy brief off"}</button>
+        <button type="button" data-reasons-toggle class="${reasonsEnabled ? "is-on" : ""}">${reasonsEnabled ? "Move reasons on" : "Move reasons off"}</button>
       </div>
-      <p class="coach-lede">Coach names the next click. The Strategy brief is a longer sidebar: where you are, what this moment is, and what it sets up on the win chain. Tutorial starts both on. You can hide either during play.</p>
+      <p class="coach-lede">Coach names the next click. The Strategy brief is the voyage sidebar. <b>Move reasons</b> is a floating “Why this move” after each legal choice — what you picked, why it helps the chain, what to watch. Tutorial starts all three on. Hide any during play.</p>
       <div class="actions-row">
         <button class="btn primary" data-tutorial>Tutorial</button>
         <button class="btn" data-start>Set Sail</button>
@@ -191,7 +200,8 @@ function helpView(fromPlay: boolean): string {
     <p>Each turn you <b>must move</b> to a different unlocked location, then may use each uncovered action there once. Heroes cover the top row. End the turn to refill to 4 cards; the computer then Fates you.</p>
     <p><b>Win</b> by vanquishing Peter Pan at the Jolly Roger after unlocking Hangman’s Tree with the Never Land Map. Vanquishing him anywhere else loses the duel.</p>
     <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable.</p>
-    <p><b>Strategy brief:</b> a persistent sidebar that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach. Tutorial starts both on; hide either from the top bar.</p>
+    <p><b>Strategy brief:</b> a persistent sidebar that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
+    <p><b>Move reasons:</b> a floating “Why this move” panel that updates after each legal click. It names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on.</p>
     <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it.</p>
     <p><b>Practice tips:</b> Discard aggressively for the Map. Fish Fate with Worthy Opponent and Give Them a Scare. Station strength at the ship before walking Peter across. Beware Tick Tock and Splitting Headache.</p>
     <div class="actions-row"><button class="btn primary" data-close-help>${fromPlay ? "Return to the realm" : "Back"}</button></div>
@@ -387,7 +397,38 @@ function strategySidebar(brief: StrategyBrief): string {
   </aside>`;
 }
 
-function playView(state: GameState, coachEnabled: boolean, briefEnabled: boolean): string {
+function reasonFloat(reason: MoveReason): string {
+  return `<aside class="reason-float${reason.soft ? " is-soft" : ""}" data-reason-float aria-label="Why this move">
+    <header class="reason-head" data-reason-drag>
+      <div>
+        <p class="reason-kicker">Why this move</p>
+        <h2>Post-selection</h2>
+      </div>
+      <button type="button" class="btn ghost reason-hide" data-reasons-toggle>Hide</button>
+    </header>
+    <section class="reason-block">
+      <h3>What you chose</h3>
+      <p>${esc(reason.chose)}</p>
+    </section>
+    <section class="reason-block">
+      <h3>Why it helps the plan</h3>
+      <p>${esc(reason.why)}</p>
+    </section>
+    <section class="reason-block">
+      <h3>What it sets up</h3>
+      <p>${esc(reason.next)}</p>
+    </section>
+    <p class="reason-foot">Not Coach (next click) and not the Strategy brief (voyage status). Drag the title bar to park this out of the way.</p>
+  </aside>`;
+}
+
+function playView(
+  state: GameState,
+  coachEnabled: boolean,
+  briefEnabled: boolean,
+  reasonsEnabled: boolean,
+  reason: MoveReason | null,
+): string {
   const hi = highlightSet(state);
   const sel = selectedSet(state);
   const advice = coachEnabled ? advise(state) : null;
@@ -436,6 +477,7 @@ function playView(state: GameState, coachEnabled: boolean, briefEnabled: boolean
         <div class="chip">${state.difficulty === "easy" ? "Easy Fate" : "Normal Fate"}</div>
         <button type="button" class="chip ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
         <button type="button" class="chip ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
+        <button type="button" class="chip ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
         <button class="chip" data-help>Help</button>
         <button class="chip" data-resign>Resign</button>
       </div>
@@ -474,6 +516,7 @@ function playView(state: GameState, coachEnabled: boolean, briefEnabled: boolean
       </aside>
     </footer>
   </div>
+  ${reasonsEnabled && reason ? reasonFloat(reason) : ""}
   ${overlayFor(state, hi, sel, coached)}`;
 }
 
@@ -512,27 +555,93 @@ function bootState(): GameState {
   return titleState();
 }
 
+function readReasonPos(): { x: number; y: number } | null {
+  try {
+    const raw = sessionStorage.getItem("nld-reason-pos");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { x?: number; y?: number };
+    if (typeof parsed.x === "number" && typeof parsed.y === "number") return { x: parsed.x, y: parsed.y };
+  } catch {
+    /* sessionStorage can be unavailable */
+  }
+  return null;
+}
+
+function writeReasonPos(pos: { x: number; y: number }): void {
+  try {
+    sessionStorage.setItem("nld-reason-pos", JSON.stringify(pos));
+  } catch {
+    /* sessionStorage can be unavailable */
+  }
+}
+
 export function mount(root: HTMLElement): void {
   let state: GameState = bootState();
   let difficulty: Difficulty = "normal";
   let coachEnabled = readFlag("nld-coach");
   let briefEnabled = readFlag("nld-brief");
+  let reasonsEnabled = readFlag("nld-reasons");
+  let lastReason: MoveReason = IDLE_MOVE_REASON;
   let inspectId: string | null = null;
+  let reasonPos = readReasonPos();
+
+  const bindReasonDrag = () => {
+    const el = root.querySelector<HTMLElement>("[data-reason-float]");
+    if (!el) return;
+    if (reasonPos) {
+      el.style.left = `${reasonPos.x}px`;
+      el.style.top = `${reasonPos.y}px`;
+      el.style.right = "auto";
+      el.style.bottom = "auto";
+    }
+    const handle = el.querySelector<HTMLElement>("[data-reason-drag]");
+    if (!handle) return;
+    handle.addEventListener("pointerdown", (event) => {
+      if ((event.target as HTMLElement).closest("button")) return;
+      event.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const dx = event.clientX - rect.left;
+      const dy = event.clientY - rect.top;
+      const move = (ev: PointerEvent) => {
+        const x = Math.max(8, Math.min(window.innerWidth - el.offsetWidth - 8, ev.clientX - dx));
+        const y = Math.max(8, Math.min(window.innerHeight - 48, ev.clientY - dy));
+        reasonPos = { x, y };
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+        el.style.right = "auto";
+        el.style.bottom = "auto";
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        if (reasonPos) writeReasonPos(reasonPos);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    });
+  };
 
   const render = () => {
     const inspect = inspectId ? inspectOverlay(state, inspectId) : "";
-    if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled, briefEnabled);
+    const reason = reasonsEnabled ? lastReason : null;
+    if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled);
     else if (state.screen === "help") {
       root.innerHTML =
-        (state.phase === "title" ? titleView(difficulty, coachEnabled, briefEnabled) : playView(state, coachEnabled, briefEnabled)) +
+        (state.phase === "title"
+          ? titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled)
+          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason)) +
         helpView(state.phase !== "title") +
         inspect;
-    } else root.innerHTML = playView(state, coachEnabled, briefEnabled) + inspect;
+    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason) + inspect;
+    bindReasonDrag();
   };
 
   const dispatch = (input: Input) => {
     inspectId = null;
+    const before = state;
     state = applyInput(state, input);
+    const explained = explainSelection(before, input, state);
+    if (explained) lastReason = explained;
     render();
   };
 
@@ -550,12 +659,20 @@ export function mount(root: HTMLElement): void {
       render();
       return;
     }
+    if (t.closest("[data-reasons-toggle]")) {
+      reasonsEnabled = !reasonsEnabled;
+      writeFlag("nld-reasons", reasonsEnabled);
+      render();
+      return;
+    }
     const tutorial = t.closest<HTMLElement>("[data-tutorial]");
     if (tutorial) {
       coachEnabled = true;
       briefEnabled = true;
+      reasonsEnabled = true;
       writeFlag("nld-coach", true);
       writeFlag("nld-brief", true);
+      writeFlag("nld-reasons", true);
       return dispatch({ type: "start", difficulty });
     }
     const start = t.closest<HTMLElement>("[data-start]");
