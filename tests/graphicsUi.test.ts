@@ -76,6 +76,30 @@ describe("game graphics UI pass", () => {
     expect(html).not.toMatch(/class="chip[^"]*"[^>]*>Power/);
   });
 
+  it("lays a silent original chart under the topbar without crowding the HUD", () => {
+    const html = renderPlay(createGame("normal", 7));
+    const root = document.createElement("div");
+    root.innerHTML = html;
+
+    const topbar = root.querySelector(".topbar");
+    const map = topbar?.querySelector("[data-topbar-map]");
+    expect(map).toBeTruthy();
+    expect(map?.getAttribute("aria-hidden")).toBe("true");
+    expect(map?.textContent?.trim()).toBe("");
+    expect(map?.querySelector(".topbar-chart")).toBeTruthy();
+    expect(map?.querySelector(".chart-coast")).toBeTruthy();
+    expect(map?.querySelector(".chart-path")).toBeTruthy();
+    expect(map?.querySelector(".chart-compass")).toBeTruthy();
+    expect(map?.innerHTML).not.toMatch(/Never Land|Peter|Disney|Hangman|Mermaid|Skull|Jolly|Peter Pan/i);
+
+    const chrome = html.slice(html.indexOf('class="topbar"'), html.indexOf('class="stage"'));
+    expect(chrome).toContain("data-topbar-map");
+    expect(chrome).toContain("power is-loud");
+    expect(chrome).toContain("Turn ");
+    expect(chrome).toContain("Hand ");
+    expect(chrome.indexOf("data-topbar-map")).toBeLessThan(chrome.indexOf("power is-loud"));
+  });
+
   it("prints full action labels and gold-CTA marks the coach suggestion", () => {
     const state = barePlayState();
     state.villainLocation = "mermaidLagoon";

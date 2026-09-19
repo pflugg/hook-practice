@@ -293,9 +293,50 @@ h1.wordmark {
   padding: 8px 16px;
   min-width: 0;
   overflow-x: auto;
+  position: relative;
+  isolation: isolate;
   border-bottom: 1px solid rgba(232, 195, 106, 0.22);
   background: linear-gradient(180deg, rgba(28, 20, 12, 0.94), rgba(10, 12, 14, 0.72));
   backdrop-filter: blur(8px);
+}
+.topbar-map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.15;
+  filter: saturate(0.52) sepia(0.18);
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.4) 10%,
+    rgba(0, 0, 0, 1) 26%,
+    rgba(0, 0, 0, 1) 58%,
+    rgba(0, 0, 0, 0.38) 80%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.4) 10%,
+    rgba(0, 0, 0, 1) 26%,
+    rgba(0, 0, 0, 1) 58%,
+    rgba(0, 0, 0, 0.38) 80%,
+    transparent 100%
+  );
+}
+.topbar-map svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.topbar-chart .chart-path {
+  animation: chart-drift 36s linear infinite;
+}
+.topbar > :not(.topbar-map) {
+  position: relative;
+  z-index: 1;
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand svg { width: 38px; height: 38px; }
@@ -1280,6 +1321,9 @@ h1.wordmark {
 @keyframes swell {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }
+}
+@keyframes chart-drift {
+  to { stroke-dashoffset: -86; }
 }
 
 @media (max-width: 1400px) {
