@@ -25,6 +25,8 @@ export {
   objectiveSteps,
   playableHandCards,
   fateShowStillInPlay,
+  clashAndCrocLine,
+  fateEmptyLine,
   promptText,
   vanquishClashMath,
   vanquishableHeroes,

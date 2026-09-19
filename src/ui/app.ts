@@ -7,6 +7,7 @@ import {
   findCard,
   HEADACHE_NO_ITEM_BANNER,
   HEADACHE_NO_ITEM_NOTE,
+  fateEmptyLine,
   fateShowStillInPlay,
   highlightSet,
   isNoItemFateDiscard,
@@ -81,6 +82,7 @@ function renderCard(
   const attachNote = attached.length ? `<p class="text">+ ${attached.map((a) => esc(def(a.defId).name)).join(", ")}</p>` : "";
   const inspectable = Boolean(opts.inspectable && !opts.legal && opts.size !== "reveal");
   const draggable = isDraggableCard(state, card.instanceId);
+  const spentObsession = d.id === "obsession" && state.peterPanRevealed;
   const costMark = d.deck === "villain" ? String(d.cost) : "Fate";
   const typeBar =
     opts.size === "hand"
@@ -89,11 +91,15 @@ function renderCard(
       <span class="badge">${typeLabel(d.type)}</span>
       ${d.deck === "villain" ? `<span class="cost" title="Power cost">${d.cost}</span>` : `<span class="fate-mark">Fate</span>`}
     </div>`;
-  return `<button type="button" class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""} ${inspectable ? "is-inspectable" : ""} ${draggable ? "is-draggable" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}" aria-label="${esc(d.name)}. ${esc(d.text)}">
+  const cardText = spentObsession
+    ? "Peter is already in the realm. This hunt is spent — discard it if you want the slot."
+    : d.text;
+  return `<button type="button" class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""} ${inspectable ? "is-inspectable" : ""} ${draggable ? "is-draggable" : ""} ${spentObsession ? "is-spent" : ""}" data-card="${card.instanceId}" ${spentObsession ? 'data-spent="obsession"' : ""} title="${esc(d.name)} — ${esc(cardText)}" aria-label="${esc(d.name)}. ${esc(cardText)}">
     ${opts.legal && opts.size === "hand" && (state.pending?.kind === "playChooseCard" || state.pending?.kind === "cunningAlly") ? `<span class="playable-tag">Playable</span>` : ""}
+    ${spentObsession ? `<span class="spent-tag">Spent</span>` : ""}
     ${typeBar}
     <h3>${esc(d.name)}</h3>
-    <p class="text">${esc(d.text)}</p>
+    <p class="text">${esc(cardText)}</p>
     ${attachNote}
     ${d.type === "hero" || d.type === "ally" ? `<div class="str" title="Strength">${str}</div>` : ""}
   </button>`;
@@ -362,7 +368,7 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
           ? "The Never Land Map is in the realm and can cover this cost instead of Power."
           : `Pay ${cost} Power to play ${esc(name)}.`
       }</p>
-      <div class="pay-meter" role="status">Power ${state.power} / cost ${cost}${mapOut ? " · Map available" : ""}</div>
+      <div class="pay-meter" role="status">Pay ${cost} · you have ${state.power} · ${Math.max(0, state.power - cost)} left${mapOut ? " · Map available" : ""}</div>
       <div class="actions-row">
         <button class="btn primary${coachClass(coached, "btn:pay-power")}" data-pay-power ${canPay ? "" : "disabled"}>Pay ${cost} Power</button>
         ${
@@ -685,10 +691,20 @@ function playView(
   const reasonHtml = reasonsEnabled && reason ? reasonDock(reason) : "";
   const teachOn = Boolean(briefHtml || coachHtml || reasonHtml);
   const activeTab = resolveTeachTab(teachTab, Boolean(briefHtml), Boolean(coachHtml), Boolean(reasonHtml));
+  const placeLabel = state.phase === "move" && !state.pending ? "Move here" : "Choose this place";
+  const placeButtons = LOCATION_IDS.filter((id) => hi.has(`loc:${id}`)).map(
+    (id) =>
+      `<button type="button" class="btn primary prompt-place${coachClass(coached, `loc:${id}`)}" data-move="${id}">${placeLabel}: ${esc(REALM[id].name)}</button>`,
+  );
+  const fateEmpty = fateEmptyLine(state);
+  const fateLogTitle = fateEmpty
+    ? `Log · Fate 0 · empty`
+    : `Log · Fate ${state.fateDeck.length}`;
 
   return `<div class="sky play-sky" aria-hidden="true"><div class="stars"></div><div class="fog fog-a"></div></div>
   <div class="grain"></div>
   <div class="play ${coachEnabled ? "has-coach" : ""} ${briefEnabled ? "has-brief" : ""} ${reasonsEnabled ? "has-reasons" : ""} ${teachOn ? "has-teach" : ""}">
+    <div class="play-main" data-play-main>
     <header class="topbar" data-topbar-map>
       <div class="brand">${CREST}<div><h1>Never Land Duel</h1><small>Hook Practice</small></div></div>
       <div class="meters">
@@ -707,12 +723,11 @@ function playView(
         </div>
       </div>
     </header>
+    <div class="prompt${clash ? " is-clash" : ""}" data-prompt>${clashMeter(clash)}<p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}${placeButtons.join("")}</div></div>
     <div class="stage">
-      <div class="prompt${clash ? " is-clash" : ""}">${clashMeter(clash)}<p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}</div></div>
       ${fateRail(state)}
       <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
     </div>
-    ${teachRailHtml(briefHtml, coachHtml, reasonHtml, activeTab)}
     <footer class="dock">
       <section class="hand ${state.pending?.kind === "playChooseCard" || state.pending?.kind === "discardSelect" ? "is-picking" : ""}">
         <h2>Hand</h2>
@@ -736,10 +751,12 @@ function playView(
         </div>
       </section>
       <aside class="log">
-        <h2>Log · Fate ${state.fateDeck.length}</h2>
+        <h2>${esc(fateLogTitle)}</h2>
         <ol>${state.log.map((e) => `<li class="${e.tone}">${esc(e.text)}</li>`).join("")}</ol>
       </aside>
     </footer>
+    </div>
+    ${teachRailHtml(briefHtml, coachHtml, reasonHtml, activeTab)}
   </div>
   ${overlayFor(state, hi, sel, coached)}`;
 }

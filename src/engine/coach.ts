@@ -18,6 +18,7 @@ import {
   movableAlliesAndItems,
   movableHeroes,
   playableHandCards,
+  clashAndCrocLine,
   vanquishAllyPool,
   vanquishableHeroes,
 } from "./queries";
@@ -145,11 +146,15 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
   const notes: string[] = [];
   const croc = tickTockAt(state);
   const slideNow = Boolean(croc && crocCanSlideOnto(state, state.villainLocation) && heroSlideReady(state));
-  if (slideNow) {
+  const pair = clashAndCrocLine(state);
+  const moveOrSlide = state.phase === "move" || heroSlideReady(state);
+  if (pair) {
+    notes.push(pair);
+  } else if (slideNow) {
     notes.push(
       "A Hero move can slide Tick Tock onto the captain this turn. That empties the hand the same as stepping onto him — park the crocodile elsewhere.",
     );
-  } else if (croc) {
+  } else if (croc && moveOrSlide) {
     notes.push(
       `Tick Tock waits at ${locName(croc)} — sharing that place (stepping there, or sliding the crocodile onto the captain) empties your hand.`,
     );

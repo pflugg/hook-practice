@@ -7,6 +7,7 @@ import {
   cardName,
   coveringHero,
   heroStrength,
+  fateEmptyLine,
   mapInRealm,
   playableHandCards,
   vanquishableHeroes,
@@ -148,7 +149,10 @@ function whereYouAre(state: GameState): string {
       ? ` Tick Tock is at ${locName(croc)}. Sharing that place with the captain — stepping there, or sliding the crocodile onto him — empties the whole hand.`
     : " Tick Tock is not ashore, so movement is safer than it will be later.";
 
-  return `The captain is at ${loc} with ${state.power} Power on turn ${state.turn}. ${tree}${coverNote}${crocNote} ${handNote} Allies already on the Jolly Roger total about ${jrStrength(state)} Strength — that number is the late-game clock.`;
+  const fateNote = fateEmptyLine(state);
+  const fateCue = fateNote ? ` ${fateNote}` : "";
+
+  return `The captain is at ${loc} with ${state.power} Power on turn ${state.turn}. ${tree}${coverNote}${crocNote} ${handNote}${fateCue} Allies already on the Jolly Roger total about ${jrStrength(state)} Strength — that number is the late-game clock.`;
 }
 
 function thisMoment(state: GameState): string {
