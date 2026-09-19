@@ -310,6 +310,18 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
   if (slot.kind === "playCard" && playableMap(state)) {
     return "The Never Land Map unlocks Hangman’s Tree. Until that hideout opens, Peter cannot start the walk to the ship.";
   }
+  if (slot.kind === "playCard") {
+    const card = usefulPlay(state);
+    if (card && def(card.defId).type === "ally") {
+      return "An Ally on the Jolly Roger is Strength waiting for Peter. Play one while this action is open.";
+    }
+    if (card && (card.defId === "worthyOpponent" || card.defId === "giveThemAScare")) {
+      return "These hunts can flip Peter onto Hangman’s Tree without waiting on a Fate action.";
+    }
+    if (card) {
+      return `Play ${cardName(card)} if it helps the Map, the escort, or the ship’s clash.`;
+    }
+  }
   if (slot.kind === "gainPower") {
     return needPowerForMap(state)
       ? "Bank Power now so the Never Land Map is affordable. Allies for the final clash will want a reserve too."
