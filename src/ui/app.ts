@@ -25,9 +25,10 @@ import {
 } from "../engine";
 import { LOCATION_IDS } from "../engine/types";
 import { allAllies, allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
-import { cutlassAttachScene, tickTockReportScene } from "../engine/scenes";
+import { cutlassAttachScene, dragHeroScene, tickTockReportScene } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
-import { CREST, TITLE_SCENE, locationDecor } from "./decor";
+import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
+import { CAPTAIN_TOKEN, CREST, TITLE_SCENE, locationDecor } from "./decor";
 import "./styles.css";
 
 function esc(s: string): string {
@@ -56,7 +57,8 @@ function renderCard(
   const attached = attachmentsOn(state, card.instanceId);
   const attachNote = attached.length ? `<p class="text">+ ${attached.map((a) => esc(def(a.defId).name)).join(", ")}</p>` : "";
   const inspectable = Boolean(opts.inspectable && !opts.legal && opts.size !== "reveal");
-  return `<button type="button" class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""} ${inspectable ? "is-inspectable" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}" aria-label="${esc(d.name)}. ${esc(d.text)}">
+  const draggable = isDraggableCard(state, card.instanceId);
+  return `<button type="button" class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""} ${inspectable ? "is-inspectable" : ""} ${draggable ? "is-draggable" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}" aria-label="${esc(d.name)}. ${esc(d.text)}">
     ${opts.legal && opts.size === "hand" && (state.pending?.kind === "playChooseCard" || state.pending?.kind === "cunningAlly") ? `<span class="playable-tag">Playable</span>` : ""}
     <div class="meta">
       <span class="badge">${typeLabel(d.type)}</span>
@@ -134,7 +136,14 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
         <h2>${esc(meta.name)} ${locked ? `<span class="lock-badge">Locked</span>` : ""}</h2>
         <p>${esc(meta.subtitle)}${locked ? " — play the Never Land Map to open the path" : ""}</p>
       </div>
-      ${current ? `<div class="hook-token" title="Captain">${CREST.replace('class="crest"', 'class="token-crest"')}</div>` : ""}
+      ${
+        current
+          ? `<div class="captain-token" title="You — the captain">
+              ${CAPTAIN_TOKEN}
+              <span class="you-tag">You</span>
+            </div>`
+          : ""
+      }
     </div>
     ${actBtns(top)}
     ${zone("Heroes", cards("Clear — top actions are open.", loc.heroes))}
@@ -202,7 +211,8 @@ function helpView(fromPlay: boolean): string {
     <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable.</p>
     <p><b>Strategy brief:</b> a persistent sidebar that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
     <p><b>Move reasons:</b> a floating “Why this move” panel that updates after each legal click. It names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on.</p>
-    <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it.</p>
+    <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it. The <b>Across the table</b> strip keeps the last revealed Fate play visible — never the face-down deck.</p>
+    <p><b>Drag:</b> When a card can move or be played onto a place, grab it and slide onto a glowing location (or Ally, for the Cutlass). Drop outside to cancel the slide; clicking still works.</p>
     <p><b>Practice tips:</b> Discard aggressively for the Map. Fish Fate with Worthy Opponent and Give Them a Scare. Station strength at the ship before walking Peter across. Beware Tick Tock and Splitting Headache.</p>
     <div class="actions-row"><button class="btn primary" data-close-help>${fromPlay ? "Return to the realm" : "Back"}</button></div>
   </div></div>`;
@@ -327,6 +337,40 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
     </div></div>`;
   }
   return "";
+}
+
+function fateRail(state: GameState): string {
+  const show = state.lastFateShow;
+  const live =
+    state.pending?.kind === "fateReport" && state.pending.resume === "nextTurn" ? state.pending : null;
+  const drawn = live?.drawn ?? show?.drawn ?? [];
+  const played = live?.played ?? show?.played;
+  const note = live?.note ?? show?.note ?? "";
+  const ability = live?.abilityText ?? show?.abilityText ?? "";
+  if (!drawn.length && !show) {
+    return `<aside class="fate-rail is-empty" aria-label="Fate adversary">
+      <div class="fate-rail-copy">
+        <p class="fate-kicker">Across the table</p>
+        <h2>Fate adversary</h2>
+        <p>This strip is the practice stand-in for another player Fating you. Only cards that were just revealed or seated appear here — never the face-down Fate deck.</p>
+      </div>
+    </aside>`;
+  }
+  return `<aside class="fate-rail" aria-label="Fate adversary">
+    <div class="fate-rail-copy">
+      <p class="fate-kicker">Across the table</p>
+      <h2>Fate adversary</h2>
+      <p>${esc(note || "Last revealed Fate play.")}</p>
+      ${ability ? `<p class="fate-ability">${esc(ability)}</p>` : ""}
+      <p class="fate-fine">Revealed this Fate only. The rest of the Fate deck stays face down, as at a real table.</p>
+    </div>
+    <div class="fate-rail-cards">${drawn
+      .map((c) => {
+        const focus = played?.instanceId === c.instanceId;
+        return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: focus ? "hand" : "mini", legal: false, selected: focus })}</div>`;
+      })
+      .join("")}</div>
+  </aside>`;
 }
 
 function inspectOverlay(state: GameState, instanceId: string): string {
@@ -486,6 +530,7 @@ function playView(
       <div class="prompt"><p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}</div></div>
       ${advice ? coachPanel(advice) : ""}
     </div>
+    ${fateRail(state)}
     <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
     ${brief ? strategySidebar(brief) : ""}
     <footer class="dock">
@@ -548,6 +593,7 @@ function bootState(): GameState {
       const scene = new URLSearchParams(window.location.search).get("scene");
       if (scene === "cutlass") return cutlassAttachScene();
       if (scene === "ticktock") return tickTockReportScene();
+      if (scene === "drag") return dragHeroScene();
     }
   } catch {
     /* ignore */
@@ -584,6 +630,86 @@ export function mount(root: HTMLElement): void {
   let lastReason: MoveReason = IDLE_MOVE_REASON;
   let inspectId: string | null = null;
   let reasonPos = readReasonPos();
+  let suppressClick = false;
+
+  const bindCardDrag = () => {
+    root.querySelectorAll<HTMLElement>(".card.is-draggable").forEach((cardEl) => {
+      cardEl.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        const fromId = cardEl.dataset.card;
+        if (!fromId || !isDraggableCard(state, fromId)) return;
+        cardEl.setPointerCapture?.(event.pointerId);
+        const startX = event.clientX;
+        const startY = event.clientY;
+        let ghost: HTMLElement | null = null;
+        let started = false;
+        const targets = dropTargets(state, fromId);
+
+        const paintZones = (overLoc?: string, overCard?: string) => {
+          root.querySelectorAll("[data-loc]").forEach((node) => {
+            const id = (node as HTMLElement).dataset.loc;
+            node.classList.toggle("is-drop-target", Boolean(id && targets.locations.includes(id as LocationId)));
+            node.classList.toggle("is-drop-over", id === overLoc);
+          });
+          root.querySelectorAll("[data-card]").forEach((node) => {
+            const id = (node as HTMLElement).dataset.card;
+            node.classList.toggle("is-drop-target", Boolean(id && targets.cards.includes(id)));
+            node.classList.toggle("is-drop-over", id === overCard && id !== fromId);
+          });
+        };
+
+        const hitFromPoint = (x: number, y: number) => {
+          if (ghost) ghost.style.pointerEvents = "none";
+          return document.elementFromPoint(x, y) as HTMLElement | null;
+        };
+
+        const move = (ev: PointerEvent) => {
+          if (!started && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
+          if (!started) {
+            started = true;
+            suppressClick = true;
+            ghost = cardEl.cloneNode(true) as HTMLElement;
+            ghost.classList.add("is-drag-ghost");
+            ghost.style.width = `${cardEl.getBoundingClientRect().width}px`;
+            document.body.appendChild(ghost);
+            cardEl.classList.add("is-drag-source");
+            paintZones();
+          }
+          if (ghost) {
+            ghost.style.left = `${ev.clientX - 36}px`;
+            ghost.style.top = `${ev.clientY - 28}px`;
+          }
+          const hit = hitFromPoint(ev.clientX, ev.clientY);
+          paintZones(hit?.closest<HTMLElement>("[data-loc]")?.dataset.loc, hit?.closest<HTMLElement>("[data-card]")?.dataset.card);
+        };
+
+        const up = (ev: PointerEvent) => {
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
+          const hit = started ? hitFromPoint(ev.clientX, ev.clientY) : null;
+          ghost?.remove();
+          cardEl.classList.remove("is-drag-source");
+          root.querySelectorAll(".is-drop-target, .is-drop-over").forEach((node) => {
+            node.classList.remove("is-drop-target", "is-drop-over");
+          });
+          if (!started) return;
+          const locationId = hit?.closest<HTMLElement>("[data-loc]")?.dataset.loc as LocationId | undefined;
+          const cardId = hit?.closest<HTMLElement>("[data-card]")?.dataset.card;
+          const dest = {
+            locationId: locationId && targets.locations.includes(locationId) ? locationId : undefined,
+            cardId: cardId && cardId !== fromId && targets.cards.includes(cardId) ? cardId : undefined,
+          };
+          for (const input of inputsForDrop(state, fromId, dest)) dispatch(input);
+          queueMicrotask(() => {
+            suppressClick = false;
+          });
+        };
+
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+      });
+    });
+  };
 
   const bindReasonDrag = () => {
     const el = root.querySelector<HTMLElement>("[data-reason-float]");
@@ -634,6 +760,7 @@ export function mount(root: HTMLElement): void {
         inspect;
     } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason) + inspect;
     bindReasonDrag();
+    bindCardDrag();
   };
 
   const dispatch = (input: Input) => {
@@ -646,6 +773,11 @@ export function mount(root: HTMLElement): void {
   };
 
   root.addEventListener("click", (event) => {
+    if (suppressClick) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const t = event.target as HTMLElement;
     if (t.closest("[data-coach-toggle]")) {
       coachEnabled = !coachEnabled;

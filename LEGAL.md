@@ -14,7 +14,7 @@
 - Not for sale, relicensing, or redistribution as a competing or replacement product.
 - Not a source of official art, logos, proprietary game fonts, box scans, or PDF rules text.
 
-Character and location names that appear here are used only as **mechanical identifiers** so a player can practice the same objective chain. The interface uses original ornaments and abstract atmosphere — not character likenesses or official silhouettes.
+Character and location names that appear here are used only as **mechanical identifiers** so a player can practice the same objective chain. The interface uses original ornaments and abstract atmosphere — not character likenesses or official silhouettes. The player pawn is a generic captain figure (hat, coat, hook) drawn for this tool, not a likeness of any licensed character.
 
 If you do not already have the published game, buy and learn it from its rights-holders. This tool assumes that context; it does not grant any license to those marks or works.
 

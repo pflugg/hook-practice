@@ -95,6 +95,18 @@ A floating **Why this move** panel (default on, especially from **Tutorial**) ex
 
 Cancel softens the panel (nothing committed). Acknowledging computer Fate explains why that card hurts — or, for Peter, why the find actually helps — and what to do about it. Drag the title bar to park the window; hide it with the **Reasons** chip or **Hide**. The choice persists for the browser tab (`nld-reasons`).
 
+## Captain pawn
+
+The current location shows an original SVG captain figure (hat, coat, hook) and a tiny **You** label. It is a generic pawn, not a character likeness. The app crest in the header stays as the brand mark.
+
+## Fate adversary
+
+When the computer Fates you, the intervening modal still shows the drawn cards large with full paraphrased text until **Continue**. After that, an **Across the table** strip keeps the last revealed/seated Fate play visible — Heroes and effects that hit the realm — so it feels like seeing what the other player just did. The face-down Fate deck is never shown.
+
+## Drag-and-slide
+
+While a Play, Move a Hero, Move Ally/Item, Aye Aye, or Cutlass attach is open, grab a legal card and slide it onto a highlighted location (or onto an Ally for the Cutlass). The card lifts and follows the pointer. Drop outside to cancel the slide. Click-to-select still works.
+
 ## Practice tips
 
 - Discard often until the Map appears. Hangman’s Tree stays locked without it, so Peter cannot leave.
@@ -118,7 +130,7 @@ Cancel softens the panel (nothing committed). Acknowledging computer Fate explai
 | --- | --- |
 | A glowing location | Move, or drop a card there |
 | A glowing action | Perform that action |
-| A glowing card | Play, attach, vanquish, or move it |
+| A glowing card | Play, attach, vanquish, or move it — or drag it onto a glowing place |
 | A non-glowing hand or board card | Inspect — full paraphrased text in a modal |
 | End turn | Draw, then face Fate |
 | Continue on a Fate report | Required. The reveal stays until you acknowledge; it does not auto-dismiss |
