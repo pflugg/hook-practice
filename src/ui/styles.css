@@ -994,6 +994,8 @@ h1.wordmark {
   gap: 10px;
   cursor: grab;
   margin-bottom: 10px;
+  user-select: none;
+  touch-action: none;
 }
 .reason-head:active { cursor: grabbing; }
 .reason-kicker {
