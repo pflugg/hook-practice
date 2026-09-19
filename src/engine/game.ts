@@ -216,6 +216,76 @@ function abilityLine(card: CardInstance): string {
   return `${d.name}: ${d.text}`;
 }
 
+export const HEADACHE_NO_ITEM_BANNER = "No Item ashore — this Fate card is discarded.";
+
+export const HEADACHE_NO_ITEM_NOTE =
+  `${HEADACHE_NO_ITEM_BANNER} Splitting Headache finds no Item and is discarded.`;
+
+export function isNoItemFateDiscard(note: string): boolean {
+  return /no item/i.test(note) && /discard/i.test(note);
+}
+
+function discardHeadacheIfNeeded(state: GameState, card: CardInstance | undefined): void {
+  if (!card) return;
+  if (state.fateDiscard.some((c) => c.instanceId === card.instanceId)) return;
+  state.fateDeck = state.fateDeck.filter((c) => c.instanceId !== card.instanceId);
+  discardFateCard(state, card);
+}
+
+function finishHeadacheWithoutItems(
+  state: GameState,
+  card: CardInstance | undefined,
+  opts: {
+    resume: "nextTurn" | "actions";
+    drawn?: CardInstance[];
+    discarded?: CardInstance[];
+  },
+): void {
+  discardHeadacheIfNeeded(state, card);
+  state.heldCard = undefined;
+  log(state, HEADACHE_NO_ITEM_NOTE, "fate");
+  openFateReport(state, {
+    drawn: opts.drawn ?? (card ? [card] : []),
+    played: card,
+    discarded: opts.discarded ?? [],
+    note: HEADACHE_NO_ITEM_NOTE,
+    resume: opts.resume,
+    markAction: opts.resume === "actions",
+  });
+}
+
+function headacheCardFromChoice(state: GameState, cardId: string): CardInstance {
+  if (state.heldCard?.instanceId === cardId) return state.heldCard;
+  return findCard(state, cardId) ?? state.heldCard ?? { instanceId: cardId, defId: "splittingHeadache" };
+}
+
+/** Empty-shore Headache must never sit on fateChooseItem — convert to a Continue report. */
+function recoverEmptyHeadacheChoice(state: GameState): void {
+  const p = state.pending;
+  if (p?.kind !== "fateChooseItem") return;
+  if (allLocationItems(state).length > 0) return;
+  finishHeadacheWithoutItems(state, headacheCardFromChoice(state, p.cardId), {
+    resume: p.actor === "ai" ? "nextTurn" : "actions",
+  });
+}
+
+function acknowledgeOpenFate(state: GameState): void {
+  if (state.pending?.kind === "fateReport") {
+    if (state.pending.resume === "nextTurn") {
+      beginNextTurn(state);
+    } else if (state.pending.markAction) {
+      consumeCurrentAction(state);
+    } else {
+      state.pending = null;
+      state.phase = "actions";
+    }
+    return;
+  }
+  if (state.phase === "fateAdversary") {
+    beginNextTurn(state);
+  }
+}
+
 function openFateReport(
   state: GameState,
   opts: {
@@ -411,14 +481,13 @@ function resolveComputerFateCard(
   } else if (d.id === "splittingHeadache") {
     const item = chooseHeadacheItem(state);
     if (!item) {
-      discardFateCard(state, card);
-      note = "Splitting Headache finds no Item and is discarded.";
-    } else {
-      removeFromRealm(state, item.instanceId);
-      discardVillainCard(state, item);
-      discardFateCard(state, card);
-      note = `Splitting Headache discards ${def(item.defId).name}.`;
+      finishHeadacheWithoutItems(state, card, { resume: "nextTurn", drawn, discarded });
+      return;
     }
+    removeFromRealm(state, item.instanceId);
+    discardVillainCard(state, item);
+    discardFateCard(state, card);
+    note = `Splitting Headache discards ${def(item.defId).name}.`;
   } else {
     discardFateCard(state, card);
   }
@@ -691,21 +760,18 @@ export function applyInput(prev: GameState, input: Input): GameState {
 
   if (state.phase === "over" || state.won || state.lost) return state;
 
+  recoverEmptyHeadacheChoice(state);
+
   if (input.type === "acknowledgeFate") {
-    if (state.pending?.kind === "fateReport") {
-      if (state.pending.resume === "nextTurn") {
-        beginNextTurn(state);
-      } else if (state.pending.markAction) {
-        consumeCurrentAction(state);
-      } else {
-        state.pending = null;
-        state.phase = "actions";
-      }
-    }
+    acknowledgeOpenFate(state);
     return state;
   }
 
   if (input.type === "endTurn") {
+    if (state.pending?.kind === "fateReport") {
+      acknowledgeOpenFate(state);
+      return state;
+    }
     if (state.phase === "actions" || (state.phase === "resolving" && !state.pending)) {
       refillHand(state);
       startComputerFate(state);
@@ -733,6 +799,7 @@ export function applyInput(prev: GameState, input: Input): GameState {
     if (state.phase === "resolving") {
       if (state.pending?.kind === "scarePeek") return state;
       if (state.pending?.kind === "fateChooseCard") return state;
+      if (state.pending?.kind === "fateChooseItem") return state;
       state.pending = null;
       state.phase = "actions";
       state.actionKey = undefined;
@@ -1156,7 +1223,7 @@ function handleCard(state: GameState, instanceId: string): GameState {
       return finishPlayerFatePlay(
         state,
         headache,
-        item ? `Splitting Headache discards ${def(item.defId).name}.` : "Splitting Headache finds no Item.",
+        item ? `Splitting Headache discards ${def(item.defId).name}.` : HEADACHE_NO_ITEM_NOTE,
       );
     }
     consumeCurrentAction(state);
@@ -1226,9 +1293,8 @@ function playPlayerFateCard(state: GameState, card: CardInstance): GameState {
   }
   if (d.id === "splittingHeadache") {
     if (allLocationItems(state).length === 0) {
-      discardFateCard(state, card);
-      log(state, "Splitting Headache finds no Item.");
-      return finishPlayerFatePlay(state, card, "Splitting Headache finds no Item and is discarded.");
+      finishHeadacheWithoutItems(state, card, { resume: "actions" });
+      return state;
     }
     state.heldCard = card;
     state.pending = { kind: "fateChooseItem", cardId: card.instanceId, actor: "player" };

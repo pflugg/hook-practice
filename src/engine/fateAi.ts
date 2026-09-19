@@ -50,7 +50,7 @@ export function scoreFateCard(state: GameState, card: CardInstance): number {
   if (d.id === "peterPan") return 1000;
   if (d.id === "splittingHeadache") {
     const items = allLocationItems(state);
-    if (items.length === 0) return -20;
+    if (items.length === 0) return -1000;
     const ids = items.map((i) => i.item.defId);
     if (ids.includes("ingeniousDevice")) return 90;
     if (ids.includes("neverLandMap")) return 80;
@@ -72,6 +72,12 @@ function allHeroesSafe(state: GameState): boolean {
   return LOCATION_IDS.some((id) => state.locations[id].heroes.length > 0);
 }
 
+function fatePlayPool(state: GameState, cards: CardInstance[]): CardInstance[] {
+  if (allLocationItems(state).length > 0) return cards;
+  const withoutHeadache = cards.filter((c) => c.defId !== "splittingHeadache");
+  return withoutHeadache.length > 0 ? withoutHeadache : cards;
+}
+
 export function chooseFateCard(
   state: GameState,
   cards: CardInstance[],
@@ -80,13 +86,14 @@ export function chooseFateCard(
   if (cards.some((c) => c.defId === "peterPan")) {
     return { card: cards.find((c) => c.defId === "peterPan")!, rng: state.rng };
   }
+  const pool = fatePlayPool(state, cards);
   if (difficulty === "easy") {
-    const pick = pickIndex(cards.length, state.rng);
-    return { card: cards[pick.index], rng: pick.rng };
+    const pick = pickIndex(pool.length, state.rng);
+    return { card: pool[pick.index], rng: pick.rng };
   }
-  let best = cards[0];
+  let best = pool[0];
   let bestScore = -Infinity;
-  for (const card of cards) {
+  for (const card of pool) {
     const s = scoreFateCard(state, card);
     if (s > bestScore) {
       best = card;

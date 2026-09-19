@@ -26,7 +26,16 @@ export {
   playableHandCards,
   promptText,
 } from "./queries";
-export { applyInput, createGame, highlightSet, selectedSet, titleState } from "./game";
+export {
+  applyInput,
+  createGame,
+  highlightSet,
+  selectedSet,
+  titleState,
+  HEADACHE_NO_ITEM_BANNER,
+  HEADACHE_NO_ITEM_NOTE,
+  isNoItemFateDiscard,
+} from "./game";
 export { advise, type CoachAdvice } from "./coach";
 export { strategyBrief, type ObjectiveLine, type StrategyBrief } from "./strategyBrief";
 export { explainSelection, IDLE_MOVE_REASON, type MoveReason } from "./moveReason";

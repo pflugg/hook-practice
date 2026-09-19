@@ -5,7 +5,10 @@ import {
   cardName,
   def,
   findCard,
+  HEADACHE_NO_ITEM_BANNER,
+  HEADACHE_NO_ITEM_NOTE,
   highlightSet,
+  isNoItemFateDiscard,
   objectiveSteps,
   promptText,
   REALM,
@@ -24,7 +27,7 @@ import {
   type MoveReason,
 } from "../engine";
 import { LOCATION_IDS } from "../engine/types";
-import { allAllies, allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
+import { allAllies, allLocationItems, allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
 import { cutlassAttachScene, dragHeroScene, tickTockReportScene } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
 import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
@@ -82,6 +85,12 @@ function abilityReadout(title: string, text: string): string {
     <h3>${esc(title)}</h3>
     <p>${esc(text)}</p>
   </div>`;
+}
+
+function noItemDiscardBanner(): string {
+  return `<aside class="fate-discard-banner" data-no-item-discard role="status">
+    <p>${esc(HEADACHE_NO_ITEM_BANNER)}</p>
+  </aside>`;
 }
 
 function zone(title: string, body: string): string {
@@ -251,9 +260,11 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
           ? "Tick Tock snaps"
           : "Read this card";
     const eyebrow = p.resume === "nextTurn" ? "Across the table" : "Before you continue";
+    const emptyShore = isNoItemFateDiscard(p.note);
     return `<div class="overlay fate-in"><div class="modal wood fate">
       <p class="eyebrow">${eyebrow}</p>
       <h2>${heading}</h2>
+      ${emptyShore ? noItemDiscardBanner() : ""}
       <p>${esc(p.note)}</p>
       ${abilityReadout("What it does", p.abilityText)}
       <div class="modal-cards">${p.drawn
@@ -278,6 +289,21 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
         ${p.cards[1] ? `<button class="btn${coachClass(coached, `btn:scare-order:${p.cards[1].instanceId},${p.cards[0].instanceId}`)}" data-scare-order="${p.cards[1].instanceId},${p.cards[0].instanceId}">${esc(cardName(p.cards[1]))} on top</button>` : ""}
       </div>
     </div></div>`;
+  }
+  if (p?.kind === "fateChooseItem") {
+    const items = allLocationItems(state);
+    if (items.length === 0) {
+      const d = def("splittingHeadache");
+      const ability = `${d.name}: ${d.text}`;
+      return `<div class="overlay fate-in"><div class="modal wood fate">
+      <p class="eyebrow">Across the table</p>
+      <h2>Fate intervening</h2>
+      ${noItemDiscardBanner()}
+      <p>${esc(HEADACHE_NO_ITEM_NOTE)}</p>
+      ${abilityReadout("What it does", ability)}
+      <div class="actions-row"><button type="button" class="btn primary${coachClass(coached, "btn:ack")}" data-ack>Continue</button></div>
+    </div></div>`;
+    }
   }
   if (p?.kind === "fateChooseCard") {
     return `<div class="overlay"><div class="modal">
