@@ -9,7 +9,7 @@ import { renderPlay } from "../src/ui/app";
 import { barePlayState, give } from "./helpers";
 
 describe("game graphics UI pass", () => {
-  it("docks Coach and Why this move in a shared teach-dock, not a floating overlay", () => {
+  it("stacks Strategy brief, Coach, and Why this move in a right teaching rail", () => {
     const html = renderPlay(createGame("normal", 7), {
       coachEnabled: true,
       briefEnabled: true,
@@ -17,26 +17,51 @@ describe("game graphics UI pass", () => {
       reason: IDLE_MOVE_REASON,
     });
 
-    expect(html).toContain('class="teach-dock"');
-    expect(html).toContain("teach-strip");
-    expect(html).toContain("coach-panel");
+    expect(html).toContain("has-teach");
+    expect(html).toContain("data-teach-rail");
+    expect(html).toContain("teach-pane coach-panel");
+    expect(html).toContain("teach-pane strategy-brief");
     expect(html).toContain("reason-dock");
     expect(html).toContain("What you chose");
     expect(html).toContain("Why it helps the plan");
     expect(html).toContain("What it sets up");
-    expect(html).toContain("strategy-brief");
+    expect(html).toContain("data-teach-tab=\"brief\"");
+    expect(html).toContain("data-teach-tab=\"coach\"");
+    expect(html).toContain("data-teach-tab=\"reasons\"");
+    expect(html).not.toContain("teach-dock");
+    expect(html).not.toContain("teach-strip");
     expect(html).not.toContain("reason-float");
     expect(html).not.toContain("data-reason-float");
     expect(html).not.toContain("data-reason-drag");
 
-    const dockStart = html.indexOf('class="teach-dock"');
+    const topbarStart = html.indexOf('class="topbar"');
+    const stageStart = html.indexOf('class="stage"');
     const boardStart = html.indexOf('class="board"');
-    const reasonStart = html.indexOf("reason-dock");
+    const railStart = html.indexOf("data-teach-rail");
     const briefStart = html.indexOf("strategy-brief");
-    expect(dockStart).toBeGreaterThan(-1);
-    expect(reasonStart).toBeGreaterThan(dockStart);
-    expect(reasonStart).toBeLessThan(boardStart);
-    expect(briefStart).toBeGreaterThan(boardStart);
+    const coachStart = html.indexOf("coach-panel");
+    const reasonStart = html.indexOf("reason-dock");
+    expect(topbarStart).toBeGreaterThan(-1);
+    expect(stageStart).toBeGreaterThan(topbarStart);
+    expect(boardStart).toBeGreaterThan(stageStart);
+    expect(railStart).toBeGreaterThan(boardStart);
+    expect(briefStart).toBeGreaterThan(railStart);
+    expect(coachStart).toBeGreaterThan(briefStart);
+    expect(reasonStart).toBeGreaterThan(coachStart);
+
+    const chrome = html.slice(topbarStart, stageStart);
+    expect(chrome).not.toContain("coach-do");
+    expect(chrome).not.toContain("reason-dock");
+    expect(chrome).not.toContain("strategy-brief");
+    expect(chrome).toContain("power is-loud");
+
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    const rail = root.querySelector("[data-teach-rail]");
+    expect(rail?.querySelectorAll(":scope > .teach-pane").length).toBe(3);
+    expect(rail?.querySelector(":scope > .strategy-brief")).toBeTruthy();
+    expect(rail?.querySelector(":scope > .coach-panel")).toBeTruthy();
+    expect(rail?.querySelector(":scope > .reason-dock")).toBeTruthy();
   });
 
   it("keeps Power, Turn, and Hand/Deck/Discard as loud HUD chips", () => {
@@ -98,6 +123,8 @@ describe("game graphics UI pass", () => {
     expect(html).toContain("lock-veil");
     expect(html).toContain(">LOCKED<");
     expect(html).toContain("Need: Never Land Map");
+    expect(html).not.toContain("has-teach");
+    expect(html).not.toContain("data-teach-rail");
 
     const tree = html.slice(html.indexOf('data-loc="hangmansTree"'));
     const treeChunk = tree.slice(0, tree.indexOf("</section>") + 10);
