@@ -335,7 +335,7 @@ export function promptText(state: GameState): string {
       return "Attach this to a Hero in the realm.";
     case "fateChooseItem":
       return allLocationItems(state).length === 0
-        ? "No Item ashore — discarded. Splitting Headache finds no Item and is discarded."
+        ? "No Item ashore — this Fate card is discarded. Splitting Headache finds no Item and is discarded."
         : "Choose an Item in the realm to discard.";
     case "tinkerDiscard":
       return "Tinker Bell may discard one Ally here. Choose one or skip.";

@@ -682,7 +682,7 @@ function advisePending(state: GameState): CoachAdvice {
       if (!pick) {
         return say(
           "Continue",
-          "No Item ashore — discarded. Splitting Headache has nothing to take; acknowledge the report and take your next move.",
+          "No Item ashore — this Fate card is discarded. You do not pick anything. Acknowledge, then make the required move.",
           ["btn:ack"],
           state,
         );
@@ -760,6 +760,14 @@ function advisePending(state: GameState): CoachAdvice {
       );
     }
     case "fateReport": {
+      if (/no item/i.test(p.note) && /discard/i.test(p.note)) {
+        return say(
+          "Continue",
+          "No Item ashore — this Fate card is discarded. You do not pick anything. Acknowledge, then make the required move.",
+          ["btn:ack"],
+          state,
+        );
+      }
       if (p.resume === "nextTurn") {
         return say(
           "Continue",

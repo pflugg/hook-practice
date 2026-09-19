@@ -1091,6 +1091,19 @@ h1.wordmark {
   max-height: min(92vh, 980px);
   overflow: auto;
 }
+.fate-discard-banner {
+  border: 1px solid rgba(232, 195, 106, 0.62);
+  background: rgba(56, 28, 14, 0.78);
+  padding: 12px 14px;
+  margin: 0 0 16px;
+}
+.fate-discard-banner p {
+  margin: 0 !important;
+  color: #fff4d4 !important;
+  font-size: 17px !important;
+  line-height: 1.45;
+  font-weight: 700;
+}
 .ability-readout {
   border: 1px solid rgba(232, 195, 106, 0.3);
   background: rgba(8, 8, 10, 0.42);

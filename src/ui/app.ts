@@ -5,7 +5,10 @@ import {
   cardName,
   def,
   findCard,
+  HEADACHE_NO_ITEM_BANNER,
+  HEADACHE_NO_ITEM_NOTE,
   highlightSet,
+  isNoItemFateDiscard,
   objectiveSteps,
   promptText,
   REALM,
@@ -82,6 +85,12 @@ function abilityReadout(title: string, text: string): string {
     <h3>${esc(title)}</h3>
     <p>${esc(text)}</p>
   </div>`;
+}
+
+function noItemDiscardBanner(): string {
+  return `<aside class="fate-discard-banner" data-no-item-discard role="status">
+    <p>${esc(HEADACHE_NO_ITEM_BANNER)}</p>
+  </aside>`;
 }
 
 function zone(title: string, body: string): string {
@@ -251,9 +260,11 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
           ? "Tick Tock snaps"
           : "Read this card";
     const eyebrow = p.resume === "nextTurn" ? "Across the table" : "Before you continue";
+    const emptyShore = isNoItemFateDiscard(p.note);
     return `<div class="overlay fate-in"><div class="modal wood fate">
       <p class="eyebrow">${eyebrow}</p>
       <h2>${heading}</h2>
+      ${emptyShore ? noItemDiscardBanner() : ""}
       <p>${esc(p.note)}</p>
       ${abilityReadout("What it does", p.abilityText)}
       <div class="modal-cards">${p.drawn
@@ -287,7 +298,8 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
       return `<div class="overlay fate-in"><div class="modal wood fate">
       <p class="eyebrow">Across the table</p>
       <h2>Fate intervening</h2>
-      <p>No Item ashore — discarded. Splitting Headache finds no Item and is discarded.</p>
+      ${noItemDiscardBanner()}
+      <p>${esc(HEADACHE_NO_ITEM_NOTE)}</p>
       ${abilityReadout("What it does", ability)}
       <div class="actions-row"><button type="button" class="btn primary${coachClass(coached, "btn:ack")}" data-ack>Continue</button></div>
     </div></div>`;

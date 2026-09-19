@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { def } from "../src/engine/cards";
 import { chooseFateCard, scoreFateCard } from "../src/engine/fateAi";
-import { applyInput, HEADACHE_NO_ITEM_NOTE } from "../src/engine/game";
-import { promptText } from "../src/engine/queries";
+import { applyInput, HEADACHE_NO_ITEM_BANNER, HEADACHE_NO_ITEM_NOTE } from "../src/engine/game";
+import { legalMoveLocations, promptText } from "../src/engine/queries";
 import { advise } from "../src/engine/coach";
-import { renderOverlay } from "../src/ui/app";
+import { renderOverlay, renderPlay } from "../src/ui/app";
 import { barePlayState, inst, putAlly, putHero } from "./helpers";
 
 const HEADACHE_TEXT = def("splittingHeadache").text;
@@ -34,10 +34,10 @@ describe("computer Fate Splitting Headache with zero realm Items", () => {
     expect(next.pending.resume).toBe("nextTurn");
     expect(next.pending.played?.defId).toBe("splittingHeadache");
     expect(next.pending.note).toBe(HEADACHE_NO_ITEM_NOTE);
-    expect(next.pending.note).toMatch(/No Item ashore — discarded/);
+    expect(next.pending.note).toContain(HEADACHE_NO_ITEM_BANNER);
     expect(next.pending.abilityText).toContain(HEADACHE_TEXT);
     expect(next.pending.abilityText).toContain("Choose one Item");
-    expect(next.log.some((e) => e.text.includes("No Item ashore — discarded"))).toBe(true);
+    expect(next.log.some((e) => e.text.includes(HEADACHE_NO_ITEM_BANNER))).toBe(true);
     expect(LOCATION_IDS_HAVE_ITEMS(next)).toBe(false);
     expect(next.locations.skullRock.heroes.some((h) => h.defId === "wendy")).toBe(true);
     expect(next.locations.jollyRoger.allies.some((a) => a.defId === "smee")).toBe(true);
@@ -48,7 +48,15 @@ describe("computer Fate Splitting Headache with zero realm Items", () => {
     const after = applyInput(report, { type: "acknowledgeFate" });
     expect(after.pending).toBeNull();
     expect(after.phase).toBe("move");
+    expect(after.phase).not.toBe("actions");
     expect(after.turn).toBe(report.turn + 1);
+    expect(legalMoveLocations(after).length).toBeGreaterThan(0);
+    const coach = advise(after);
+    expect(coach.do).toMatch(/^Move to /);
+    expect(coach.highlights.some((h) => h.startsWith("loc:"))).toBe(true);
+    const play = renderPlay(after);
+    expect(play).not.toContain("data-end");
+    expect(play).not.toMatch(/>End turn</);
 
     const prematureEnd = applyInput(after, { type: "endTurn" });
     expect(prematureEnd.phase).toBe("move");
@@ -75,19 +83,23 @@ describe("computer Fate Splitting Headache with zero realm Items", () => {
     expect(after.phase).toBe("move");
   });
 
-  it("shows the full card text and Continue — not an item picker", () => {
+  it("shows an explicit discarded banner, full card text, and Continue — not an item picker", () => {
     const next = afterForcedComputerHeadache();
     const html = renderOverlay(next);
-    expect(html).toContain("No Item ashore — discarded");
+    expect(html).toContain("data-no-item-discard");
+    expect(html).toContain(HEADACHE_NO_ITEM_BANNER);
     expect(html).toContain(HEADACHE_TEXT);
     expect(html).toContain("What it does");
     expect(html).toContain("data-ack");
     expect(html).toContain("Continue");
+    expect(html).toMatch(/class="btn primary[^"]*"[^>]*data-ack/);
     expect(html).not.toContain("is-legal");
     expect(html).not.toContain("attach-list");
+    expect(html).not.toContain("fateChooseItem");
     expect(promptText(next)).toContain(HEADACHE_TEXT);
     const advice = advise(next);
     expect(advice.do).toMatch(/Continue/);
+    expect(advice.why).toMatch(/do not pick|discarded/i);
     expect(advice.highlights).toContain("btn:ack");
   });
 
@@ -133,15 +145,28 @@ describe("player Fate Splitting Headache with zero realm Items", () => {
 });
 
 describe("Fate AI skips Headache when the shore has no Items", () => {
-  it("deprioritizes Headache hard and plays the other card", () => {
+  it("deprioritizes Headache hard and Easy random never picks it when an alternative exists", () => {
     const state = realmWithPeopleNoItems();
     const headache = inst("splittingHeadache");
     const wendy = inst("wendy");
     expect(scoreFateCard(state, headache)).toBeLessThan(-100);
     const pick = chooseFateCard(state, [headache, wendy], "normal");
     expect(pick.card.defId).toBe("wendy");
-    const easy = chooseFateCard(state, [headache, wendy], "easy");
-    expect(easy.card.defId).toBe("wendy");
+
+    for (let rng = 1; rng <= 80; rng++) {
+      const easyState = { ...state, rng };
+      const easy = chooseFateCard(easyState, [headache, wendy], "easy");
+      expect(easy.card.defId, `easy rng ${rng}`).toBe("wendy");
+    }
+
+    const live = realmWithPeopleNoItems();
+    live.difficulty = "easy";
+    live.fateDeck = [inst("splittingHeadache"), inst("wendy")];
+    const played = applyInput(live, { type: "endTurn" });
+    expect(played.pending?.kind).toBe("fateReport");
+    if (played.pending?.kind !== "fateReport") throw new Error("expected fateReport");
+    expect(played.pending.played?.defId).toBe("wendy");
+    expect(played.pending.note).not.toMatch(/No Item ashore/);
   });
 });
 

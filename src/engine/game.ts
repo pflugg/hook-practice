@@ -216,8 +216,14 @@ function abilityLine(card: CardInstance): string {
   return `${d.name}: ${d.text}`;
 }
 
+export const HEADACHE_NO_ITEM_BANNER = "No Item ashore — this Fate card is discarded.";
+
 export const HEADACHE_NO_ITEM_NOTE =
-  "No Item ashore — discarded. Splitting Headache finds no Item and is discarded.";
+  `${HEADACHE_NO_ITEM_BANNER} Splitting Headache finds no Item and is discarded.`;
+
+export function isNoItemFateDiscard(note: string): boolean {
+  return /no item/i.test(note) && /discard/i.test(note);
+}
 
 function discardHeadacheIfNeeded(state: GameState, card: CardInstance | undefined): void {
   if (!card) return;
