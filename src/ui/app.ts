@@ -24,7 +24,7 @@ import {
   type MoveReason,
 } from "../engine";
 import { LOCATION_IDS } from "../engine/types";
-import { allAllies, allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
+import { allAllies, allLocationItems, allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
 import { cutlassAttachScene, dragHeroScene, tickTockReportScene } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
 import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
@@ -278,6 +278,20 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
         ${p.cards[1] ? `<button class="btn${coachClass(coached, `btn:scare-order:${p.cards[1].instanceId},${p.cards[0].instanceId}`)}" data-scare-order="${p.cards[1].instanceId},${p.cards[0].instanceId}">${esc(cardName(p.cards[1]))} on top</button>` : ""}
       </div>
     </div></div>`;
+  }
+  if (p?.kind === "fateChooseItem") {
+    const items = allLocationItems(state);
+    if (items.length === 0) {
+      const d = def("splittingHeadache");
+      const ability = `${d.name}: ${d.text}`;
+      return `<div class="overlay fate-in"><div class="modal wood fate">
+      <p class="eyebrow">Across the table</p>
+      <h2>Fate intervening</h2>
+      <p>No Item ashore — discarded. Splitting Headache finds no Item and is discarded.</p>
+      ${abilityReadout("What it does", ability)}
+      <div class="actions-row"><button type="button" class="btn primary${coachClass(coached, "btn:ack")}" data-ack>Continue</button></div>
+    </div></div>`;
+    }
   }
   if (p?.kind === "fateChooseCard") {
     return `<div class="overlay"><div class="modal">

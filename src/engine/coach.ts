@@ -679,7 +679,14 @@ function advisePending(state: GameState): CoachAdvice {
       const items = LOCATION_IDS.flatMap((id) => state.locations[id].items.map((item) => ({ item, id })));
       const junk = items.find((i) => i.item.defId !== "neverLandMap" && i.item.defId !== "ingeniousDevice");
       const pick = junk ?? items.find((i) => i.item.defId !== "neverLandMap") ?? items[0];
-      if (!pick) return say("Choose an Item", "Fate wants something discarded.", [], state);
+      if (!pick) {
+        return say(
+          "Continue",
+          "No Item ashore — discarded. Splitting Headache has nothing to take; acknowledge the report and take your next move.",
+          ["btn:ack"],
+          state,
+        );
+      }
       return say(
         `Discard ${cardName(pick.item)}`,
         "Protect the Map and the Device if they are still helping the escort.",
