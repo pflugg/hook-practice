@@ -9,7 +9,6 @@ import {
   HEADACHE_NO_ITEM_NOTE,
   highlightSet,
   isNoItemFateDiscard,
-  objectiveSteps,
   promptText,
   REALM,
   selectedSet,
@@ -210,7 +209,7 @@ function titleView(
         <button type="button" data-brief-toggle class="${briefEnabled ? "is-on" : ""}">${briefEnabled ? "Strategy brief on" : "Strategy brief off"}</button>
         <button type="button" data-reasons-toggle class="${reasonsEnabled ? "is-on" : ""}">${reasonsEnabled ? "Move reasons on" : "Move reasons off"}</button>
       </div>
-      <p class="coach-lede">Coach names the next click. The Strategy brief is the voyage sidebar. <b>Move reasons</b> docks beside Coach as “Why this move” after each legal choice — what you picked, why it helps the chain, what to watch. Tutorial starts all three on. Hide any during play.</p>
+      <p class="coach-lede">Coach names the next click. The Strategy brief, Coach, and <b>Why this move</b> stack in the right teaching rail — each pane scrolls on its own. Move reasons names what you picked, why it helps the chain, and what to watch. Tutorial starts all three on. Hide any during play.</p>
       <div class="actions-row">
         <button class="btn primary" data-tutorial>Tutorial</button>
         <button class="btn" data-start>Set Sail</button>
@@ -226,9 +225,9 @@ function helpView(fromPlay: boolean): string {
     <h2>How to play</h2>
     <p>Each turn you <b>must move</b> to a different unlocked location, then may use each uncovered action there once. Heroes cover the top row. End the turn to refill to 4 cards; the computer then Fates you.</p>
     <p><b>Win</b> by vanquishing Peter Pan at the Jolly Roger after unlocking Hangman’s Tree with the Never Land Map. Vanquishing him anywhere else loses the duel.</p>
-    <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable.</p>
-    <p><b>Strategy brief:</b> a persistent sidebar that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
-    <p><b>Move reasons:</b> a docked “Why this move” panel in the teach strip that updates after each legal click. It names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on.</p>
+    <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable. It lives in the right teaching rail with the Strategy brief and Why this move — each pane scrolls independently.</p>
+    <p><b>Strategy brief:</b> a persistent right-rail pane that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
+    <p><b>Move reasons:</b> a “Why this move” pane in that same right-hand stack. After each legal click it names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on. Below about 1100px the three panes tab under the board so type stays at the desktop floor.</p>
     <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it. The <b>Across the table</b> strip keeps the last revealed Fate play visible — never the face-down deck.</p>
     <p><b>Drag:</b> When a card can move or be played onto a place, grab it and slide onto a glowing location (or Ally, for the Cutlass). Drop outside to cancel the slide; clicking still works.</p>
     <p><b>Practice tips:</b> Discard aggressively for the Map. Fish Fate with Worthy Opponent and Give Them a Scare. Station strength at the ship before walking Peter across. Beware Tick Tock and Splitting Headache.</p>
@@ -427,8 +426,48 @@ function inspectOverlay(state: GameState, instanceId: string): string {
   </div></div>`;
 }
 
+export type TeachTab = "brief" | "coach" | "reasons";
+
+function resolveTeachTab(
+  requested: TeachTab,
+  briefOn: boolean,
+  coachOn: boolean,
+  reasonsOn: boolean,
+): TeachTab {
+  if (requested === "brief" && briefOn) return "brief";
+  if (requested === "coach" && coachOn) return "coach";
+  if (requested === "reasons" && reasonsOn) return "reasons";
+  if (briefOn) return "brief";
+  if (coachOn) return "coach";
+  return "reasons";
+}
+
+function teachTabBar(briefOn: boolean, coachOn: boolean, reasonsOn: boolean, active: TeachTab): string {
+  const tabs: { id: TeachTab; label: string }[] = [];
+  if (briefOn) tabs.push({ id: "brief", label: "Brief" });
+  if (coachOn) tabs.push({ id: "coach", label: "Coach" });
+  if (reasonsOn) tabs.push({ id: "reasons", label: "Why this move" });
+  if (tabs.length < 2) return "";
+  return `<div class="teach-tabs" role="tablist" aria-label="Teaching panes">
+    ${tabs
+      .map(
+        (tab) =>
+          `<button type="button" role="tab" class="teach-tab${tab.id === active ? " is-on" : ""}" data-teach-tab="${tab.id}" aria-selected="${tab.id === active ? "true" : "false"}">${esc(tab.label)}</button>`,
+      )
+      .join("")}
+  </div>`;
+}
+
+function teachRailHtml(brief: string, coach: string, reasons: string, active: TeachTab): string {
+  if (!brief && !coach && !reasons) return "";
+  return `<aside class="teach-rail" data-teach-rail data-active-tab="${active}" aria-label="Teaching">
+    ${teachTabBar(Boolean(brief), Boolean(coach), Boolean(reasons), active)}
+    ${brief}${coach}${reasons}
+  </aside>`;
+}
+
 function coachPanel(advice: CoachAdvice): string {
-  return `<aside class="teach-pane coach-panel" aria-live="polite">
+  return `<section class="teach-pane coach-panel" aria-live="polite">
     <header class="teach-pane-head">
       <p class="coach-kicker">Coach</p>
       <button type="button" class="btn ghost coach-hide" data-coach-toggle>Hide coach</button>
@@ -438,11 +477,11 @@ function coachPanel(advice: CoachAdvice): string {
       <p class="coach-why">${esc(advice.why)}</p>
       ${advice.warning ? `<p class="coach-warn">${esc(advice.warning)}</p>` : ""}
     </div>
-  </aside>`;
+  </section>`;
 }
 
 function strategySidebar(brief: StrategyBrief): string {
-  return `<aside class="strategy-brief" aria-label="Strategy brief">
+  return `<section class="teach-pane strategy-brief" aria-label="Strategy brief">
     <header class="brief-head">
       <div>
         <p class="brief-kicker">Strategy brief</p>
@@ -475,11 +514,11 @@ function strategySidebar(brief: StrategyBrief): string {
       <h3>What we’re setting up for</h3>
       <p>${esc(brief.setup)}</p>
     </section>
-  </aside>`;
+  </section>`;
 }
 
 function reasonDock(reason: MoveReason): string {
-  return `<aside class="teach-pane reason-dock${reason.soft ? " is-soft" : ""}" data-reason-dock aria-label="Why this move">
+  return `<section class="teach-pane reason-dock${reason.soft ? " is-soft" : ""}" data-reason-dock aria-label="Why this move">
     <header class="teach-pane-head">
       <div>
         <p class="reason-kicker">Why this move</p>
@@ -499,8 +538,8 @@ function reasonDock(reason: MoveReason): string {
       <h3>What it sets up</h3>
       <p>${esc(reason.next)}</p>
     </section>
-    <p class="reason-foot">Not Coach (next click) and not the Strategy brief (voyage status). This panel stays in the teach strip so it never covers legal board actions.</p>
-  </aside>`;
+    <p class="reason-foot">Not Coach (next click) and not the Strategy brief (voyage status). This pane stays in the right teaching rail so it never covers legal board actions. Scroll it on its own — Coach and the brief keep their own overflow.</p>
+  </section>`;
 }
 
 function playView(
@@ -509,12 +548,12 @@ function playView(
   briefEnabled: boolean,
   reasonsEnabled: boolean,
   reason: MoveReason | null,
+  teachTab: TeachTab = "brief",
 ): string {
   const hi = highlightSet(state);
   const sel = selectedSet(state);
   const advice = coachEnabled ? advise(state) : null;
   const coached = new Set(advice?.highlights ?? []);
-  const steps = objectiveSteps(state);
   const promptButtons: string[] = [];
   if (state.phase === "actions" && !state.pending) {
     promptButtons.push(`<button class="btn primary${coachClass(coached, "btn:end")}" data-end>End turn</button>`);
@@ -539,20 +578,17 @@ function playView(
     promptButtons.push(`<button class="btn ghost${coachClass(coached, "btn:skip-cond")}" data-skip-cond>Skip discard</button>`);
   }
 
-  const brief = briefEnabled ? strategyBrief(state) : null;
+  const briefHtml = briefEnabled ? strategySidebar(strategyBrief(state)) : "";
+  const coachHtml = advice ? coachPanel(advice) : "";
+  const reasonHtml = reasonsEnabled && reason ? reasonDock(reason) : "";
+  const teachOn = Boolean(briefHtml || coachHtml || reasonHtml);
+  const activeTab = resolveTeachTab(teachTab, Boolean(briefHtml), Boolean(coachHtml), Boolean(reasonHtml));
 
-  const teachOn = Boolean(advice || (reasonsEnabled && reason));
   return `<div class="sky play-sky" aria-hidden="true"><div class="stars"></div><div class="fog fog-a"></div></div>
   <div class="grain"></div>
-  <div class="play ${coachEnabled ? "has-coach" : ""} ${briefEnabled ? "has-brief" : ""} ${reasonsEnabled ? "has-reasons" : ""}">
+  <div class="play ${coachEnabled ? "has-coach" : ""} ${briefEnabled ? "has-brief" : ""} ${reasonsEnabled ? "has-reasons" : ""} ${teachOn ? "has-teach" : ""}">
     <header class="topbar">
       <div class="brand">${CREST}<div><h1>Never Land Duel</h1><small>Hook Practice</small></div></div>
-      <div class="stepper">
-        <div class="step ${steps.map ? "is-done" : ""}"><span class="dot"></span>Map</div>
-        <div class="step ${steps.peter ? "is-done" : ""}"><span class="dot"></span>Peter revealed</div>
-        <div class="step ${steps.atRoger ? "is-done" : ""}"><span class="dot"></span>At the Roger</div>
-        <div class="step ${steps.win ? "is-done" : ""}"><span class="dot"></span>Vanquished</div>
-      </div>
       <div class="meters">
         <div class="hud-core" aria-label="Voyage meters">
           <div class="power is-loud" title="Power"><span>Power</span><b>${state.power}</b></div>
@@ -569,20 +605,12 @@ function playView(
         </div>
       </div>
     </header>
-    <div class="teach-dock">
+    <div class="stage">
       <div class="prompt"><p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}</div></div>
-      ${
-        teachOn
-          ? `<div class="teach-strip">
-        ${advice ? coachPanel(advice) : ""}
-        ${reasonsEnabled && reason ? reasonDock(reason) : ""}
-      </div>`
-          : ""
-      }
+      ${fateRail(state)}
+      <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
     </div>
-    ${fateRail(state)}
-    <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
-    ${brief ? strategySidebar(brief) : ""}
+    ${teachRailHtml(briefHtml, coachHtml, reasonHtml, activeTab)}
     <footer class="dock">
       <section class="hand ${state.pending?.kind === "playChooseCard" || state.pending?.kind === "discardSelect" ? "is-picking" : ""}">
         <h2>Hand</h2>
@@ -625,13 +653,15 @@ export function renderPlay(
     briefEnabled?: boolean;
     reasonsEnabled?: boolean;
     reason?: MoveReason | null;
+    teachTab?: TeachTab;
   } = {},
 ): string {
   const coachEnabled = flags.coachEnabled ?? true;
   const briefEnabled = flags.briefEnabled ?? true;
   const reasonsEnabled = flags.reasonsEnabled ?? true;
   const reason = reasonsEnabled ? (flags.reason ?? IDLE_MOVE_REASON) : null;
-  return playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason);
+  const teachTab = flags.teachTab ?? "brief";
+  return playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, teachTab);
 }
 
 function readFlag(key: string, fallback = true): boolean {
@@ -673,6 +703,7 @@ export function mount(root: HTMLElement): void {
   let briefEnabled = readFlag("nld-brief");
   let reasonsEnabled = readFlag("nld-reasons");
   let lastReason: MoveReason = IDLE_MOVE_REASON;
+  let teachTab: TeachTab = "brief";
   let inspectId: string | null = null;
   let suppressClick = false;
 
@@ -755,18 +786,21 @@ export function mount(root: HTMLElement): void {
     });
   };
 
+  const activeTeachTab = () => resolveTeachTab(teachTab, briefEnabled, coachEnabled, reasonsEnabled);
+
   const render = () => {
     const inspect = inspectId ? inspectOverlay(state, inspectId) : "";
     const reason = reasonsEnabled ? lastReason : null;
+    const tab = activeTeachTab();
     if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled);
     else if (state.screen === "help") {
       root.innerHTML =
         (state.phase === "title"
           ? titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled)
-          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason)) +
+          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab)) +
         helpView(state.phase !== "title") +
         inspect;
-    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason) + inspect;
+    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab) + inspect;
     bindCardDrag();
   };
 
@@ -786,6 +820,12 @@ export function mount(root: HTMLElement): void {
       return;
     }
     const t = event.target as HTMLElement;
+    const tabBtn = t.closest<HTMLElement>("[data-teach-tab]");
+    if (tabBtn?.dataset.teachTab) {
+      teachTab = tabBtn.dataset.teachTab as TeachTab;
+      render();
+      return;
+    }
     if (t.closest("[data-coach-toggle]")) {
       coachEnabled = !coachEnabled;
       writeFlag("nld-coach", coachEnabled);
