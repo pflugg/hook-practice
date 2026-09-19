@@ -974,7 +974,8 @@ h1.wordmark {
 }
 .reason-float {
   position: fixed;
-  right: 16px;
+  left: 16px;
+  right: auto;
   bottom: 16px;
   z-index: 16;
   width: min(380px, calc(100vw - 24px));
@@ -1038,7 +1039,7 @@ h1.wordmark {
   .topbar, .dock { display: flex; flex-direction: column; }
   .objective-row { grid-template-columns: 1fr 1fr; }
   .has-coach .prompt-stack { grid-template-columns: 1fr; }
-  .reason-float { max-height: 34vh; right: 8px; bottom: 8px; }
+  .reason-float { max-height: 34vh; left: 8px; right: auto; bottom: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
