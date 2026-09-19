@@ -689,7 +689,7 @@ function playView(
   return `<div class="sky play-sky" aria-hidden="true"><div class="stars"></div><div class="fog fog-a"></div></div>
   <div class="grain"></div>
   <div class="play ${coachEnabled ? "has-coach" : ""} ${briefEnabled ? "has-brief" : ""} ${reasonsEnabled ? "has-reasons" : ""} ${teachOn ? "has-teach" : ""}">
-    <header class="topbar">
+    <header class="topbar" data-topbar-map>
       <div class="brand">${CREST}<div><h1>Never Land Duel</h1><small>Hook Practice</small></div></div>
       <div class="meters">
         <div class="hud-core" aria-label="Voyage meters">
