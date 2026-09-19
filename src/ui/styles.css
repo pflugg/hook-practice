@@ -244,18 +244,11 @@ h1.wordmark {
 .btn.ghost { background: transparent; }
 .fine { text-align: center; color: rgba(215, 199, 162, 0.68); font-size: 12px; margin: 16px 0 0; }
 
-body:has(.play) {
-  overflow: hidden;
-  height: 100%;
-}
-
 .play {
-  height: 100vh;
-  height: 100dvh;
-  min-height: 0;
+  min-height: 100vh;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto;
   grid-template-areas:
     "top"
     "stage"
@@ -264,7 +257,6 @@ body:has(.play) {
   z-index: 1;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
 }
 .play.has-teach {
   grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
@@ -275,25 +267,24 @@ body:has(.play) {
 }
 .play .topbar { grid-area: top; }
 .play .stage { grid-area: stage; }
-.play .dock { grid-area: dock; }
+.play .dock { grid-area: dock; min-width: 0; }
 .play .teach-rail { grid-area: rail; }
 
 .stage {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
-  overflow: auto;
 }
 
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 10px;
   padding: 8px 16px;
   min-width: 0;
+  overflow-x: auto;
   border-bottom: 1px solid rgba(232, 195, 106, 0.22);
   background: linear-gradient(180deg, rgba(28, 20, 12, 0.94), rgba(10, 12, 14, 0.72));
   backdrop-filter: blur(8px);
@@ -316,8 +307,8 @@ body:has(.play) {
 .dot { width: 9px; height: 9px; border-radius: 50%; background: #5a5346; }
 .step.is-done .dot { background: var(--lagoon); box-shadow: 0 0 8px var(--lagoon); }
 
-.meters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.hud-core, .hud-toggles { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.meters { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+.hud-core, .hud-toggles { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
 .power {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 18px 8px 12px;
@@ -363,6 +354,12 @@ body:has(.play) {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   border-left: 1px solid rgba(232, 195, 106, 0.42);
   background:
     linear-gradient(180deg, rgba(255, 246, 210, 0.08), transparent 18%),
@@ -405,6 +402,7 @@ body:has(.play) {
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: rgba(232, 195, 106, 0.55) rgba(8, 8, 10, 0.35);
+  overscroll-behavior: contain;
 }
 .strategy-brief,
 .coach-panel,
@@ -1227,15 +1225,8 @@ body:has(.play) {
 }
 
 @media (max-width: 1100px) {
-  body:has(.play) {
-    overflow: auto;
-    height: auto;
-  }
   .play,
   .play.has-teach {
-    height: auto;
-    min-height: 100vh;
-    overflow: visible;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto auto auto;
     grid-template-areas:
@@ -1245,6 +1236,9 @@ body:has(.play) {
       "rail";
   }
   .teach-rail {
+    position: static;
+    height: auto;
+    max-height: none;
     border-left: 0;
     border-top: 1px solid rgba(232, 195, 106, 0.42);
   }
@@ -1293,7 +1287,7 @@ body:has(.play) {
 }
 
 @media (max-width: 900px) {
-  .topbar, .dock { display: flex; flex-direction: column; }
+  .topbar, .dock, .meters, .hud-core, .hud-toggles { display: flex; flex-direction: column; flex-wrap: wrap; }
   .objective-row { grid-template-columns: 1fr 1fr; }
   .chip-piles { white-space: normal; }
 }
