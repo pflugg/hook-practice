@@ -42,6 +42,7 @@ import {
   dragHeroScene,
   easyFizzleScene,
   fateSpentScene,
+  lagoonCoverScene,
   obsessionDecideScene,
   payNoMapScene,
   peterSoftConfirmScene,
@@ -52,7 +53,7 @@ import {
 } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
 import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
-import { CAPTAIN_TOKEN, CREST, TITLE_SCENE, locationDecor } from "./decor";
+import { CAPTAIN_TOKEN, CREST, TITLE_SCENE, TOPBAR_MAP, locationDecor } from "./decor";
 import "./styles.css";
 
 function esc(s: string): string {
@@ -248,7 +249,7 @@ function titleView(
         <button type="button" data-brief-toggle class="${briefEnabled ? "is-on" : ""}">${briefEnabled ? "Strategy brief on" : "Strategy brief off"}</button>
         <button type="button" data-reasons-toggle class="${reasonsEnabled ? "is-on" : ""}">${reasonsEnabled ? "Move reasons on" : "Move reasons off"}</button>
       </div>
-      <p class="coach-lede">Coach names the next click. The Strategy brief, Coach, and <b>Why this move</b> stack in the right teaching rail — each pane scrolls on its own. Move reasons names what you picked, why it helps the chain, and what to watch. Tutorial starts all three on. Hide any during play.</p>
+      <p class="coach-lede">Coach names the next click. Coach, <b>Why this move</b>, and the Strategy brief stack in the right teaching rail — each pane scrolls on its own. Move reasons names what you picked, why it helps the chain, and what to watch. Tutorial starts all three on. Hide any during play.</p>
       <div class="actions-row">
         <button class="btn primary" data-tutorial>Tutorial</button>
         <button class="btn" data-start>Set Sail</button>
@@ -486,7 +487,7 @@ function fateRail(state: GameState): string {
     <div class="fate-rail-cards">${drawn
       .map((c) => {
         const focus = played?.instanceId === c.instanceId;
-        return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: focus ? "hand" : "mini", legal: false, selected: focus })}</div>`;
+        return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: "mini", legal: false, selected: false })}</div>`;
       })
       .join("")}</div>
   </aside>`;
@@ -536,19 +537,19 @@ function resolveTeachTab(
   coachOn: boolean,
   reasonsOn: boolean,
 ): TeachTab {
-  if (requested === "brief" && briefOn) return "brief";
   if (requested === "coach" && coachOn) return "coach";
   if (requested === "reasons" && reasonsOn) return "reasons";
-  if (briefOn) return "brief";
+  if (requested === "brief" && briefOn) return "brief";
   if (coachOn) return "coach";
-  return "reasons";
+  if (reasonsOn) return "reasons";
+  return "brief";
 }
 
 function teachTabBar(briefOn: boolean, coachOn: boolean, reasonsOn: boolean, active: TeachTab): string {
   const tabs: { id: TeachTab; label: string }[] = [];
-  if (briefOn) tabs.push({ id: "brief", label: "Brief" });
   if (coachOn) tabs.push({ id: "coach", label: "Coach" });
   if (reasonsOn) tabs.push({ id: "reasons", label: "Why this move" });
+  if (briefOn) tabs.push({ id: "brief", label: "Brief" });
   if (tabs.length < 2) return "";
   return `<div class="teach-tabs" role="tablist" aria-label="Teaching panes">
     ${tabs
@@ -564,7 +565,7 @@ function teachRailHtml(brief: string, coach: string, reasons: string, active: Te
   if (!brief && !coach && !reasons) return "";
   return `<aside class="teach-rail" data-teach-rail data-active-tab="${active}" aria-label="Teaching">
     ${teachTabBar(Boolean(brief), Boolean(coach), Boolean(reasons), active)}
-    ${brief}${coach}${reasons}
+    ${coach}${reasons}${brief}
   </aside>`;
 }
 
@@ -705,8 +706,10 @@ function playView(
   <div class="grain"></div>
   <div class="play ${coachEnabled ? "has-coach" : ""} ${briefEnabled ? "has-brief" : ""} ${reasonsEnabled ? "has-reasons" : ""} ${teachOn ? "has-teach" : ""}">
     <div class="play-main" data-play-main>
+    <div class="play-chrome">
     <header class="topbar" data-topbar-map>
       <div class="brand">${CREST}<div><h1>Never Land Duel</h1><small>Hook Practice</small></div></div>
+      ${TOPBAR_MAP}
       <div class="meters">
         <div class="hud-core" aria-label="Voyage meters">
           <div class="power is-loud" title="Power"><span>Power</span><b>${state.power}</b></div>
@@ -724,6 +727,8 @@ function playView(
       </div>
     </header>
     <div class="prompt${clash ? " is-clash" : ""}" data-prompt>${clashMeter(clash)}<p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}${placeButtons.join("")}</div></div>
+    </div>
+    <div class="play-scroll" data-play-scroll>
     <div class="stage">
       ${fateRail(state)}
       <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
@@ -756,6 +761,7 @@ function playView(
       </aside>
     </footer>
     </div>
+    </div>
     ${teachRailHtml(briefHtml, coachHtml, reasonHtml, activeTab)}
   </div>
   ${overlayFor(state, hi, sel, coached)}`;
@@ -779,7 +785,7 @@ export function renderPlay(
   const briefEnabled = flags.briefEnabled ?? true;
   const reasonsEnabled = flags.reasonsEnabled ?? true;
   const reason = reasonsEnabled ? (flags.reason ?? IDLE_MOVE_REASON) : null;
-  const teachTab = flags.teachTab ?? "brief";
+  const teachTab = flags.teachTab ?? "coach";
   return playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, teachTab);
 }
 
@@ -816,6 +822,7 @@ function bootState(): GameState {
       if (scene === "pay") return payNoMapScene();
       if (scene === "fatepick") return easyFizzleScene();
       if (scene === "fatespent") return fateSpentScene();
+      if (scene === "lagoon") return lagoonCoverScene();
     }
   } catch {
     /* ignore */
@@ -830,7 +837,7 @@ export function mount(root: HTMLElement): void {
   let briefEnabled = readFlag("nld-brief");
   let reasonsEnabled = readFlag("nld-reasons");
   let lastReason: MoveReason = IDLE_MOVE_REASON;
-  let teachTab: TeachTab = "brief";
+  let teachTab: TeachTab = "coach";
   let inspectId: string | null = null;
   let suppressClick = false;
 
@@ -923,8 +930,8 @@ export function mount(root: HTMLElement): void {
   const captureScroll = () => {
     pageScrollX = window.scrollX;
     pageScrollY = window.scrollY;
-    const main = root.querySelector<HTMLElement>("[data-play-main]");
-    if (main) mainScroll = main.scrollTop;
+    const scroller = root.querySelector<HTMLElement>("[data-play-scroll]") ?? root.querySelector<HTMLElement>("[data-play-main]");
+    if (scroller) mainScroll = scroller.scrollTop;
     root.querySelectorAll<HTMLElement>("[data-teach-pane]").forEach((pane) => {
       const key = pane.dataset.teachPane as TeachTab | undefined;
       if (key && key in paneScroll) paneScroll[key] = pane.scrollTop;
@@ -936,8 +943,8 @@ export function mount(root: HTMLElement): void {
       const key = pane.dataset.teachPane as TeachTab | undefined;
       if (key && key in paneScroll) pane.scrollTop = paneScroll[key];
     });
-    const main = root.querySelector<HTMLElement>("[data-play-main]");
-    if (main) main.scrollTop = mainScroll;
+    const scroller = root.querySelector<HTMLElement>("[data-play-scroll]") ?? root.querySelector<HTMLElement>("[data-play-main]");
+    if (scroller) scroller.scrollTop = mainScroll;
     window.scrollTo(pageScrollX, pageScrollY);
   };
 

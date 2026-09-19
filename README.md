@@ -71,13 +71,13 @@ A heuristic advisor (not an LLM) sits beside the prompt and names the next concr
 - **Tutorial** on the title screen starts a game with Coach on.
 - **Set Sail** uses the title **Coach on/off** toggle (defaults on for a new session).
 - During play, the top-bar **Coach** chip or the panel’s **Hide coach** button turns it off without ending the game. The choice persists for the browser tab.
-- Coach lives in the **right teaching rail** with the Strategy brief and Why this move. Each pane keeps the full *do* line and *why* paragraph at readable size and scrolls on its own, so one pane never buries another. The rail sits beside the board — it never covers Gain / Play / Move buttons.
+- Coach lives in the **right teaching rail** with Why this move and the Strategy brief (Coach on top, then Why, then the voyage brief). Each pane keeps the full *do* line and *why* paragraph at readable size and scrolls on its own, so one pane never buries another. The rail sits beside the board — it never covers Gain / Play / Move buttons.
 - Coach only *highlights* a recommended legal target more strongly — the suggested action uses a gold CTA; every other legal option stays clickable.
 - It covers the full loop: required move, actions (Gain / Discard / Play / Fate / Vanquish / Move), card and payment choices, Fate acknowledge, and win/loss awareness. It warns about Tick Tock and Heroes covering key actions.
 
 ## Strategy brief
 
-A persistent right-rail pane (default on, especially from **Tutorial**) teaches the voyage instead of only the next click. Coach stays the short “do this” panel; the brief is the longer briefing and updates every render from a pure `strategyBrief(state)` helper. The three teaching panes stack in one parchment/gold rail and each has its own scroll.
+A persistent right-rail pane (default on, especially from **Tutorial**) teaches the voyage instead of only the next click. Coach stays the short “do this” panel; the brief is the longer briefing and updates every render from a pure `strategyBrief(state)` helper. The three teaching panes stack Coach → Why this move → Strategy brief in one parchment/gold rail and each has its own scroll.
 
 - **Objective progress** — Map unlock, Peter found, walk to the ship, clash ready — each with a plain-English status.
 - **Where you are** — location, Power, hand pressure, whether the tree is locked, Tick Tock and covering Heroes.

@@ -194,6 +194,41 @@ export function easyFizzleScene(): GameState {
   return state;
 }
 
+/** Turn 2 at Mermaid Lagoon after Fate seated Tinker Bell — tree open, Peter still hidden. */
+export function lagoonCoverScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.turn = 2;
+  state.power = 1;
+  state.hangmansUnlocked = true;
+  state.peterPanRevealed = false;
+  state.villainLocation = "mermaidLagoon";
+  state.phase = "actions";
+  const tinker = inst(state, "tinkerBell");
+  const dust = inst(state, "pixieDust");
+  const map = inst(state, "neverLandMap");
+  state.locations.mermaidLagoon.heroes.push(tinker);
+  state.locations.jollyRoger.items.push(map);
+  state.attachments.push({ item: dust, attachedTo: tinker.instanceId });
+  state.usedActions = ["ml-gain", "ml-play2"];
+  state.hand.push(inst(state, "cannon"), inst(state, "smee"), inst(state, "worthyOpponent"));
+  state.villainDeck = [inst(state, "pirateBrute"), inst(state, "hooksCase")];
+  state.lastFateShow = {
+    drawn: [tinker, dust],
+    played: tinker,
+    discarded: [],
+    note: "Fate seats Tinker Bell at Mermaid Lagoon.",
+    abilityText: `${def(tinker.defId).name}: ${def(tinker.defId).text}`,
+  };
+  state.lastComputerFateNote = "Fate seats Tinker Bell at Mermaid Lagoon.";
+  state.log.unshift({
+    id: state.logSeq++,
+    text: "Fate seats Tinker Bell at Mermaid Lagoon.",
+    tone: "fate",
+  });
+  return state;
+}
+
 /** Stale Fate memory after the clinging Hero was vanquished — strip should read “That Fate is over.” */
 export function fateSpentScene(): GameState {
   const state = createGame("normal", 1);

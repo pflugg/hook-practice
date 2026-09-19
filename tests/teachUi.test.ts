@@ -177,6 +177,10 @@ describe("teaching UI for Must fixes", () => {
     expect(html).toContain('data-teach-pane="coach"');
     expect(html).toContain('data-teach-pane="reasons"');
     expect(html).toContain('data-teach-tab="coach"');
+    expect(html.indexOf('data-teach-pane="coach"')).toBeLessThan(html.indexOf('data-teach-pane="reasons"'));
+    expect(html.indexOf('data-teach-pane="reasons"')).toBeLessThan(html.indexOf('data-teach-pane="brief"'));
+    expect(html.indexOf('data-teach-tab="coach"')).toBeLessThan(html.indexOf('data-teach-tab="reasons"'));
+    expect(html.indexOf('data-teach-tab="reasons"')).toBeLessThan(html.indexOf('data-teach-tab="brief"'));
   });
 
   it("DEV clash / Obsession / local-vanquish scenes paint the new teaching chrome", () => {

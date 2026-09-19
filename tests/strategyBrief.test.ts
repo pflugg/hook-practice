@@ -27,6 +27,25 @@ describe("strategy brief", () => {
     expect(brief.moment.length).toBeGreaterThan(160);
   });
 
+  it("marks the tree open while Peter is still hidden as two separate gates", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.peterPanRevealed = false;
+    state.villainLocation = "mermaidLagoon";
+    state.phase = "actions";
+    state.turn = 2;
+    putHero(state, "tinkerBell", "mermaidLagoon");
+
+    const brief = strategyBrief(state);
+    const map = brief.objective.find((o) => o.key === "map")!;
+    const peter = brief.objective.find((o) => o.key === "peter")!;
+    expect(map.done).toBe(true);
+    expect(map.status).toMatch(/open/i);
+    expect(peter.done).toBe(false);
+    expect(peter.status).toMatch(/hidden/i);
+    expect(brief.setup).toMatch(/hunt|Fate|hidden/i);
+  });
+
   it("explains the escort once the tree is open and Peter is at Hangman’s Tree", () => {
     const state = barePlayState();
     state.hangmansUnlocked = true;

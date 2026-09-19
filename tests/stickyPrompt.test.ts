@@ -16,8 +16,11 @@ describe("sticky command / prompt bar", () => {
     expect(promptBlock).toMatch(/top:\s*0/);
     expect(promptBlock).toMatch(/z-index:\s*12/);
     expect(css).toContain(".play-main");
-    expect(css).toMatch(/\.play-main\s*\{[^}]*overflow:\s*auto/);
+    expect(css).toContain(".play-chrome");
+    expect(css).toContain(".play-scroll");
+    expect(css).toMatch(/\.play-scroll\s*\{[^}]*overflow:\s*auto/);
     expect(css).toMatch(/overflow-x:\s*clip/);
+    expect(css).toMatch(/100dvh/);
     expect(css).not.toMatch(/\.prompt\.is-clash\s*\{[^}]*position:\s*sticky/);
   });
 
@@ -69,15 +72,16 @@ describe("sticky command / prompt bar", () => {
     window.scrollTo = (() => undefined) as typeof window.scrollTo;
     mount(root);
 
-    const main = root.querySelector<HTMLElement>("[data-play-main]");
-    expect(main).toBeTruthy();
-    main!.scrollTop = 220;
+    const scroller = root.querySelector<HTMLElement>("[data-play-scroll]");
+    expect(scroller).toBeTruthy();
+    scroller!.scrollTop = 220;
     const prompt = root.querySelector("[data-prompt]");
     expect(prompt).toBeTruthy();
+    expect(root.querySelector(".play-chrome")?.contains(prompt!)).toBe(true);
 
     const hide = root.querySelector<HTMLButtonElement>("[data-coach-toggle]");
     hide?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-    expect(root.querySelector<HTMLElement>("[data-play-main]")?.scrollTop).toBe(220);
+    expect(root.querySelector<HTMLElement>("[data-play-scroll]")?.scrollTop).toBe(220);
     root.remove();
   });
 });
