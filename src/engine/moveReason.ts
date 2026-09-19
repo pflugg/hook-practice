@@ -110,8 +110,8 @@ function playCardWhy(defId: string, state: GameState): { why: string; next: stri
       };
     case "giveThemAScare":
       return {
-        why: "Give Them a Scare peeks the top of Fate without finding Peter. Looking is not revealing: a peek will not force him onto the tree. It lets you banish trouble or stack Peter on top for the next real Fate flip.",
-        next: "If Tick Tock or Splitting Headache is in the peek, banishing both is often kinder. If Peter is there, return him on top so the next Fate action can find him.",
+        why: "Give Them a Scare peeks the top of Fate without finding Peter. Looking is not revealing: a peek will not force him onto the tree. It lets you send trouble to the Fate discard or stack Peter on top for the next real Fate flip.",
+        next: "If Tick Tock or Splitting Headache is in the peek, discarding both is often kinder — they can still return when Fate reshuffles. If Peter is there, return him on top so the next Fate action can find him.",
       };
     case "cutlass":
       return {
@@ -125,8 +125,8 @@ function playCardWhy(defId: string, state: GameState): { why: string; next: stri
       };
     case "hooksCase":
       return {
-        why: "This case is extra discard and play flexibility — a way to dig when Skull Rock is covered or you are stuck at a Power stop with a clogged hand.",
-        next: "Keep the Map if it is in hand. Toss cards that do not serve Map, hunt, escort, or the ship stack.",
+        why: "Hook's Case adds an extra Gain 1 Power action at the place it sits. That extra Gain is never covered by a Hero, so it is a reliable trickle when the printed Power row is shut.",
+        next: "Take that extra Gain when you still need Power for the Map or a Play. It is not a discard or extra Play — only Gain 1.",
       };
     case "ayeAyeSir":
       return {
@@ -323,8 +323,8 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
   }
   if (input.type === "scareDiscardBoth") {
     return pack(
-      "You banished both peeked Fate cards.",
-      "Those cards will not sit on top for the next Fate flip. That is how you remove Tick Tock or Splitting Headache before the computer can play them.",
+      "You discarded both peeked Fate cards.",
+      "Those cards go to the Fate discard, so they will not sit on top for the next Fate flip. They can still return when Fate reshuffles — this is not a remove-from-game pile.",
       "You did not find Peter this way — a peek never forces him onto the tree. Hunt again with a real Fate action or Worthy Opponent if he is still hidden.",
     );
   }
@@ -552,6 +552,7 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
     );
   }
   if (p.kind === "vanquishHero") {
+    const lossWarn = after.pending?.kind === "vanquishConfirmLoss";
     return pack(
       `You named ${name} as the vanquish target.`,
       card?.defId === "peterPan"
@@ -559,7 +560,9 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
           ? "Peter on the Jolly Roger is the win check. Meet his Strength with Allies and confirm."
           : "Stop — vanquishing Peter away from the Jolly Roger loses the duel. Cancel unless you are practicing that failure on purpose."
         : `Clearing ${name} uncovers the top row and may remove Tick Tock’s trap or Wendy’s buff.`,
-      "Select Allies until the Strength meets the Hero, then confirm.",
+      lossWarn
+        ? "A confirm gate is up because this clash loses the practice duel. Cancel unless you mean to practice that failure."
+        : "Select Allies until the Strength meets the Hero, then confirm.",
     );
   }
   if (p.kind === "vanquishAllies") {
@@ -630,6 +633,13 @@ function explainConfirm(before: GameState, after: GameState): MoveReason | null 
         : "You confirmed Discard with nothing selected.",
       "The action is spent either way. Digging is how most opening voyages actually find the Map.",
       `${chainLine(after)} You can still take other uncovered actions at this stop.`,
+    );
+  }
+  if (p?.kind === "vanquishConfirmLoss") {
+    return pack(
+      "You chose to continue the off-ship clash with Peter.",
+      "This practice duel will lose if you finish the vanquish away from the Jolly Roger. The extra confirm is so first voyages do not trip that trap by accident.",
+      "Select Allies if you still mean it, or cancel to name a different Hero.",
     );
   }
   if (p?.kind === "vanquishAllies") {

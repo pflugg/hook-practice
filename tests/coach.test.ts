@@ -125,6 +125,20 @@ describe("coach suggestions", () => {
     expect(advice.highlights).toContain("btn:pay-power");
   });
 
+  it("does not gold-CTA locked Hangman’s Tree as an Aye Aye destination", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = false;
+    state.phase = "resolving";
+    const ally = putAlly(state, "swashbuckler", "mermaidLagoon");
+    state.pending = { kind: "ayeAyeDest", allyId: ally.instanceId };
+
+    const advice = advise(state);
+    expect(advice.highlights).not.toContain("loc:hangmansTree");
+    expect(advice.highlights).toContain("loc:skullRock");
+    expectLegalHighlights(state, advice.highlights);
+    expect(highlightSet(state).has("loc:hangmansTree")).toBe(false);
+  });
+
   it("recommends the ship clash when Peter is vanquishable at the Jolly Roger", () => {
     const state = barePlayState();
     state.hangmansUnlocked = true;

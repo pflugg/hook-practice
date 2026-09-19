@@ -25,6 +25,8 @@ export {
   objectiveSteps,
   playableHandCards,
   promptText,
+  vanquishClashMath,
+  vanquishableHeroes,
 } from "./queries";
 export {
   applyInput,

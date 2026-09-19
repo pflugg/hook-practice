@@ -422,26 +422,21 @@ function startComputerFate(state: GameState): void {
     beginNextTurn(state);
     return;
   }
-  const peter = drawn.find((c) => c.defId === "peterPan");
-  if (peter) {
-    revealPeter(
-      state,
-      peter,
-      drawn.filter((c) => c.instanceId !== peter.instanceId),
-    );
-    openFateReport(state, {
-      drawn,
-      played: peter,
-      discarded: drawn.filter((c) => c.instanceId !== peter.instanceId),
-      note: "Fate reveals Peter Pan. He is forced to Hangman's Tree.",
-      resume: "nextTurn",
-    });
-    return;
-  }
   const choice = chooseFateCard(state, drawn, state.difficulty);
   state.rng = choice.rng;
   const play = choice.card;
   const discarded = drawn.filter((c) => c.instanceId !== play.instanceId);
+  if (play.defId === "peterPan") {
+    revealPeter(state, play, discarded);
+    openFateReport(state, {
+      drawn,
+      played: play,
+      discarded,
+      note: "Fate plays Peter Pan. He is forced to Hangman's Tree.",
+      resume: "nextTurn",
+    });
+    return;
+  }
   discarded.forEach((c) => discardFateCard(state, c));
   resolveComputerFateCard(state, play, drawn, discarded);
 }
@@ -796,6 +791,10 @@ export function applyInput(prev: GameState, input: Input): GameState {
       state.actionKey = undefined;
       return state;
     }
+    if (state.pending?.kind === "vanquishConfirmLoss") {
+      state.pending = { kind: "vanquishHero" };
+      return state;
+    }
     if (state.phase === "resolving") {
       if (state.pending?.kind === "scarePeek") return state;
       if (state.pending?.kind === "fateChooseCard") return state;
@@ -822,7 +821,7 @@ export function applyInput(prev: GameState, input: Input): GameState {
   if (input.type === "scareDiscardBoth") {
     if (state.pending?.kind === "scarePeek") {
       state.pending.cards.forEach((c) => discardFateCard(state, c));
-      log(state, "Both peeked Fate cards are banished.");
+      log(state, "Both peeked Fate cards go to the Fate discard. They can return when Fate reshuffles.");
       consumeCurrentAction(state);
     }
     return state;
@@ -1150,7 +1149,12 @@ function handleCard(state: GameState, instanceId: string): GameState {
   }
 
   if (p.kind === "vanquishHero") {
-    if (!vanquishableHeroes(state).some((h) => h.hero.instanceId === instanceId)) return state;
+    const target = vanquishableHeroes(state).find((h) => h.hero.instanceId === instanceId);
+    if (!target) return state;
+    if (target.hero.defId === "peterPan" && target.location !== "jollyRoger") {
+      state.pending = { kind: "vanquishConfirmLoss", heroId: instanceId };
+      return state;
+    }
     state.pending = { kind: "vanquishAllies", heroId: instanceId, selected: [] };
     return state;
   }
@@ -1314,6 +1318,10 @@ function handleConfirm(state: GameState): GameState {
     }
     log(state, p.selected.length ? `Discarded ${p.selected.length} card(s).` : "Discarded nothing.");
     consumeCurrentAction(state);
+    return state;
+  }
+  if (p.kind === "vanquishConfirmLoss") {
+    state.pending = { kind: "vanquishAllies", heroId: p.heroId, selected: [] };
     return state;
   }
   if (p.kind === "vanquishAllies") {

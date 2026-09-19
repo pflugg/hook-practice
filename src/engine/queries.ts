@@ -208,18 +208,42 @@ export function adjacentUnlocked(state: GameState, id: LocationId): LocationId[]
   return adjacentIds(id).filter((dest) => isUnlocked(state, dest) && isUnlocked(state, id));
 }
 
+export function vanquishAllyPoolAt(
+  state: GameState,
+  location: LocationId,
+): { ally: CardInstance; location: LocationId }[] {
+  const local = state.locations[location].allies.map((ally) => ({
+    ally,
+    location,
+  }));
+  const boarding = allAllies(state).filter(
+    (a) =>
+      a.ally.defId === "boardingParty" &&
+      isUnlocked(state, a.location) &&
+      (a.location === location || (isUnlocked(state, location) && adjacentIds(a.location).includes(location))),
+  );
+  const seen = new Set<string>();
+  return [...local, ...boarding].filter((a) => {
+    if (seen.has(a.ally.instanceId)) return false;
+    seen.add(a.ally.instanceId);
+    return true;
+  });
+}
+
+/** Heroes the captain can name with the current Vanquish: same place, or a neighboring unlocked place a Boarding Party can reach. */
+export function canVanquishAt(state: GameState, location: LocationId): boolean {
+  if (location === state.villainLocation) return true;
+  if (!isUnlocked(state, location)) return false;
+  if (!adjacentIds(state.villainLocation).includes(location)) return false;
+  return vanquishAllyPoolAt(state, location).some((a) => a.ally.defId === "boardingParty");
+}
+
 export function vanquishableHeroes(state: GameState): { hero: CardInstance; location: LocationId }[] {
   const tauntLock = anyTauntInRealm(state);
   return allHeroes(state).filter(({ hero, location }) => {
     if (tauntLock && !hasTaunt(state, hero.instanceId)) return false;
-    const localAllies = state.locations[location].allies;
-    const boarding = allAllies(state).filter(
-      (a) => a.ally.defId === "boardingParty" && adjacentIds(a.location).includes(location),
-    );
-    const pool = [
-      ...localAllies.map((ally) => ({ ally, location })),
-      ...boarding,
-    ];
+    if (!canVanquishAt(state, location)) return false;
+    const pool = vanquishAllyPoolAt(state, location);
     if (pool.length === 0) return false;
     if (hero.defId === "lostBoys" && pool.length < 2) return false;
     const total = pool.reduce((sum, a) => sum + allyStrength(state, a.ally), 0);
@@ -233,19 +257,38 @@ export function vanquishAllyPool(
 ): { ally: CardInstance; location: LocationId }[] {
   const found = allHeroes(state).find((h) => h.hero.instanceId === heroId);
   if (!found) return [];
-  const local = state.locations[found.location].allies.map((ally) => ({
-    ally,
-    location: found.location,
-  }));
-  const boarding = allAllies(state).filter(
-    (a) => a.ally.defId === "boardingParty" && adjacentIds(a.location).includes(found.location),
-  );
-  const seen = new Set<string>();
-  return [...local, ...boarding].filter((a) => {
-    if (seen.has(a.ally.instanceId)) return false;
-    seen.add(a.ally.instanceId);
-    return true;
-  });
+  return vanquishAllyPoolAt(state, found.location);
+}
+
+export function vanquishClashMath(state: GameState): {
+  heroName: string;
+  need: number;
+  selected: number;
+  selectedAllies: number;
+  lostBoys: boolean;
+  ready: boolean;
+} | null {
+  const p = state.pending;
+  if (p?.kind !== "vanquishAllies") return null;
+  const hero = findCard(state, p.heroId);
+  if (!hero) return null;
+  const pool = vanquishAllyPool(state, p.heroId);
+  const need = heroStrength(state, hero);
+  const selected = p.selected.reduce((n, id) => {
+    const ally = pool.find((a) => a.ally.instanceId === id)?.ally;
+    return n + (ally ? allyStrength(state, ally) : 0);
+  }, 0);
+  const lostBoys = hero.defId === "lostBoys";
+  const ready =
+    selected >= need && p.selected.length > 0 && (!lostBoys || p.selected.length >= 2);
+  return {
+    heroName: cardName(hero),
+    need,
+    selected,
+    selectedAllies: p.selected.length,
+    lostBoys,
+    ready,
+  };
 }
 
 export function movableAlliesAndItems(state: GameState): CardInstance[] {
@@ -314,9 +357,17 @@ export function promptText(state: GameState): string {
     case "discardSelect":
       return "Select cards to discard, then confirm. Discarding none still spends the action.";
     case "vanquishHero":
-      return "Choose a Hero you can vanquish.";
-    case "vanquishAllies":
-      return "Select Allies whose Strength meets the Hero, then confirm.";
+      return "Choose a Hero at the captain's place. A Boarding Party can reach a neighboring unlocked Hero.";
+    case "vanquishConfirmLoss":
+      return "Vanquishing Peter away from the Jolly Roger loses this practice duel. Continue only if you mean to practice that failure.";
+    case "vanquishAllies": {
+      const math = vanquishClashMath(state);
+      if (!math) return "Select Allies whose Strength meets the Hero, then confirm.";
+      const boys = math.lostBoys
+        ? ` Lost Boys need two Allies (${math.selectedAllies}/2).`
+        : "";
+      return `Clash Strength ${math.selected} / ${math.need} against ${math.heroName}.${boys} Confirm when the total meets the Hero.`;
+    }
     case "movePieceSelect":
       return "Choose an Ally or unattached Item to move.";
     case "movePieceDest":
@@ -326,7 +377,7 @@ export function promptText(state: GameState): string {
     case "moveHeroDest":
       return "Choose an adjacent unlocked location.";
     case "scarePeek":
-      return "Banish both peeked Fate cards, or return them on top in an order.";
+      return "Discard both peeked Fate cards to the Fate discard (they can return when Fate reshuffles), or put them back on top in an order.";
     case "fateChooseCard":
       return "Play one Fate card and discard the other.";
     case "fateChooseLocation":

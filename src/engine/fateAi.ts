@@ -83,8 +83,9 @@ export function chooseFateCard(
   cards: CardInstance[],
   difficulty: "easy" | "normal",
 ): { card: CardInstance; rng: number } {
-  if (cards.some((c) => c.defId === "peterPan")) {
-    return { card: cards.find((c) => c.defId === "peterPan")!, rng: state.rng };
+  if (difficulty !== "easy") {
+    const peter = cards.find((c) => c.defId === "peterPan");
+    if (peter) return { card: peter, rng: state.rng };
   }
   const pool = fatePlayPool(state, cards);
   if (difficulty === "easy") {

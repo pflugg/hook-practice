@@ -124,6 +124,9 @@ describe("vanquish win check", () => {
 
     let next = applyInput(state, { type: "selectAction", actionKey: `extra:${cannon.instanceId}` });
     next = applyInput(next, { type: "selectCard", instanceId: peter.instanceId });
+    expect(next.pending?.kind).toBe("vanquishConfirmLoss");
+    next = applyInput(next, { type: "confirm" });
+    expect(next.pending?.kind).toBe("vanquishAllies");
     next = applyInput(next, { type: "selectCard", instanceId: brute.instanceId });
     next = applyInput(next, { type: "selectCard", instanceId: brute2.instanceId });
     next = applyInput(next, { type: "confirm" });

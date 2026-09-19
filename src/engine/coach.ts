@@ -610,10 +610,18 @@ function advisePending(state: GameState): CoachAdvice {
     case "ayeAyeDest": {
       const from = findCardLocation(state, p.allyId);
       const toward = from ? towardRoger(from) : null;
-      const dests = from ? adjacentIds(from) : [];
+      const dests = from ? adjacentUnlocked(state, from) : [];
       const dest = toward && dests.includes(toward) ? toward : dests[0];
-      if (!dest) return say("Cancel", "No step available.", ["btn:cancel"], state);
+      if (!dest) return say("Cancel", "No unlocked adjacent step.", ["btn:cancel"], state);
       return say(`Move that Ally to ${locName(dest)}`, "Close the gap to the Jolly Roger.", [`loc:${dest}`], state);
+    }
+    case "vanquishConfirmLoss": {
+      return say(
+        "Cancel — this clash loses the duel",
+        "Peter is not on the Jolly Roger. Confirming the vanquish is an intentional-loss lesson. First voyages should cancel and walk him to the ship.",
+        ["btn:cancel"],
+        state,
+      );
     }
     case "cunningAlly": {
       const ally = state.hand.filter((c) => def(c.defId).type === "ally").sort((a, b) => def(b.defId).strength - def(a.defId).strength)[0];
@@ -716,15 +724,15 @@ function advisePending(state: GameState): CoachAdvice {
       }
       if (croc || p.cards.some((c) => c.defId === "splittingHeadache")) {
         return say(
-          "Banish both peeked cards",
-          "Sweep the crocodile or the headache aside so they do not land on your Map or your path.",
+          "Discard both peeked cards",
+          "Send the crocodile or the headache to the Fate discard so they do not land on your Map or your path. They can still return when Fate reshuffles.",
           ["btn:scare-discard"],
           state,
         );
       }
       return say(
-        "Banish both peeked cards",
-        "A cleaner Fate deck makes Worthy Opponent and later Fate actions more likely to find Peter.",
+        "Discard both peeked cards",
+        "A cleaner Fate deck makes Worthy Opponent and later Fate actions more likely to find Peter. Discarded cards can still return when Fate reshuffles.",
         ["btn:scare-discard"],
         state,
       );
