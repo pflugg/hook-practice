@@ -4,6 +4,7 @@ export type {
   CardDef,
   CardInstance,
   Difficulty,
+  FateShow,
   GameState,
   Input,
   LocationId,

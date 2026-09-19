@@ -1,5 +1,22 @@
 /** Original decorative SVGs — abstract atmosphere only, no character likenesses. */
 
+/** Generic pirate-captain pawn for the current location. Not a character likeness. */
+export const CAPTAIN_TOKEN = `<svg class="captain-figure" viewBox="0 0 64 80" aria-hidden="true">
+  <ellipse cx="32" cy="74" rx="16" ry="4" fill="rgba(8,6,4,.45)"/>
+  <path d="M20 44 L16 72 Q32 76 48 72 L44 44 Z" fill="#1c2830"/>
+  <path d="M22 46 L20 68 Q32 71 44 68 L42 46 Z" fill="#243844"/>
+  <path d="M28 48 L32 70 L36 48" fill="none" stroke="#c9a24a" stroke-width="1.2"/>
+  <circle cx="28" cy="56" r="1.3" fill="#e8c36a"/>
+  <circle cx="28" cy="62" r="1.3" fill="#e8c36a"/>
+  <path d="M14 50 Q8 54 10 62" fill="none" stroke="#d4c4a0" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M10 61 q4 6 -1 7" fill="none" stroke="#d4c4a0" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M50 52 L54 58" stroke="#3a2a18" stroke-width="2.2" stroke-linecap="round"/>
+  <ellipse cx="32" cy="34" rx="9" ry="10" fill="#2a2116"/>
+  <path d="M6 26 L32 12 L58 26 L42 24 Q32 28 22 24 Z" fill="#12100c"/>
+  <path d="M10 26 L32 16 L54 26" fill="none" stroke="#c9a24a" stroke-width="1.4"/>
+  <path d="M18 24 Q32 20 46 24" fill="#1a1812"/>
+</svg>`;
+
 export const CREST = `<svg class="crest" viewBox="0 0 92 92" aria-hidden="true">
   <defs>
     <radialGradient id="crestGlow" cx="40%" cy="35%" r="70%">

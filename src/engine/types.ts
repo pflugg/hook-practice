@@ -148,8 +148,17 @@ export interface GameState {
   defeatedHeroStrengthsThisTurn: number[];
   log: LogEntry[];
   lastComputerFateNote: string;
+  lastFateShow: FateShow | null;
   actionKey?: string;
   heldCard?: CardInstance;
+}
+
+export interface FateShow {
+  drawn: CardInstance[];
+  played?: CardInstance;
+  discarded: CardInstance[];
+  note: string;
+  abilityText: string;
 }
 
 export type Input =

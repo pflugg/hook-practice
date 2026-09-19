@@ -73,6 +73,7 @@ export function titleState(): GameState {
     defeatedHeroStrengthsThisTurn: [],
     log: [],
     lastComputerFateNote: "",
+    lastFateShow: null,
   };
 }
 
@@ -240,6 +241,13 @@ function openFateReport(
   state.phase = opts.resume === "nextTurn" ? "fateAdversary" : "resolving";
   if (opts.resume === "nextTurn") {
     state.lastComputerFateNote = opts.note;
+    state.lastFateShow = {
+      drawn: opts.drawn,
+      played,
+      discarded: opts.discarded ?? [],
+      note: opts.note,
+      abilityText: played ? abilityLine(played) : "",
+    };
   }
 }
 

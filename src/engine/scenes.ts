@@ -65,5 +65,36 @@ export function tickTockReportScene(): GameState {
   };
   state.phase = "fateAdversary";
   state.lastComputerFateNote = "Fate seats Tick Tock at Mermaid Lagoon.";
+  state.lastFateShow = {
+    drawn: [tick, wendy],
+    played: tick,
+    discarded: [wendy],
+    note: "Fate seats Tick Tock at Mermaid Lagoon.",
+    abilityText: `${def(tick.defId).name}: ${def(tick.defId).text}`,
+  };
+  return state;
+}
+
+/** Scripted Move a Hero so drag-and-drop can be verified. */
+export function dragHeroScene(): GameState {
+  const state = createGame("normal", 1);
+  state.hand = [];
+  state.villainDeck = [];
+  state.villainDiscard = [];
+  state.fateDeck = [];
+  state.fateDiscard = [];
+  state.power = 3;
+  state.usedActions = [];
+  state.villainLocation = "hangmansTree";
+  state.hangmansUnlocked = true;
+  state.attachments = [];
+  for (const id of ["jollyRoger", "skullRock", "mermaidLagoon", "hangmansTree"] as const) {
+    state.locations[id] = { id, heroes: [], allies: [], items: [] };
+  }
+  const wendy = inst(state, "wendy");
+  state.locations.hangmansTree.heroes.push(wendy);
+  state.pending = { kind: "moveHeroSelect" };
+  state.phase = "resolving";
+  state.actionKey = "ht-moveHero";
   return state;
 }
