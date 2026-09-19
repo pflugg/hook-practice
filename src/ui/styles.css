@@ -648,6 +648,10 @@ h1.wordmark {
   z-index: 4;
   opacity: 0.2;
   pointer-events: none;
+  background: #f4e8c8;
+  color: #1b1408;
+  border-color: #c9a14a;
+  font-weight: 700;
 }
 
 .drop-hint {
