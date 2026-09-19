@@ -1,0 +1,20 @@
+{
+  "name": "hook-practice",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Never Land Duel — a browser practice tool for the captain's objective chain, vs a computer Fate adversary.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  }
+}
