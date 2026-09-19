@@ -58,12 +58,17 @@ function renderCard(
   const attachNote = attached.length ? `<p class="text">+ ${attached.map((a) => esc(def(a.defId).name)).join(", ")}</p>` : "";
   const inspectable = Boolean(opts.inspectable && !opts.legal && opts.size !== "reveal");
   const draggable = isDraggableCard(state, card.instanceId);
-  return `<button type="button" class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""} ${inspectable ? "is-inspectable" : ""} ${draggable ? "is-draggable" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}" aria-label="${esc(d.name)}. ${esc(d.text)}">
-    ${opts.legal && opts.size === "hand" && (state.pending?.kind === "playChooseCard" || state.pending?.kind === "cunningAlly") ? `<span class="playable-tag">Playable</span>` : ""}
-    <div class="meta">
+  const costMark = d.deck === "villain" ? String(d.cost) : "Fate";
+  const typeBar =
+    opts.size === "hand"
+      ? `<div class="type-bar" data-type="${d.type}"><span class="type-name">${esc(d.type.toUpperCase())}</span><span class="type-dot" aria-hidden="true">·</span><span class="type-cost" title="Power cost">${esc(costMark)}</span></div>`
+      : `<div class="meta">
       <span class="badge">${typeLabel(d.type)}</span>
       ${d.deck === "villain" ? `<span class="cost" title="Power cost">${d.cost}</span>` : `<span class="fate-mark">Fate</span>`}
-    </div>
+    </div>`;
+  return `<button type="button" class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""} ${inspectable ? "is-inspectable" : ""} ${draggable ? "is-draggable" : ""}" data-card="${card.instanceId}" title="${esc(d.name)} — ${esc(d.text)}" aria-label="${esc(d.name)}. ${esc(d.text)}">
+    ${opts.legal && opts.size === "hand" && (state.pending?.kind === "playChooseCard" || state.pending?.kind === "cunningAlly") ? `<span class="playable-tag">Playable</span>` : ""}
+    ${typeBar}
     <h3>${esc(d.name)}</h3>
     <p class="text">${esc(d.text)}</p>
     ${attachNote}
@@ -104,9 +109,9 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
   const actBtns = (list: typeof printed) =>
     `<div class="row">${list
       .map((a) => {
-        const legalAct = showLegalActs && hi.has(`act:${a.key}`);
+        const legalAct = showLegalActs && !locked && hi.has(`act:${a.key}`);
         const coachAct = legalAct && coached.has(`act:${a.key}`);
-        return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : ""} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${a.covered || a.used || !showLegalActs ? "disabled" : ""}>${esc(a.label)}</button>`;
+        return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : ""} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${a.covered || a.used || !showLegalActs || locked ? "disabled" : ""}>${esc(a.label)}</button>`;
       })
       .join("")}</div>`;
 
@@ -133,8 +138,9 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
     ${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : ""}
     <div class="loc-head">
       <div>
-        <h2>${esc(meta.name)} ${locked ? `<span class="lock-badge">Locked</span>` : ""}</h2>
-        <p>${esc(meta.subtitle)}${locked ? " — play the Never Land Map to open the path" : ""}</p>
+        <h2>${esc(meta.name)} ${locked ? `<span class="lock-badge">LOCKED</span>` : ""}</h2>
+        <p>${esc(meta.subtitle)}</p>
+        ${locked ? `<p class="lock-need">Need: Never Land Map</p>` : ""}
       </div>
       ${
         current
@@ -145,12 +151,15 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
           : ""
       }
     </div>
-    ${actBtns(top)}
-    ${zone("Heroes", cards("Clear — top actions are open.", loc.heroes))}
-    ${zone("Allies", cards("No crew stationed.", loc.allies))}
-    ${zone("Items", cards("No gear here.", loc.items))}
-    ${actBtns(bottom)}
-    ${extras.length ? `<div class="row">${extras.map((a) => `<button class="action ${hi.has(`act:${a.key}`) ? "is-legal" : ""} ${coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}">${esc(a.label)}</button>`).join("")}</div>` : ""}
+    <div class="loc-body">
+      ${locked ? `<div class="lock-veil" aria-hidden="true"></div>` : ""}
+      ${actBtns(top)}
+      ${zone("Heroes", cards("Clear — top actions are open.", loc.heroes))}
+      ${zone("Allies", cards("No crew stationed.", loc.allies))}
+      ${zone("Items", cards("No gear here.", loc.items))}
+      ${actBtns(bottom)}
+      ${extras.length ? `<div class="row">${extras.map((a) => `<button class="action ${!locked && hi.has(`act:${a.key}`) ? "is-legal" : ""} ${!locked && coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}" ${locked ? "disabled" : ""}>${esc(a.label)}</button>`).join("")}</div>` : ""}
+    </div>
   </section>`;
 }
 
@@ -192,7 +201,7 @@ function titleView(
         <button type="button" data-brief-toggle class="${briefEnabled ? "is-on" : ""}">${briefEnabled ? "Strategy brief on" : "Strategy brief off"}</button>
         <button type="button" data-reasons-toggle class="${reasonsEnabled ? "is-on" : ""}">${reasonsEnabled ? "Move reasons on" : "Move reasons off"}</button>
       </div>
-      <p class="coach-lede">Coach names the next click. The Strategy brief is the voyage sidebar. <b>Move reasons</b> is a floating “Why this move” after each legal choice — what you picked, why it helps the chain, what to watch. Tutorial starts all three on. Hide any during play.</p>
+      <p class="coach-lede">Coach names the next click. The Strategy brief is the voyage sidebar. <b>Move reasons</b> docks beside Coach as “Why this move” after each legal choice — what you picked, why it helps the chain, what to watch. Tutorial starts all three on. Hide any during play.</p>
       <div class="actions-row">
         <button class="btn primary" data-tutorial>Tutorial</button>
         <button class="btn" data-start>Set Sail</button>
@@ -210,7 +219,7 @@ function helpView(fromPlay: boolean): string {
     <p><b>Win</b> by vanquishing Peter Pan at the Jolly Roger after unlocking Hangman’s Tree with the Never Land Map. Vanquishing him anywhere else loses the duel.</p>
     <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable.</p>
     <p><b>Strategy brief:</b> a persistent sidebar that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
-    <p><b>Move reasons:</b> a floating “Why this move” panel that updates after each legal click. It names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on.</p>
+    <p><b>Move reasons:</b> a docked “Why this move” panel in the teach strip that updates after each legal click. It names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on.</p>
     <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it. The <b>Across the table</b> strip keeps the last revealed Fate play visible — never the face-down deck.</p>
     <p><b>Drag:</b> When a card can move or be played onto a place, grab it and slide onto a glowing location (or Ally, for the Cutlass). Drop outside to cancel the slide; clicking still works.</p>
     <p><b>Practice tips:</b> Discard aggressively for the Map. Fish Fate with Worthy Opponent and Give Them a Scare. Station strength at the ship before walking Peter across. Beware Tick Tock and Splitting Headache.</p>
@@ -393,14 +402,16 @@ function inspectOverlay(state: GameState, instanceId: string): string {
 }
 
 function coachPanel(advice: CoachAdvice): string {
-  return `<aside class="coach-panel" aria-live="polite">
-    <div class="coach-copy">
+  return `<aside class="teach-pane coach-panel" aria-live="polite">
+    <header class="teach-pane-head">
       <p class="coach-kicker">Coach</p>
+      <button type="button" class="btn ghost coach-hide" data-coach-toggle>Hide coach</button>
+    </header>
+    <div class="coach-copy">
       <p class="coach-do">${esc(advice.do)}</p>
       <p class="coach-why">${esc(advice.why)}</p>
       ${advice.warning ? `<p class="coach-warn">${esc(advice.warning)}</p>` : ""}
     </div>
-    <button type="button" class="btn ghost coach-hide" data-coach-toggle>Hide coach</button>
   </aside>`;
 }
 
@@ -441,9 +452,9 @@ function strategySidebar(brief: StrategyBrief): string {
   </aside>`;
 }
 
-function reasonFloat(reason: MoveReason): string {
-  return `<aside class="reason-float${reason.soft ? " is-soft" : ""}" data-reason-float aria-label="Why this move">
-    <header class="reason-head" data-reason-drag>
+function reasonDock(reason: MoveReason): string {
+  return `<aside class="teach-pane reason-dock${reason.soft ? " is-soft" : ""}" data-reason-dock aria-label="Why this move">
+    <header class="teach-pane-head">
       <div>
         <p class="reason-kicker">Why this move</p>
         <h2>Post-selection</h2>
@@ -462,7 +473,7 @@ function reasonFloat(reason: MoveReason): string {
       <h3>What it sets up</h3>
       <p>${esc(reason.next)}</p>
     </section>
-    <p class="reason-foot">Not Coach (next click) and not the Strategy brief (voyage status). Drag the title bar to park this out of the way.</p>
+    <p class="reason-foot">Not Coach (next click) and not the Strategy brief (voyage status). This panel stays in the teach strip so it never covers legal board actions.</p>
   </aside>`;
 }
 
@@ -504,9 +515,10 @@ function playView(
 
   const brief = briefEnabled ? strategyBrief(state) : null;
 
+  const teachOn = Boolean(advice || (reasonsEnabled && reason));
   return `<div class="sky play-sky" aria-hidden="true"><div class="stars"></div><div class="fog fog-a"></div></div>
   <div class="grain"></div>
-  <div class="play ${coachEnabled ? "has-coach" : ""} ${briefEnabled ? "has-brief" : ""}">
+  <div class="play ${coachEnabled ? "has-coach" : ""} ${briefEnabled ? "has-brief" : ""} ${reasonsEnabled ? "has-reasons" : ""}">
     <header class="topbar">
       <div class="brand">${CREST}<div><h1>Never Land Duel</h1><small>Hook Practice</small></div></div>
       <div class="stepper">
@@ -516,26 +528,38 @@ function playView(
         <div class="step ${steps.win ? "is-done" : ""}"><span class="dot"></span>Vanquished</div>
       </div>
       <div class="meters">
-        <div class="power"><span>Power</span><b>${state.power}</b></div>
-        <div class="chip">Turn ${state.turn}</div>
-        <div class="chip">${state.difficulty === "easy" ? "Easy Fate" : "Normal Fate"}</div>
-        <button type="button" class="chip ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
-        <button type="button" class="chip ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
-        <button type="button" class="chip ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
-        <button class="chip" data-help>Help</button>
-        <button class="chip" data-resign>Resign</button>
+        <div class="hud-core" aria-label="Voyage meters">
+          <div class="power is-loud" title="Power"><span>Power</span><b>${state.power}</b></div>
+          <div class="chip chip-stat" title="Turn">Turn ${state.turn}</div>
+          <div class="chip chip-stat chip-piles" title="Hand, deck, and discard">Hand ${state.hand.length} · Deck ${state.villainDeck.length} · Discard ${state.villainDiscard.length}</div>
+        </div>
+        <div class="hud-toggles">
+          <div class="chip">${state.difficulty === "easy" ? "Easy Fate" : "Normal Fate"}</div>
+          <button type="button" class="chip ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
+          <button type="button" class="chip ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
+          <button type="button" class="chip ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
+          <button class="chip" data-help>Help</button>
+          <button class="chip" data-resign>Resign</button>
+        </div>
       </div>
     </header>
-    <div class="prompt-stack">
+    <div class="teach-dock">
       <div class="prompt"><p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}</div></div>
-      ${advice ? coachPanel(advice) : ""}
+      ${
+        teachOn
+          ? `<div class="teach-strip">
+        ${advice ? coachPanel(advice) : ""}
+        ${reasonsEnabled && reason ? reasonDock(reason) : ""}
+      </div>`
+          : ""
+      }
     </div>
     ${fateRail(state)}
     <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
     ${brief ? strategySidebar(brief) : ""}
     <footer class="dock">
       <section class="hand ${state.pending?.kind === "playChooseCard" || state.pending?.kind === "discardSelect" ? "is-picking" : ""}">
-        <h2>Hand · ${state.hand.length} · Deck ${state.villainDeck.length} · Discard ${state.villainDiscard.length}</h2>
+        <h2>Hand</h2>
         <div class="hand-row">
           ${
             state.hand.length
@@ -561,12 +585,27 @@ function playView(
       </aside>
     </footer>
   </div>
-  ${reasonsEnabled && reason ? reasonFloat(reason) : ""}
   ${overlayFor(state, hi, sel, coached)}`;
 }
 
 export function renderOverlay(state: GameState): string {
   return overlayFor(state, highlightSet(state), selectedSet(state), new Set());
+}
+
+export function renderPlay(
+  state: GameState,
+  flags: {
+    coachEnabled?: boolean;
+    briefEnabled?: boolean;
+    reasonsEnabled?: boolean;
+    reason?: MoveReason | null;
+  } = {},
+): string {
+  const coachEnabled = flags.coachEnabled ?? true;
+  const briefEnabled = flags.briefEnabled ?? true;
+  const reasonsEnabled = flags.reasonsEnabled ?? true;
+  const reason = reasonsEnabled ? (flags.reason ?? IDLE_MOVE_REASON) : null;
+  return playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason);
 }
 
 function readFlag(key: string, fallback = true): boolean {
@@ -601,26 +640,6 @@ function bootState(): GameState {
   return titleState();
 }
 
-function readReasonPos(): { x: number; y: number } | null {
-  try {
-    const raw = sessionStorage.getItem("nld-reason-pos");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { x?: number; y?: number };
-    if (typeof parsed.x === "number" && typeof parsed.y === "number") return { x: parsed.x, y: parsed.y };
-  } catch {
-    /* sessionStorage can be unavailable */
-  }
-  return null;
-}
-
-function writeReasonPos(pos: { x: number; y: number }): void {
-  try {
-    sessionStorage.setItem("nld-reason-pos", JSON.stringify(pos));
-  } catch {
-    /* sessionStorage can be unavailable */
-  }
-}
-
 export function mount(root: HTMLElement): void {
   let state: GameState = bootState();
   let difficulty: Difficulty = "normal";
@@ -629,7 +648,6 @@ export function mount(root: HTMLElement): void {
   let reasonsEnabled = readFlag("nld-reasons");
   let lastReason: MoveReason = IDLE_MOVE_REASON;
   let inspectId: string | null = null;
-  let reasonPos = readReasonPos();
   let suppressClick = false;
 
   const bindCardDrag = () => {
@@ -711,42 +729,6 @@ export function mount(root: HTMLElement): void {
     });
   };
 
-  const bindReasonDrag = () => {
-    const el = root.querySelector<HTMLElement>("[data-reason-float]");
-    if (!el) return;
-    if (reasonPos) {
-      el.style.left = `${reasonPos.x}px`;
-      el.style.top = `${reasonPos.y}px`;
-      el.style.right = "auto";
-      el.style.bottom = "auto";
-    }
-    const handle = el.querySelector<HTMLElement>("[data-reason-drag]");
-    if (!handle) return;
-    handle.addEventListener("pointerdown", (event) => {
-      if ((event.target as HTMLElement).closest("button")) return;
-      event.preventDefault();
-      const rect = el.getBoundingClientRect();
-      const dx = event.clientX - rect.left;
-      const dy = event.clientY - rect.top;
-      const move = (ev: PointerEvent) => {
-        const x = Math.max(8, Math.min(window.innerWidth - el.offsetWidth - 8, ev.clientX - dx));
-        const y = Math.max(8, Math.min(window.innerHeight - 48, ev.clientY - dy));
-        reasonPos = { x, y };
-        el.style.left = `${x}px`;
-        el.style.top = `${y}px`;
-        el.style.right = "auto";
-        el.style.bottom = "auto";
-      };
-      const up = () => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", up);
-        if (reasonPos) writeReasonPos(reasonPos);
-      };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-    });
-  };
-
   const render = () => {
     const inspect = inspectId ? inspectOverlay(state, inspectId) : "";
     const reason = reasonsEnabled ? lastReason : null;
@@ -759,7 +741,6 @@ export function mount(root: HTMLElement): void {
         helpView(state.phase !== "title") +
         inspect;
     } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason) + inspect;
-    bindReasonDrag();
     bindCardDrag();
   };
 

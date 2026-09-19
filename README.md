@@ -57,7 +57,7 @@ npm run build
 3. End the turn. Draw back up to 4 cards.
 4. The computer performs one Fate action against you.
 
-Heroes cover the **top** actions at their location. Gold outlines mark legal clicks. A stronger teal outline marks the Coach’s suggested target when Coach is on. The prompt bar always says what the rules need next.
+Heroes cover the **top** actions at their location. Gold outlines mark legal clicks. A louder gold CTA marks the Coach’s suggested action when Coach is on. The prompt bar always says what the rules need next. The top bar always shows **Power** (loudest), **Turn**, and **Hand / Deck / Discard**. Hand cards wear a colored **TYPE · COST** bar and keep their teaching text; Hangman’s Tree stays under a lock veil until the Never Land Map opens it.
 
 **Difficulty**
 
@@ -71,7 +71,8 @@ A heuristic advisor (not an LLM) sits beside the prompt and names the next concr
 - **Tutorial** on the title screen starts a game with Coach on.
 - **Set Sail** uses the title **Coach on/off** toggle (defaults on for a new session).
 - During play, the top-bar **Coach** chip or the panel’s **Hide coach** button turns it off without ending the game. The choice persists for the browser tab.
-- Coach only *highlights* a recommended legal target more strongly. Every other legal option stays clickable.
+- Coach lives in the shared **teach-dock** under the top bar, as a compact strip that keeps the full *do* line and *why* paragraph at readable size. **Why this move** docks beside it in the same strip so it never covers Gain / Play / Move buttons.
+- Coach only *highlights* a recommended legal target more strongly — the suggested action uses a gold CTA; every other legal option stays clickable.
 - It covers the full loop: required move, actions (Gain / Discard / Play / Fate / Vanquish / Move), card and payment choices, Fate acknowledge, and win/loss awareness. It warns about Tick Tock and Heroes covering key actions.
 
 ## Strategy brief
@@ -87,13 +88,13 @@ Hide it with the top-bar **Brief** chip or **Hide brief**. On narrower windows i
 
 ## Move reasons
 
-A floating **Why this move** panel (default on, especially from **Tutorial**) explains the choice you just made. It is not Coach (the next suggested click) and not the Strategy brief (voyage status). After each legal location, action, card, confirm, or Fate Continue it names:
+A docked **Why this move** panel in the teach strip (default on, especially from **Tutorial**) explains the choice you just made. It is not Coach (the next suggested click) and not the Strategy brief (voyage status). After each legal location, action, card, confirm, or Fate Continue it names:
 
 - **What you chose** — the place, action, or card in plain language
 - **Why it helps the plan** — how that click serves Map → unlock Hangman’s Tree → find Peter → walk to the Jolly Roger → vanquish there
 - **What it sets up** — Fate pressure, covered top rows, Power, Tick Tock, the next gate
 
-Cancel softens the panel (nothing committed). Acknowledging computer Fate explains why that card hurts — or, for Peter, why the find actually helps — and what to do about it. Drag the title bar to park the window; hide it with the **Reasons** chip or **Hide**. The choice persists for the browser tab (`nld-reasons`).
+Cancel softens the panel (nothing committed). Acknowledging computer Fate explains why that card hurts — or, for Peter, why the find actually helps — and what to do about it. The panel stays in the teach-dock (scroll inside the dock if needed) so it never overlays legal board actions. Hide it with the **Reasons** chip or **Hide**. The choice persists for the browser tab (`nld-reasons`).
 
 ## Captain pawn
 
@@ -134,7 +135,7 @@ While a Play, Move a Hero, Move Ally/Item, Aye Aye, or Cutlass attach is open, g
 | A non-glowing hand or board card | Inspect — full paraphrased text in a modal |
 | End turn | Draw, then face Fate |
 | Continue on a Fate report | Required. The reveal stays until you acknowledge; it does not auto-dismiss |
-| Why this move float | Updates after each legal click; drag the title bar; Reasons chip hides it |
+| Why this move (teach-dock) | Updates after each legal click beside Coach; Reasons chip hides it |
 | Resign | Concede and review the result |
 
 Fate intervening (and similar reveal moments) use a larger unclamped card face plus a **What it does** readout of the complete paraphrased ability. Hover titles are not the only way to read Tick Tock. If the engine already seated the card or wiped the hand, the modal still waits on Continue before the next move or action stretch.
