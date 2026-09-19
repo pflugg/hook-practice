@@ -9,7 +9,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 3,
     cost: 2,
     strength: 2,
-    text: "May join a clash at this spot or one step next door.",
+    text: "This crew may join a clash here or at a neighboring unlocked place.",
   },
   giveThemAScare: {
     id: "giveThemAScare",
@@ -19,7 +19,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 3,
     cost: 1,
     strength: 0,
-    text: "Peek at the top two Fate cards. Banish both, or tuck them back in any order.",
+    text: "Look at the next two Fate cards. Remove both from play, or put them back in either order.",
   },
   swashbuckler: {
     id: "swashbuckler",
@@ -29,7 +29,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 3,
     cost: 1,
     strength: 2,
-    text: "A reliable cutlass-hand. No extra trick.",
+    text: "A sturdy Ally. No special ability.",
   },
   worthyOpponent: {
     id: "worthyOpponent",
@@ -39,7 +39,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 3,
     cost: 0,
     strength: 0,
-    text: "Gain 2 Power. Flip Fate cards until a Hero appears; play that Hero and banish the rest.",
+    text: "Gain 2 Power. Draw Fate cards until you find a Hero; put that Hero into the realm and discard the rest.",
   },
   ayeAyeSir: {
     id: "ayeAyeSir",
@@ -49,7 +49,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 1,
     strength: 0,
-    text: "Shift an Ally one unlocked step. That Ally is +2 Strength until the turn ends.",
+    text: "Move one Ally to a neighboring unlocked place. That Ally gets +2 Strength until this turn ends.",
   },
   cannon: {
     id: "cannon",
@@ -59,7 +59,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 2,
     strength: 0,
-    text: "This place gains an extra Vanquish action.",
+    text: "Adds one extra Vanquish action at this place.",
   },
   cunning: {
     id: "cunning",
@@ -69,7 +69,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 0,
     strength: 0,
-    text: "Solo: if a Hero of Strength 4+ is ashore, play an Ally from hand for free (no Play action).",
+    text: "Practice rule: if any Hero of Strength 4 or more is in the realm, play an Ally from hand without using a Play action.",
   },
   cutlass: {
     id: "cutlass",
@@ -79,7 +79,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 1,
     strength: 0,
-    text: "Strap this to an Ally. That Ally is +2 Strength.",
+    text: "Attach to an Ally to give that Ally +2 Strength.",
   },
   hooksCase: {
     id: "hooksCase",
@@ -89,7 +89,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 2,
     strength: 0,
-    text: "This place gains an extra Gain 1 Power action.",
+    text: "Adds one extra Gain 1 Power action at this place.",
   },
   obsession: {
     id: "obsession",
@@ -99,7 +99,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 0,
     strength: 0,
-    text: "Solo: if Peter is still hidden, flip Fate cards until a Hero; play or banish that Hero.",
+    text: "Practice rule: if Peter is not yet in the realm, draw Fate cards until a Hero appears, then play or remove that Hero.",
   },
   pirateBrute: {
     id: "pirateBrute",
@@ -109,7 +109,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 3,
     strength: 4,
-    text: "A heavy hitter. No extra trick.",
+    text: "A strong Ally. No special ability.",
   },
   ingeniousDevice: {
     id: "ingeniousDevice",
@@ -119,7 +119,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 1,
     cost: 2,
     strength: 0,
-    text: "This place gains an extra Move a Hero action.",
+    text: "Adds one extra Move a Hero action at this place.",
   },
   mrStarkey: {
     id: "mrStarkey",
@@ -129,7 +129,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 1,
     cost: 2,
     strength: 2,
-    text: "When he comes ashore, you may nudge a Hero here one unlocked step.",
+    text: "When played, you may move one Hero at this place one unlocked step.",
   },
   neverLandMap: {
     id: "neverLandMap",
@@ -139,7 +139,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 1,
     cost: 4,
     strength: 0,
-    text: "Unlocks Hangman's Tree. Later, you may discard this Map instead of paying an Item's cost.",
+    text: "Opens Hangman's Tree. After it is in play, you may discard it instead of paying Power for another Item.",
   },
   smee: {
     id: "smee",
@@ -149,7 +149,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 1,
     cost: 2,
     strength: 2,
-    text: "+2 Strength while stationed at the Jolly Roger.",
+    text: "Gets +2 Strength while at the Jolly Roger.",
   },
   pixieDust: {
     id: "pixieDust",
@@ -159,7 +159,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 3,
     cost: 0,
     strength: 0,
-    text: "Attach to a Hero. That Hero is +2 Strength.",
+    text: "Attach to a Hero to give that Hero +2 Strength.",
   },
   lostBoys: {
     id: "lostBoys",
@@ -169,7 +169,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 0,
     strength: 4,
-    text: "A clash against them needs at least two Allies.",
+    text: "A clash against this Hero requires at least two Allies.",
   },
   splittingHeadache: {
     id: "splittingHeadache",
@@ -179,7 +179,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 0,
     strength: 0,
-    text: "Discard one Item from the realm.",
+    text: "Choose one Item in the realm and discard it.",
   },
   taunt: {
     id: "taunt",
@@ -189,7 +189,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 0,
     strength: 0,
-    text: "Attach to a Hero. Heroes wearing Taunt must be clashed before anyone else.",
+    text: "Attach to a Hero. That Hero must be chosen for a clash before any other Hero.",
   },
   john: {
     id: "john",
@@ -199,7 +199,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 1,
     cost: 0,
     strength: 2,
-    text: "+1 Strength while any Item is attached to him.",
+    text: "Gets +1 Strength while any Item is attached.",
   },
   michael: {
     id: "michael",
@@ -209,7 +209,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 1,
     cost: 0,
     strength: 1,
-    text: "+1 Strength for every location that currently has a Hero.",
+    text: "Gets +1 Strength for each place that currently has a Hero.",
   },
   peterPan: {
     id: "peterPan",
@@ -219,7 +219,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 1,
     cost: 0,
     strength: 8,
-    text: "When revealed, he must land at Hangman's Tree even if it is still locked. Other Fate cards from that reveal are banished.",
+    text: "When first found, this Hero is placed at Hangman's Tree even if that place is still locked. Other cards from that find are discarded.",
   },
   tickTock: {
     id: "tickTock",
@@ -229,7 +229,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 1,
     cost: 0,
     strength: 5,
-    text: "If the captain steps onto this crocodile's location, discard the whole hand.",
+    text: "If the captain moves to this Hero's place, discard every card in hand.",
   },
   tinkerBell: {
     id: "tinkerBell",
@@ -239,7 +239,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 1,
     cost: 0,
     strength: 2,
-    text: "When she arrives, one Ally at her location may be discarded.",
+    text: "When this Hero is placed, you may discard one Ally at the same place.",
   },
   wendy: {
     id: "wendy",
@@ -249,7 +249,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 1,
     cost: 0,
     strength: 3,
-    text: "Every other Hero in the realm is +1 Strength.",
+    text: "Each other Hero in the realm gets +1 Strength.",
   },
 };
 

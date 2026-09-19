@@ -158,7 +158,7 @@ function titleView(difficulty: Difficulty, coachEnabled: boolean): string {
         <button class="btn" data-start>Set Sail</button>
         <button class="btn ghost" data-help>How to play</button>
       </div>
-      <p class="fine">Original UI and paraphrased abilities. Personal practice tool — not an official product.</p>
+      <p class="fine">Unofficial personal practice tool. Not affiliated with, endorsed by, or associated with Disney or Ravensburger.</p>
     </section>
   </main>`;
 }

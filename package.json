@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Never Land Duel — a browser practice tool for the Captain Hook Villainous objective, vs a computer Fate adversary.",
+  "description": "Never Land Duel — a browser practice tool for the captain's objective chain, vs a computer Fate adversary.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

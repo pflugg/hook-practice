@@ -1,8 +1,8 @@
 # Never Land Duel (Hook Practice)
 
-A browser practice tool for the **Captain Hook** objective from *Villainous*. You play the captain. A computer adversary applies Fate pressure after every turn.
+A browser practice tool for the **captain’s objective chain**. You play the captain. A computer adversary applies Fate pressure after every turn.
 
-This is a personal practice app with original UI and paraphrased card abilities. It is **not** an official Ravensburger or Disney product.
+This is an unofficial personal practice aid with original UI and paraphrased mechanical descriptions. See [LEGAL.md](LEGAL.md).
 
 ## Requirements
 
@@ -80,7 +80,8 @@ A heuristic advisor (not an LLM) sits beside the prompt and names the next concr
 - `src/engine/` — pure rules engine (cards, realm, queries, Fate AI, heuristic Coach, reducer)
 - `src/ui/` — original CSS/SVG interface
 - `tests/` — Vitest coverage for the objective chain
-- `RULES_NOTES.md` — intentional simplifications versus the full board game
+- `RULES_NOTES.md` — intentional simplifications versus a full table game
+- `LEGAL.md` — unofficial-practice disclaimer
 
 ## Controls
 
@@ -91,3 +92,7 @@ A heuristic advisor (not an LLM) sits beside the prompt and names the next concr
 | A glowing card | Play, attach, vanquish, or move it |
 | End turn | Draw, then face Fate |
 | Resign | Concede and review the result |
+
+## Legal
+
+Unofficial personal practice tool. Not affiliated with, endorsed by, or associated with Disney or Ravensburger. Original code and CSS/SVG only; card abilities are paraphrased play effects, not published flavor text. Not for sale or redistribution as a substitute product. You should already own or know the published game — this is a practice aid only. Full statement: [LEGAL.md](LEGAL.md).
