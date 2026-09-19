@@ -1,6 +1,6 @@
 import { def } from "./cards";
 import { LOCATION_IDS, type ActionSlot, type CardInstance, type FateShow, type GameState, type LocationId } from "./types";
-import { REALM, actionLabel, adjacentIds } from "./realm";
+import { REALM, actionLabel, adjacentIds, locName } from "./realm";
 
 export function cardName(card: CardInstance): string {
   return def(card.defId).name;
@@ -142,6 +142,60 @@ export function canPlayCunning(state: GameState): boolean {
 
 export function canPlayObsession(state: GameState): boolean {
   return state.hand.some((c) => c.defId === "obsession") && !state.peterPanRevealed;
+}
+
+export function fateEmptyLine(state: GameState): string {
+  if (state.fateDeck.length > 0) return "";
+  if (state.fateDiscard.length > 0) {
+    return "Fate deck is empty. The discard will reshuffle before the next Fate flip.";
+  }
+  return "Fate has no cards left, so the computer will not answer.";
+}
+
+/** A cheap clash sitting on Tick Tock’s square — wipe and vanquish are one sentence. */
+export function clashBesideCroc(state: GameState): {
+  location: LocationId;
+  place: string;
+  heroName: string;
+  heroNeed: number;
+  allyName: string;
+  allyHave: number;
+} | null {
+  let crocAt: LocationId | null = null;
+  for (const id of LOCATION_IDS) {
+    if (state.locations[id].heroes.some((h) => h.defId === "tickTock")) {
+      crocAt = id;
+      break;
+    }
+  }
+  if (!crocAt) return null;
+  const heroes = state.locations[crocAt].heroes.filter((h) => h.defId !== "tickTock");
+  if (!heroes.length) return null;
+  const pool = vanquishAllyPoolAt(state, crocAt);
+  if (!pool.length) return null;
+  for (const hero of heroes) {
+    if (hero.defId === "peterPan" && crocAt !== "jollyRoger") continue;
+    const need = heroStrength(state, hero);
+    const have = pool.reduce((sum, a) => sum + allyStrength(state, a.ally), 0);
+    if (have < need) continue;
+    if (hero.defId === "lostBoys" && pool.length < 2) continue;
+    const best = [...pool].sort((a, b) => allyStrength(state, b.ally) - allyStrength(state, a.ally))[0];
+    return {
+      location: crocAt,
+      place: locName(crocAt),
+      heroName: cardName(hero),
+      heroNeed: need,
+      allyName: cardName(best.ally),
+      allyHave: allyStrength(state, best.ally),
+    };
+  }
+  return null;
+}
+
+export function clashAndCrocLine(state: GameState): string {
+  const pair = clashBesideCroc(state);
+  if (!pair) return "";
+  return `${pair.heroName} is ${pair.heroNeed} and ${pair.allyName} is ${pair.allyHave}, but standing here, or sliding the crocodile onto you, discards your hand.`;
 }
 
 export function playableHandCards(state: GameState): CardInstance[] {
@@ -339,15 +393,25 @@ export function objectiveSteps(state: GameState): {
   };
 }
 
+function withClashAndCroc(state: GameState, text: string): string {
+  const extra = clashAndCrocLine(state);
+  return extra ? `${text} ${extra}` : text;
+}
+
 export function promptText(state: GameState): string {
   if (state.phase === "title") return "Choose a heading and set sail.";
   if (state.won) return "Peter Pan is vanquished at the Jolly Roger. The duel is yours.";
   if (state.lost) return state.loseReason || "The tide has turned against you.";
-  if (state.phase === "move") return "Move the captain to a different unlocked location.";
+  if (state.phase === "move") {
+    return withClashAndCroc(state, "Move the captain to a different unlocked location.");
+  }
   const p = state.pending;
   if (!p) {
     if (state.phase === "actions") {
-      return "Perform any available actions, play a ready Condition, or end the turn.";
+      return withClashAndCroc(
+        state,
+        "Perform any available actions, play a ready Condition, or end the turn.",
+      );
     }
     return "";
   }
@@ -355,7 +419,10 @@ export function promptText(state: GameState): string {
     case "playChooseCard":
       return "Click a glowing card in your hand. Affordable cards are outlined in gold.";
     case "playChooseLocation":
-      return `Click a glowing location to play ${cardName(findCard(state, p.cardId)!)}.`;
+      return withClashAndCroc(
+        state,
+        `Click a glowing location to play ${cardName(findCard(state, p.cardId)!)}.`,
+      );
     case "playChooseAllyAttach":
       return "Use the picker to strap this to an Ally, or click that Ally on the board. Cancel returns to your hand.";
     case "playChoosePayment": {
@@ -376,7 +443,10 @@ export function promptText(state: GameState): string {
     case "discardSelect":
       return "Select cards to discard, then confirm. Discarding none still spends the action.";
     case "vanquishHero":
-      return "Choose a Hero at the captain's place. A Boarding Party can reach a neighboring unlocked Hero.";
+      return withClashAndCroc(
+        state,
+        "Choose a Hero at the captain's place. A Boarding Party can reach a neighboring unlocked Hero.",
+      );
     case "vanquishConfirmLoss":
       return "Vanquishing Peter away from the Jolly Roger loses this practice duel. Continue only if you mean to practice that failure.";
     case "vanquishAllies": {

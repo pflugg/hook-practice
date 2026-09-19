@@ -15,7 +15,9 @@ import {
   availableActions,
   canPlayCunning,
   canPlayObsession,
+  clashAndCrocLine,
   coveringHero,
+  fateEmptyLine,
   findCard,
   findCardLocation,
   heroStrength,
@@ -124,6 +126,13 @@ function drawVillain(state: GameState, n: number): CardInstance[] {
   return drawn;
 }
 
+function noteFateDeckEmpty(state: GameState): void {
+  const line = fateEmptyLine(state);
+  if (!line) return;
+  if (state.log.some((e) => e.text === line)) return;
+  log(state, line, "fate");
+}
+
 function drawFate(state: GameState, n: number): CardInstance[] {
   const drawn: CardInstance[] = [];
   for (let i = 0; i < n; i++) {
@@ -132,6 +141,7 @@ function drawFate(state: GameState, n: number): CardInstance[] {
     if (!card) break;
     drawn.push(card);
   }
+  if (drawn.length > 0) noteFateDeckEmpty(state);
   return drawn;
 }
 
@@ -337,19 +347,25 @@ function tickTockAt(state: GameState, dest: LocationId): CardInstance | undefine
 
 function snapTickTockHand(state: GameState): boolean {
   if (!tickTockAt(state, state.villainLocation)) return false;
+  const pair = clashAndCrocLine(state);
   discardHand(state);
-  log(state, "Tick Tock snaps — the whole hand is discarded.", "bad");
+  log(
+    state,
+    pair ? `Tick Tock snaps — the whole hand is discarded. ${pair}` : "Tick Tock snaps — the whole hand is discarded.",
+    "bad",
+  );
   return true;
 }
 
 function openTickTockSnapReport(state: GameState, opts?: { markAction?: boolean }): void {
   const croc = tickTockAt(state, state.villainLocation);
   if (!croc) return;
+  const pair = clashAndCrocLine(state);
   openFateReport(state, {
     drawn: [croc],
     played: croc,
     discarded: [],
-    note: TICK_TOCK_SNAP_NOTE,
+    note: pair ? `${TICK_TOCK_SNAP_NOTE} ${pair}` : TICK_TOCK_SNAP_NOTE,
     resume: "actions",
     markAction: opts?.markAction,
   });
@@ -448,7 +464,7 @@ function startComputerFate(state: GameState): void {
   state.defeatedHeroStrengthsThisTurn = [];
   const drawn = drawFate(state, 2);
   if (drawn.length === 0) {
-    log(state, "Fate has no cards left to play.", "fate");
+    noteFateDeckEmpty(state);
     beginNextTurn(state);
     return;
   }
@@ -488,7 +504,10 @@ function resolveComputerFateCard(
     placeHero(state, card, dest.id);
     note = `Fate seats ${d.name} at ${locName(dest.id)}.`;
     if (card.defId === "tickTock" && dest.id === state.villainLocation && snapTickTockHand(state)) {
-      note += " Tick Tock snaps — the whole hand is discarded.";
+      const pair = clashAndCrocLine(state);
+      note += pair
+        ? ` Tick Tock snaps — the whole hand is discarded. ${pair}`
+        : " Tick Tock snaps — the whole hand is discarded.";
     }
     if (card.defId === "tinkerBell") {
       const ally = chooseTinkerAlly(state, dest.id);
@@ -559,7 +578,7 @@ function playPeterIfPresent(state: GameState, cards: CardInstance[]): boolean {
 function startPlayerFate(state: GameState): void {
   const drawn = drawFate(state, 2);
   if (drawn.length === 0) {
-    log(state, "The Fate deck is empty.");
+    noteFateDeckEmpty(state);
     consumeCurrentAction(state);
     return;
   }
