@@ -9,6 +9,7 @@ import {
   promptText,
   REALM,
   selectedSet,
+  strategyBrief,
   titleState,
   type CardInstance,
   type CoachAdvice,
@@ -16,6 +17,7 @@ import {
   type GameState,
   type Input,
   type LocationId,
+  type StrategyBrief,
 } from "../engine";
 import { LOCATION_IDS } from "../engine/types";
 import { allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
@@ -121,7 +123,7 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
   </section>`;
 }
 
-function titleView(difficulty: Difficulty, coachEnabled: boolean): string {
+function titleView(difficulty: Difficulty, coachEnabled: boolean, briefEnabled: boolean): string {
   return `<div class="sky" aria-hidden="true">
     <div class="stars"></div>
     <div class="stars dim"></div>
@@ -151,8 +153,9 @@ function titleView(difficulty: Difficulty, coachEnabled: boolean): string {
       </div>
       <div class="diff coach-diff">
         <button type="button" data-coach-toggle class="${coachEnabled ? "is-on" : ""}">${coachEnabled ? "Coach on" : "Coach off"}</button>
+        <button type="button" data-brief-toggle class="${briefEnabled ? "is-on" : ""}">${briefEnabled ? "Strategy brief on" : "Strategy brief off"}</button>
       </div>
-      <p class="coach-lede">Coach suggests the next click and why it serves the objective. Tutorial always starts with Coach on. Set Sail uses this toggle — you can hide Coach any time during play.</p>
+      <p class="coach-lede">Coach names the next click. The Strategy brief is a longer sidebar: where you are, what this moment is, and what it sets up on the win chain. Tutorial starts both on. You can hide either during play.</p>
       <div class="actions-row">
         <button class="btn primary" data-tutorial>Tutorial</button>
         <button class="btn" data-start>Set Sail</button>
@@ -168,7 +171,8 @@ function helpView(fromPlay: boolean): string {
     <h2>How to play</h2>
     <p>Each turn you <b>must move</b> to a different unlocked location, then may use each uncovered action there once. Heroes cover the top row. End the turn to refill to 4 cards; the computer then Fates you.</p>
     <p><b>Win</b> by vanquishing Peter Pan at the Jolly Roger after unlocking Hangman’s Tree with the Never Land Map. Vanquishing him anywhere else loses the duel.</p>
-    <p><b>Coach:</b> Tutorial starts with a warm advisor that names the next legal click and why it helps (Map → unlock the tree → reveal Peter → walk him to the ship → vanquish). Other legal options stay clickable. Toggle Coach off from the title screen or the top bar at any time.</p>
+    <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable.</p>
+    <p><b>Strategy brief:</b> a persistent sidebar that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach. Tutorial starts both on; hide either from the top bar.</p>
     <p><b>Practice tips:</b> Discard aggressively for the Map. Fish Fate with Worthy Opponent and Give Them a Scare. Station strength at the ship before walking Peter across. Beware Tick Tock and Splitting Headache.</p>
     <div class="actions-row"><button class="btn primary" data-close-help>${fromPlay ? "Return to the realm" : "Back"}</button></div>
   </div></div>`;
@@ -272,7 +276,44 @@ function coachPanel(advice: CoachAdvice): string {
   </aside>`;
 }
 
-function playView(state: GameState, coachEnabled: boolean): string {
+function strategySidebar(brief: StrategyBrief): string {
+  return `<aside class="strategy-brief" aria-label="Strategy brief">
+    <header class="brief-head">
+      <div>
+        <p class="brief-kicker">Strategy brief</p>
+        <h2>How the voyage stands</h2>
+      </div>
+      <button type="button" class="btn ghost brief-hide" data-brief-toggle>Hide brief</button>
+    </header>
+    <section class="brief-block">
+      <h3>Objective progress</h3>
+      <ol class="brief-objectives">
+        ${brief.objective
+          .map(
+            (line) => `<li class="${line.done ? "is-done" : ""}">
+          <div class="brief-obj-title"><span class="brief-pip"></span><strong>${esc(line.label)}</strong></div>
+          <p>${esc(line.status)}</p>
+        </li>`,
+          )
+          .join("")}
+      </ol>
+    </section>
+    <section class="brief-block">
+      <h3>Where you are</h3>
+      <p>${esc(brief.where)}</p>
+    </section>
+    <section class="brief-block">
+      <h3>What this moment is</h3>
+      <p>${esc(brief.moment)}</p>
+    </section>
+    <section class="brief-block">
+      <h3>What we’re setting up for</h3>
+      <p>${esc(brief.setup)}</p>
+    </section>
+  </aside>`;
+}
+
+function playView(state: GameState, coachEnabled: boolean, briefEnabled: boolean): string {
   const hi = highlightSet(state);
   const sel = selectedSet(state);
   const advice = coachEnabled ? advise(state) : null;
@@ -296,9 +337,11 @@ function playView(state: GameState, coachEnabled: boolean): string {
     promptButtons.push(`<button class="btn ghost${coachClass(coached, "btn:skip-cond")}" data-skip-cond>Skip discard</button>`);
   }
 
+  const brief = briefEnabled ? strategyBrief(state) : null;
+
   return `<div class="sky play-sky" aria-hidden="true"><div class="stars"></div><div class="fog fog-a"></div></div>
   <div class="grain"></div>
-  <div class="play ${coachEnabled ? "has-coach" : ""}">
+  <div class="play ${coachEnabled ? "has-coach" : ""} ${briefEnabled ? "has-brief" : ""}">
     <header class="topbar">
       <div class="brand">${CREST}<div><h1>Never Land Duel</h1><small>Hook Practice</small></div></div>
       <div class="stepper">
@@ -312,6 +355,7 @@ function playView(state: GameState, coachEnabled: boolean): string {
         <div class="chip">Turn ${state.turn}</div>
         <div class="chip">${state.difficulty === "easy" ? "Easy Fate" : "Normal Fate"}</div>
         <button type="button" class="chip ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
+        <button type="button" class="chip ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
         <button class="chip" data-help>Help</button>
         <button class="chip" data-resign>Resign</button>
       </div>
@@ -321,6 +365,7 @@ function playView(state: GameState, coachEnabled: boolean): string {
       ${advice ? coachPanel(advice) : ""}
     </div>
     <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
+    ${brief ? strategySidebar(brief) : ""}
     <footer class="dock">
       <section class="hand ${state.pending?.kind === "playChooseCard" || state.pending?.kind === "discardSelect" ? "is-picking" : ""}">
         <h2>Hand · ${state.hand.length} · Deck ${state.villainDeck.length} · Discard ${state.villainDiscard.length}</h2>
@@ -351,19 +396,19 @@ function playView(state: GameState, coachEnabled: boolean): string {
   ${overlayFor(state, hi, sel, coached)}`;
 }
 
-function readCoachPref(): boolean {
+function readFlag(key: string, fallback = true): boolean {
   try {
-    const stored = sessionStorage.getItem("nld-coach");
-    if (stored === null) return true;
+    const stored = sessionStorage.getItem(key);
+    if (stored === null) return fallback;
     return stored === "1";
   } catch {
-    return true;
+    return fallback;
   }
 }
 
-function writeCoachPref(on: boolean): void {
+function writeFlag(key: string, on: boolean): void {
   try {
-    sessionStorage.setItem("nld-coach", on ? "1" : "0");
+    sessionStorage.setItem(key, on ? "1" : "0");
   } catch {
     /* sessionStorage can be unavailable */
   }
@@ -372,15 +417,16 @@ function writeCoachPref(on: boolean): void {
 export function mount(root: HTMLElement): void {
   let state: GameState = titleState();
   let difficulty: Difficulty = "normal";
-  let coachEnabled = readCoachPref();
+  let coachEnabled = readFlag("nld-coach");
+  let briefEnabled = readFlag("nld-brief");
 
   const render = () => {
-    if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled);
+    if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled, briefEnabled);
     else if (state.screen === "help") {
       root.innerHTML =
-        (state.phase === "title" ? titleView(difficulty, coachEnabled) : playView(state, coachEnabled)) +
+        (state.phase === "title" ? titleView(difficulty, coachEnabled, briefEnabled) : playView(state, coachEnabled, briefEnabled)) +
         helpView(state.phase !== "title");
-    } else root.innerHTML = playView(state, coachEnabled);
+    } else root.innerHTML = playView(state, coachEnabled, briefEnabled);
   };
 
   const dispatch = (input: Input) => {
@@ -392,14 +438,22 @@ export function mount(root: HTMLElement): void {
     const t = event.target as HTMLElement;
     if (t.closest("[data-coach-toggle]")) {
       coachEnabled = !coachEnabled;
-      writeCoachPref(coachEnabled);
+      writeFlag("nld-coach", coachEnabled);
+      render();
+      return;
+    }
+    if (t.closest("[data-brief-toggle]")) {
+      briefEnabled = !briefEnabled;
+      writeFlag("nld-brief", briefEnabled);
       render();
       return;
     }
     const tutorial = t.closest<HTMLElement>("[data-tutorial]");
     if (tutorial) {
       coachEnabled = true;
-      writeCoachPref(true);
+      briefEnabled = true;
+      writeFlag("nld-coach", true);
+      writeFlag("nld-brief", true);
       return dispatch({ type: "start", difficulty });
     }
     const start = t.closest<HTMLElement>("[data-start]");

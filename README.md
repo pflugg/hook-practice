@@ -66,6 +66,17 @@ A heuristic advisor (not an LLM) sits beside the prompt and names the next concr
 - Coach only *highlights* a recommended legal target more strongly. Every other legal option stays clickable.
 - It covers the full loop: required move, actions (Gain / Discard / Play / Fate / Vanquish / Move), card and payment choices, Fate acknowledge, and win/loss awareness. It warns about Tick Tock and Heroes covering key actions.
 
+## Strategy brief
+
+A persistent sidebar (default on, especially from **Tutorial**) teaches the voyage instead of only the next click. Coach stays the short “do this” panel; the brief is the longer briefing and updates every render from a pure `strategyBrief(state)` helper.
+
+- **Objective progress** — Map unlock, Peter found, walk to the ship, clash ready — each with a plain-English status.
+- **Where you are** — location, Power, hand pressure, whether the tree is locked, Tick Tock and covering Heroes.
+- **What this moment is** — a phase-aware paragraph (required move, action stretch, targeting, Fate acknowledge) explaining what the rules are asking and why that beat exists.
+- **What we’re setting up for** — two to four sentences tying the current options to the mid/late game (Power engine, digging for the Map, escort, Ally stack at the Jolly Roger).
+
+Hide it with the top-bar **Brief** chip or **Hide brief**. On narrower windows it becomes a scrollable strip above the four-location board so the realm stays full width.
+
 ## Practice tips
 
 - Discard often until the Map appears. Hangman’s Tree stays locked without it, so Peter cannot leave.
@@ -77,7 +88,7 @@ A heuristic advisor (not an LLM) sits beside the prompt and names the next concr
 
 ## Project layout
 
-- `src/engine/` — pure rules engine (cards, realm, queries, Fate AI, heuristic Coach, reducer)
+- `src/engine/` — pure rules engine (cards, realm, queries, Fate AI, heuristic Coach, strategy brief, reducer)
 - `src/ui/` — original CSS/SVG interface
 - `tests/` — Vitest coverage for the objective chain
 - `RULES_NOTES.md` — intentional simplifications versus a full table game
