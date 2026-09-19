@@ -78,12 +78,15 @@ describe("game graphics UI pass", () => {
     const state = barePlayState();
     give(state, "neverLandMap");
     give(state, "pirateBrute");
+    give(state, "cunning");
     const html = renderPlay(state, { coachEnabled: false, reasonsEnabled: false });
     expect(html).toContain('class="type-bar"');
     expect(html).toContain("ITEM");
     expect(html).toContain("ALLY");
+    expect(html).toContain("CONDITION");
     expect(html).toMatch(/type-bar[\s\S]*ITEM[\s\S]*·[\s\S]*4/);
     expect(html).toMatch(/type-bar[\s\S]*ALLY[\s\S]*·[\s\S]*3/);
+    expect(html).toMatch(/type-bar[\s\S]*data-type="condition"[\s\S]*CONDITION/);
   });
 
   it("veils locked Hangman's Tree with LOCKED and Need: Never Land Map", () => {
