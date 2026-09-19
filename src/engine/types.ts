@@ -81,6 +81,7 @@ export type Pending =
   | { kind: "ayeAyeDest"; allyId: string }
   | { kind: "discardSelect"; selected: string[] }
   | { kind: "vanquishHero" }
+  | { kind: "vanquishConfirmLoss"; heroId: string }
   | { kind: "vanquishAllies"; heroId: string; selected: string[] }
   | { kind: "movePieceSelect" }
   | { kind: "movePieceDest"; pieceId: string }

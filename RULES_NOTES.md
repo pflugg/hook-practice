@@ -20,7 +20,10 @@ Cannon, Hook’s Case, and Ingenious Device grant extra actions at their locatio
 If Peter is vanquished anywhere other than the Jolly Roger, the duel is an immediate **loss**. A table game might simply discard him and leave the objective unfinished; the explicit loss keeps this practice tool honest.
 
 ### Give Them a Scare
-This card **looks** at the top two Fate cards. Looking does not count as revealing, so Peter Pan is not forced onto Hangman’s Tree by a peek. You may banish both cards or return them in either order.
+This card **looks** at the top two Fate cards. Looking does not count as revealing, so Peter Pan is not forced onto Hangman’s Tree by a peek. You may discard both cards to the Fate discard or return them in either order. Discarded peek cards can return when Fate reshuffles — this tool does not use a separate remove-from-game pile.
+
+### Vanquish locality
+Vanquish names a Hero at the captain’s current location. Allies at that place contribute Strength. **Boarding Party** may also join a clash here or at a neighboring unlocked place, which is the only way to reach an adjacent Hero. Crew sitting with a distant Hero cannot be spent while the captain stands elsewhere.
 
 ### Reveal vs play
 Whenever Peter Pan is *revealed* (Fate action, Worthy Opponent, Obsession), he is placed at Hangman’s Tree even if locked, and the other cards from that reveal are discarded. Player-chosen Fate plays of other Heroes go to unlocked locations only.

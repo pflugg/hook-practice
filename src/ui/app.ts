@@ -26,8 +26,23 @@ import {
   type MoveReason,
 } from "../engine";
 import { LOCATION_IDS } from "../engine/types";
-import { allAllies, allLocationItems, allyStrength, attachmentsOn, heroStrength } from "../engine/queries";
-import { cutlassAttachScene, dragHeroScene, tickTockReportScene } from "../engine/scenes";
+import {
+  allAllies,
+  allLocationItems,
+  allyStrength,
+  attachmentsOn,
+  heroStrength,
+  mapInRealm,
+  vanquishClashMath,
+} from "../engine/queries";
+import {
+  cutlassAttachScene,
+  dragHeroScene,
+  obsessionDecideScene,
+  tickTockReportScene,
+  vanquishClashScene,
+  vanquishLocalScene,
+} from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
 import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
 import { CAPTAIN_TOKEN, CREST, TITLE_SCENE, locationDecor } from "./decor";
@@ -75,6 +90,18 @@ function renderCard(
     <p class="text">${esc(d.text)}</p>
     ${attachNote}
     ${d.type === "hero" || d.type === "ally" ? `<div class="str" title="Strength">${str}</div>` : ""}
+    ${
+      state.pending?.kind === "vanquishAllies" &&
+      state.pending.heroId === card.instanceId &&
+      d.type === "hero"
+        ? (() => {
+            const math = vanquishClashMath(state);
+            return math
+              ? `<div class="clash-chip ${math.ready ? "is-ready" : ""}" data-clash-chip>${math.selected}/${math.need}</div>`
+              : "";
+          })()
+        : ""
+    }
   </button>`;
 }
 
@@ -83,6 +110,18 @@ function abilityReadout(title: string, text: string): string {
   return `<div class="ability-readout">
     <h3>${esc(title)}</h3>
     <p>${esc(text)}</p>
+  </div>`;
+}
+
+function clashMeter(
+  math: ReturnType<typeof vanquishClashMath>,
+): string {
+  if (!math) return "";
+  const boys = math.lostBoys ? ` · Allies ${math.selectedAllies}/2` : "";
+  return `<div class="clash-meter ${math.ready ? "is-ready" : "is-short"}" role="status" data-clash-meter>
+    <span class="clash-kicker">Vanquish Strength</span>
+    <b>${math.selected} / ${math.need}</b>
+    <span class="clash-hero">${esc(math.heroName)}${boys}</span>
   </div>`;
 }
 
@@ -278,12 +317,12 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
   if (p?.kind === "scarePeek") {
     return `<div class="overlay"><div class="modal">
       <h2>Give Them a Scare</h2>
-      <p>Banish both, or return them with the first button’s card on top.</p>
+      <p>Discard both to the Fate discard (they can return when Fate reshuffles), or return them with the first button’s card on top.</p>
       <div class="modal-cards">${p.cards
         .map((c) => renderCard(state, c, { size: "reveal", legal: true, selected: false }))
         .join("")}</div>
       <div class="actions-row">
-        <button class="btn${coachClass(coached, "btn:scare-discard")}" data-scare-discard>Banish both</button>
+        <button class="btn${coachClass(coached, "btn:scare-discard")}" data-scare-discard>Discard both</button>
         <button class="btn${coachClass(coached, `btn:scare-order:${p.cards[0].instanceId},${p.cards[1]?.instanceId ?? p.cards[0].instanceId}`)}" data-scare-order="${p.cards[0].instanceId},${p.cards[1]?.instanceId ?? p.cards[0].instanceId}">${esc(cardName(p.cards[0]))} on top</button>
         ${p.cards[1] ? `<button class="btn${coachClass(coached, `btn:scare-order:${p.cards[1].instanceId},${p.cards[0].instanceId}`)}" data-scare-order="${p.cards[1].instanceId},${p.cards[0].instanceId}">${esc(cardName(p.cards[1]))} on top</button>` : ""}
       </div>
@@ -314,12 +353,23 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
     </div></div>`;
   }
   if (p?.kind === "playChoosePayment") {
+    const card = findCard(state, p.cardId);
+    const cost = card ? def(card.defId).cost : 0;
+    const name = card ? cardName(card) : "this Item";
+    const canPay = state.power >= cost;
+    const mapOut = mapInRealm(state);
     return `<div class="overlay"><div class="modal">
       <h2>Pay the cost</h2>
-      <p>Spend Power, or discard the Never Land Map to cover this Item.</p>
+      <p>${esc(name)} costs <b>${cost} Power</b>. You have <b>${state.power} Power</b>.</p>
+      <p>${
+        mapOut
+          ? "The Never Land Map is in the realm and can cover this cost instead of Power."
+          : "Spend Power, or discard the Never Land Map if it is in the realm."
+      }</p>
+      <div class="pay-meter" role="status">Power ${state.power} / cost ${cost}${mapOut ? " · Map available" : ""}</div>
       <div class="actions-row">
-        <button class="btn primary${coachClass(coached, "btn:pay-power")}" data-pay-power>Pay Power</button>
-        <button class="btn${coachClass(coached, "btn:pay-map")}" data-pay-map>Discard the Map</button>
+        <button class="btn primary${coachClass(coached, "btn:pay-power")}" data-pay-power ${canPay ? "" : "disabled"}>Pay ${cost} Power</button>
+        <button class="btn${coachClass(coached, "btn:pay-map")}" data-pay-map ${mapOut ? "" : "disabled"}>Discard the Map</button>
       </div>
     </div></div>`;
   }
@@ -334,12 +384,48 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
     </div></div>`;
   }
   if (p?.kind === "obsessionDecide") {
+    const hero = state.heldCard;
     return `<div class="overlay"><div class="modal">
       <h2>Obsession</h2>
       <p>A Hero was found. Play them into the realm, or banish them?</p>
+      ${
+        hero
+          ? `<div class="modal-cards">${renderCard(state, hero, { size: "reveal", legal: false, selected: true })}</div>`
+          : ""
+      }
       <div class="actions-row">
         <button class="btn primary${coachClass(coached, "btn:play-hero")}" data-play-hero>Play the Hero</button>
         <button class="btn${coachClass(coached, "btn:banish-hero")}" data-banish-hero>Banish</button>
+      </div>
+    </div></div>`;
+  }
+  if (p?.kind === "worthyLocation" || p?.kind === "obsessionLocation") {
+    const hero = state.heldCard ?? findCard(state, p.heroId);
+    const title = p.kind === "worthyLocation" ? "Worthy Opponent" : "Obsession";
+    return `<div class="overlay pass-through"><div class="modal wood">
+      <p class="eyebrow">${esc(title)}</p>
+      <h2>Seat this Hero</h2>
+      <p>Click a glowing unlocked location. Peter still lands at Hangman’s Tree if he is the find.</p>
+      ${
+        hero
+          ? `<div class="modal-cards">${renderCard(state, hero, { size: "reveal", legal: false, selected: true })}</div>`
+          : ""
+      }
+    </div></div>`;
+  }
+  if (p?.kind === "vanquishConfirmLoss") {
+    const hero = findCard(state, p.heroId) ?? state.heldCard;
+    return `<div class="overlay"><div class="modal wood lose">
+      <h2>This loses the practice duel</h2>
+      <p>Peter is not on the Jolly Roger. Vanquishing him here is the intentional-loss trap. Continue only if you mean to practice that failure.</p>
+      ${
+        hero
+          ? `<div class="modal-cards">${renderCard(state, hero, { size: "reveal", legal: false, selected: true })}</div>`
+          : ""
+      }
+      <div class="actions-row">
+        <button class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel>Cancel</button>
+        <button class="btn${coachClass(coached, "btn:confirm")}" data-confirm>Continue anyway</button>
       </div>
     </div></div>`;
   }
@@ -558,8 +644,14 @@ function playView(
   if (state.phase === "actions" && !state.pending) {
     promptButtons.push(`<button class="btn primary${coachClass(coached, "btn:end")}" data-end>End turn</button>`);
   }
-  if (state.pending && ["discardSelect", "vanquishAllies"].includes(state.pending.kind)) {
+  const clash = vanquishClashMath(state);
+  if (state.pending?.kind === "discardSelect") {
     promptButtons.push(`<button class="btn primary${coachClass(coached, "btn:confirm")}" data-confirm>Confirm</button>`);
+  }
+  if (state.pending?.kind === "vanquishAllies") {
+    promptButtons.push(
+      `<button class="btn primary${coachClass(coached, "btn:confirm")}" data-confirm ${clash?.ready ? "" : "disabled"}>Confirm</button>`,
+    );
   }
   const canCancelPlay =
     state.pending &&
@@ -606,7 +698,7 @@ function playView(
       </div>
     </header>
     <div class="stage">
-      <div class="prompt"><p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}</div></div>
+      <div class="prompt">${clashMeter(clash)}<p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}</div></div>
       ${fateRail(state)}
       <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
     </div>
@@ -689,6 +781,9 @@ function bootState(): GameState {
       if (scene === "cutlass") return cutlassAttachScene();
       if (scene === "ticktock") return tickTockReportScene();
       if (scene === "drag") return dragHeroScene();
+      if (scene === "clash") return vanquishClashScene();
+      if (scene === "obsession") return obsessionDecideScene();
+      if (scene === "vanquish") return vanquishLocalScene();
     }
   } catch {
     /* ignore */

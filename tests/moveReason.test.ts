@@ -105,6 +105,36 @@ describe("idle vs coach/brief roles", () => {
     expect(explainSelection(state, { type: "selectLocation", locationId: "skullRock" }, after)).toBeNull();
   });
 
+  it("teaches Hook's Case as extra Gain 1, not discard or Play", () => {
+    const state = barePlayState();
+    state.villainLocation = "skullRock";
+    state.phase = "actions";
+    state.power = 2;
+    const pack = give(state, "hooksCase");
+
+    const choosing = applyInput(state, { type: "selectAction", actionKey: "sr-play" });
+    const picked = applyInput(choosing, { type: "selectCard", instanceId: pack.instanceId });
+    const reason = explainSelection(choosing, { type: "selectCard", instanceId: pack.instanceId }, picked);
+    expect(reason?.chose).toMatch(/Hook's Case/);
+    expect(reason?.why).toMatch(/Gain 1/i);
+    expect(reason?.why).not.toMatch(/discard and play/i);
+    expect(reason?.next).toMatch(/Gain 1/);
+  });
+
+  it("says Scare discards to the Fate pile rather than banishing forever", () => {
+    const state = barePlayState();
+    state.phase = "resolving";
+    const a = inst("tickTock");
+    const b = inst("splittingHeadache");
+    state.pending = { kind: "scarePeek", cards: [a, b] };
+    const after = applyInput(state, { type: "scareDiscardBoth" });
+    const reason = explainSelection(state, { type: "scareDiscardBoth" }, after);
+    expect(reason?.chose).toMatch(/discarded both/i);
+    expect(reason?.why).toMatch(/Fate discard/);
+    expect(reason?.why).not.toMatch(/banish/i);
+    expect(after.fateDiscard.map((c) => c.defId)).toEqual(expect.arrayContaining(["tickTock", "splittingHeadache"]));
+  });
+
   it("names Peter on the tree as a helpful Fate find", () => {
     const state = barePlayState();
     state.villainLocation = "skullRock";

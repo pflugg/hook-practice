@@ -189,9 +189,11 @@ function thisMoment(state: GameState): string {
     case "discardSelect":
       return "A Discard action lets you throw cards away so the deck can offer new ones. It still spends the action even if you toss nothing. Keep the Map. Keep hunt cards while Peter is hidden. Keep Allies you can still afford if the ship is light. Toss the rest — digging for the Map is how most opening voyages actually start.";
     case "vanquishHero":
-      return "You opened Vanquish, so you are naming a Hero your local (or boarding) Allies can meet. Peter only counts as a win on the Jolly Roger. Clashing him anywhere else loses this practice duel on purpose, so the lesson sticks. Tick Tock is worth clearing if the Strength is there, because the crocodile empties your hand if you later step onto him.";
+      return "You opened Vanquish, so you are naming a Hero at the captain’s current place — or a neighboring unlocked Hero a Boarding Party can reach. Remote clashes from across the realm are not legal. Peter only counts as a win on the Jolly Roger. Clashing him anywhere else loses this practice duel on purpose, so the lesson sticks. Tick Tock is worth clearing if the Strength is there, because the crocodile empties your hand if you later step onto him.";
+    case "vanquishConfirmLoss":
+      return "You named Peter away from the Jolly Roger. This practice duel treats that clash as an instant loss so the ship-only lesson sticks. A confirm gate is up so first voyages can back out. Cancel unless you mean to practice that failure.";
     case "vanquishAllies":
-      return "The Hero is named; now you tap Allies until their Strength meets that Hero. You do not have to spend everyone if a smaller group is enough. Confirm when the total is there. This is the same motion you will use on Peter at the ship — practice the count now.";
+      return "The Hero is named; now you tap Allies until their Strength meets that Hero. Watch the live Strength meter in the prompt. You do not have to spend everyone if a smaller group is enough. Confirm when the total is there. This is the same motion you will use on Peter at the ship — practice the count now.";
     case "moveHeroSelect":
     case "moveHeroDest":
     case "starkeyHero":
@@ -217,7 +219,7 @@ function thisMoment(state: GameState): string {
       }
       return "The Fate card is already seated or spent. Stay on this modal and read the full paraphrased ability — hover titles are not enough — then press Continue before the board takes focus again.";
     case "scarePeek":
-      return "You peeked at two Fate cards without revealing them. Looking is not finding Peter — a peek will not force him onto the tree. You may remove both from play, or put them back in either order. If Peter is in the peek, return him on top so the next real Fate flip can find him. If the crocodile or a headache is there, banishing both is often the kinder table.";
+      return "You peeked at two Fate cards without revealing them. Looking is not finding Peter — a peek will not force him onto the tree. You may discard both to the Fate discard (they can return when Fate reshuffles), or put them back in either order. If Peter is in the peek, return him on top so the next real Fate flip can find him. If the crocodile or a headache is there, discarding both is often the kinder table.";
     case "obsessionDecide":
     case "obsessionLocation":
       return "Obsession hunted a Hero out of Fate. If it is Peter, play him — he still goes to Hangman’s Tree. If it is Tick Tock, sending him out of the realm saves your hand later. This is a practice-only trigger: you may fire it on your own turn while Peter is still hidden, because there is no opponent’s turn here.";

@@ -98,3 +98,71 @@ export function dragHeroScene(): GameState {
   state.actionKey = "ht-moveHero";
   return state;
 }
+
+function emptyRealm(state: GameState): void {
+  state.hand = [];
+  state.villainDeck = [];
+  state.villainDiscard = [];
+  state.fateDeck = [];
+  state.fateDiscard = [];
+  state.attachments = [];
+  state.usedActions = [];
+  for (const id of ["jollyRoger", "skullRock", "mermaidLagoon", "hangmansTree"] as const) {
+    state.locations[id] = { id, heroes: [], allies: [], items: [] };
+  }
+}
+
+/** Scripted clash so the live Strength meter can be verified. */
+export function vanquishClashScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.power = 3;
+  state.hangmansUnlocked = true;
+  state.villainLocation = "jollyRoger";
+  const peter = inst(state, "peterPan");
+  const brute = inst(state, "pirateBrute");
+  const brute2 = inst(state, "pirateBrute");
+  state.locations.jollyRoger.heroes.push(peter);
+  state.locations.jollyRoger.allies.push(brute, brute2);
+  state.peterPanRevealed = true;
+  state.peterPanLocation = "jollyRoger";
+  state.pending = { kind: "vanquishAllies", heroId: peter.instanceId, selected: [brute.instanceId] };
+  state.phase = "resolving";
+  state.actionKey = "jr-vanquish";
+  return state;
+}
+
+/** Scripted Obsession decide so the found Hero face is visible. */
+export function obsessionDecideScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.power = 2;
+  state.villainLocation = "skullRock";
+  const hero = inst(state, "tickTock");
+  state.heldCard = hero;
+  state.pending = { kind: "obsessionDecide", heroId: hero.instanceId, extras: [] };
+  state.phase = "resolving";
+  return state;
+}
+
+/** Scripted Vanquish pick: local Hero legal, remote Hero with Allies is not. */
+export function vanquishLocalScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.power = 4;
+  state.hangmansUnlocked = true;
+  state.villainLocation = "jollyRoger";
+  const john = inst(state, "john");
+  const smee = inst(state, "smee");
+  const wendy = inst(state, "wendy");
+  const brute = inst(state, "pirateBrute");
+  const brute2 = inst(state, "pirateBrute");
+  state.locations.jollyRoger.heroes.push(john);
+  state.locations.jollyRoger.allies.push(smee);
+  state.locations.mermaidLagoon.heroes.push(wendy);
+  state.locations.mermaidLagoon.allies.push(brute, brute2);
+  state.pending = { kind: "vanquishHero" };
+  state.phase = "resolving";
+  state.actionKey = "jr-vanquish";
+  return state;
+}

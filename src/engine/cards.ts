@@ -19,7 +19,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 3,
     cost: 1,
     strength: 0,
-    text: "Look at the next two Fate cards. Remove both from play, or put them back in either order.",
+    text: "Look at the next two Fate cards. Discard both to the Fate discard (they can return when Fate reshuffles), or put them back in either order.",
   },
   swashbuckler: {
     id: "swashbuckler",

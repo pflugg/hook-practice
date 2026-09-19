@@ -61,7 +61,7 @@ Heroes cover the **top** actions at their location. Gold outlines mark legal cli
 
 **Difficulty**
 
-- **Easy** — Fate picks randomly among legal plays.
+- **Easy** — Fate picks randomly among legal plays in the drawn pair (including skipping Peter when he is one of the two cards).
 - **Normal** (default) — Fate prefers Peter Pan, blocks useful actions, parks Tick Tock on rich locations, and spends Splitting Headache on your best Items.
 
 ## Coach mode
