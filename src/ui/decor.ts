@@ -18,21 +18,21 @@ export const CAPTAIN_TOKEN = `<svg class="captain-figure" viewBox="0 0 72 92" ar
 
 /** Thin original chart for the play topbar gap — not a realm map, no place labels. */
 export const TOPBAR_MAP = `<svg class="topbar-map" viewBox="0 0 1600 56" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-  <rect width="1600" height="56" fill="#c9a86a"/>
-  <g fill="none" stroke="#8a7340" stroke-width=".7">
+  <rect width="1600" height="56" fill="#f4e8c8"/>
+  <g fill="none" stroke="#fff6d2" stroke-width="1">
     <path d="M0 18h1600M0 37h1600"/>
     <path d="M220 0v56M480 0v56M760 0v56M1040 0v56M1320 0v56"/>
   </g>
-  <path d="M-12 40C80 34 130 20 210 24c72 4 118 14 190 10 62-4 110-14 172-8 56 5 98 14 164 8 68-6 118-16 186-8 62 7 108 5 170-2 56-6 114 5 186 5 52 0 102-8 166-2 34 3 78 8 130 5v16H-12z" fill="#8a7340"/>
-  <path d="M-6 38C84 30 148 16 214 22s122 16 198 8 120-16 178-8 114 16 178 6 126-16 198-6 120 8 186 0 130 6 206 5 116-6 186 0" fill="none" stroke="#e8c36a" stroke-width="1.6" stroke-linecap="round"/>
-  <path d="M348 11c15-7 36-4 41 6 5 10-8 16-22 18-17 2-32-7-19-24z" fill="#8a7340" stroke="#e8c36a" stroke-width=".9"/>
-  <path d="M704 8c12-6 30-3 34 6 3 8-8 13-19 14-14 1-24-6-15-20z" fill="#8a7340" stroke="#e8c36a" stroke-width=".85"/>
-  <path d="M70 34C160 24 250 16 348 14S470 22 520 22 620 12 704 10 820 18 900 16 980 28 1010 26 1120 16 1240 24 1360 20" fill="none" stroke="#e8c36a" stroke-width="1.25" stroke-linecap="round" stroke-dasharray="2.2 4.6"/>
-  <g transform="translate(1010 26)" fill="none" stroke="#e8c36a" stroke-width=".9">
-    <circle r="11"/>
-    <circle r="6" stroke="#8a7340" stroke-width=".6"/>
-    <path d="M0-9 L1.5-1.5 L9 0 L1.5 1.5 L0 9 L-1.5 1.5 L-9 0 L-1.5-1.5 Z" fill="#e8c36a" stroke="none"/>
-    <path d="M0-9 L.7-.7 L9 0 L.7.7 L0 9 L-.7.7 L-9 0 L-.7-.7 Z" fill="#8a7340" stroke="none"/>
+  <path d="M-12 40C80 34 130 20 210 24c72 4 118 14 190 10 62-4 110-14 172-8 56 5 98 14 164 8 68-6 118-16 186-8 62 7 108 5 170-2 56-6 114 5 186 5 52 0 102-8 166-2 34 3 78 8 130 5v16H-12z" fill="#e8c36a"/>
+  <path d="M-6 38C84 30 148 16 214 22s122 16 198 8 120-16 178-8 114 16 178 6 126-16 198-6 120 8 186 0 130 6 206 5 116-6 186 0" fill="none" stroke="#fff6d2" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M348 11c15-7 36-4 41 6 5 10-8 16-22 18-17 2-32-7-19-24z" fill="#e8c36a" stroke="#fff6d2" stroke-width="1.2"/>
+  <path d="M704 8c12-6 30-3 34 6 3 8-8 13-19 14-14 1-24-6-15-20z" fill="#e8c36a" stroke="#fff6d2" stroke-width="1.2"/>
+  <path d="M70 34C160 24 250 16 348 14S470 22 520 22 620 12 704 10 820 18 900 16 980 28 1010 26 1120 16 1240 24 1360 20" fill="none" stroke="#fff6d2" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2.4 4.2"/>
+  <g transform="translate(1010 26)" fill="none" stroke="#fff6d2" stroke-width="1.2">
+    <circle r="12"/>
+    <circle r="6.5" stroke="#e8c36a" stroke-width=".8"/>
+    <path d="M0-10 L1.8-1.6 L10 0 L1.8 1.6 L0 10 L-1.8 1.6 L-10 0 L-1.8-1.6 Z" fill="#fff6d2" stroke="none"/>
+    <path d="M0-10 L.8-.8 L10 0 L.8.8 L0 10 L-.8.8 L-10 0 L-.8-.8 Z" fill="#e8c36a" stroke="none"/>
   </g>
 </svg>`;
 

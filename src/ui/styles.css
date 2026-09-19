@@ -322,7 +322,7 @@ h1.wordmark {
 
 .topbar {
   display: grid;
-  grid-template-columns: auto minmax(72px, 1fr) auto;
+  grid-template-columns: auto minmax(160px, 1fr) auto;
   align-items: center;
   column-gap: 12px;
   padding: 8px 16px;
@@ -338,10 +338,11 @@ h1.wordmark {
   grid-column: 2;
   grid-row: 1;
   width: 100%;
-  height: 46px;
+  height: 48px;
   min-width: 0;
   pointer-events: none;
   opacity: 0.12;
+  mix-blend-mode: screen;
   z-index: 0;
 }
 .topbar > :not(.topbar-map) {
@@ -862,8 +863,8 @@ h1.wordmark {
 .fate-rail {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 14px;
   margin: 6px 16px 0;
   padding: 6px 10px;
   border: 1px solid rgba(180, 140, 220, 0.35);
