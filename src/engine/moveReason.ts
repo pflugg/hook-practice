@@ -480,8 +480,19 @@ function sameTable(before: GameState, after: GameState): boolean {
     before.hand.length === after.hand.length &&
     before.won === after.won &&
     before.lost === after.lost &&
-    (before.bannerNote ?? "") === (after.bannerNote ?? "")
+    // applyInput clears bannerNote on every click. Only a newly set banner is a real reply.
+    (!(after.bannerNote) || (before.bannerNote ?? "") === after.bannerNote)
   );
+}
+
+/** True only when the rules actually spent, opened, or refused the click. */
+function actionTookEffect(before: GameState, after: GameState, actionKey: string): boolean {
+  if (after.usedActions.includes(actionKey) && !before.usedActions.includes(actionKey)) return true;
+  if (after.pending?.kind && after.pending.kind !== before.pending?.kind) return true;
+  if (after.power !== before.power) return true;
+  if (after.bannerNote && after.bannerNote !== (before.bannerNote ?? "")) return true;
+  if (after.logSeq !== before.logSeq) return true;
+  return false;
 }
 
 export function explainSelection(before: GameState, input: Input, after: GameState): MoveReason | null {
@@ -551,6 +562,7 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
   }
   if (input.type === "selectAction") {
     if (before.phase !== "actions") return null;
+    if (!actionTookEffect(before, after, input.actionKey)) return null;
     if (after.bannerNote) {
       return pack(
         "Vanquish cannot name a Hero right now.",
@@ -732,11 +744,25 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
 }
 
 function explainAction(before: GameState, after: GameState, actionKey: string): MoveReason | null {
-  const slot = availableActions(before).find((a) => a.key === actionKey);
+  if (!actionTookEffect(before, after, actionKey)) return null;
+  const slot = availableActions(before, { asIfOnActionStretch: true }).find((a) => a.key === actionKey);
   if (!slot) {
     if (sameTable(before, after)) return null;
   }
   const here = locName(after.villainLocation);
+  if (slot?.kind === "gainPower" && before.power === after.power && !after.usedActions.includes(actionKey)) {
+    return null;
+  }
+  if (
+    slot?.kind === "vanquish" &&
+    after.pending?.kind !== "vanquishHero" &&
+    after.pending?.kind !== "vanquishAllies" &&
+    after.pending?.kind !== "vanquishConfirmLoss" &&
+    !after.usedActions.includes(actionKey) &&
+    !after.bannerNote
+  ) {
+    return null;
+  }
   switch (slot?.kind) {
     case "gainPower": {
       const amt = slot.amount ?? 1;

@@ -5,6 +5,8 @@ import type { GameState, Input, LocationId } from "../engine/types";
  * Route a click on the play board.
  * Legal location targets win over disabled/inert inner controls so move
  * (and drop-a-card) clicks work even when the pointer is over a dead action button.
+ * During the required move, current-location action clicks are ignored — they
+ * must not become selectAction or a stay-put location pick that rewrites Why.
  */
 export function resolveBoardClick(target: EventTarget | null, state: GameState): Input | null {
   if (!(target instanceof Element)) return null;
@@ -14,6 +16,16 @@ export function resolveBoardClick(target: EventTarget | null, state: GameState):
   const move = el.closest<HTMLElement>("[data-move]");
   if (move?.dataset.move) {
     return { type: "selectLocation", locationId: move.dataset.move as LocationId };
+  }
+
+  const requiredMove = state.phase === "move" && !state.pending;
+  if (requiredMove) {
+    if (el.closest<HTMLElement>("[data-card]")) return null;
+    const dest = el.closest<HTMLElement>("[data-loc]");
+    if (dest && hi.has(`loc:${dest.dataset.loc}`)) {
+      return { type: "selectLocation", locationId: dest.dataset.loc as LocationId };
+    }
+    return null;
   }
 
   const card = el.closest<HTMLElement>("[data-card]");

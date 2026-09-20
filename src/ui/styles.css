@@ -955,10 +955,26 @@ h1.wordmark {
 .action.is-covered { opacity: 0.32; text-decoration: line-through; }
 .action.is-used { opacity: 0.4; }
 .action:disabled,
+.action.is-inert,
 .action.is-used,
 .action.is-covered {
   pointer-events: none;
+  cursor: default;
 }
+.action:disabled,
+.action.is-inert {
+  opacity: 0.36;
+  box-shadow: none;
+  filter: grayscale(0.25);
+  color: rgba(232, 220, 190, 0.62);
+  border-color: rgba(232, 195, 106, 0.14);
+  background: rgba(8, 8, 10, 0.28);
+}
+.action.is-covered {
+  opacity: 0.32;
+  text-decoration: line-through;
+}
+.action.is-used { opacity: 0.4; }
 .action.is-legal {
   border-color: #f4b45a;
   background: linear-gradient(180deg, rgba(244, 180, 90, 0.32), rgba(20, 14, 8, 0.55));

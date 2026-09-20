@@ -1,5 +1,6 @@
 import {
   advise,
+  actionsAreLive,
   applyInput,
   availableActions,
   cardName,
@@ -157,14 +158,15 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
   const extras = id === state.villainLocation ? actions.filter((a) => a.row === "extra") : [];
   const top = printed.filter((a) => a.row === "top");
   const bottom = printed.filter((a) => a.row === "bottom");
-  const showLegalActs = state.phase === "actions" && !state.pending && state.villainLocation === id;
+  const showLegalActs = actionsAreLive(state) && state.villainLocation === id;
 
   const actBtns = (list: typeof printed) =>
     `<div class="row">${list
       .map((a) => {
         const legalAct = showLegalActs && !locked && hi.has(`act:${a.key}`);
         const coachAct = legalAct && coached.has(`act:${a.key}`);
-        return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : ""} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${a.covered || a.used || !legalAct ? "disabled" : ""}>${esc(a.label)}</button>`;
+        const inert = a.covered || a.used || !legalAct;
+        return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : "is-inert"} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${inert ? "disabled" : ""}>${esc(a.label)}</button>`;
       })
       .join("")}</div>`;
 
@@ -213,7 +215,8 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
       ${actBtns(bottom)}
       ${extras.length ? `<div class="row">${extras.map((a) => {
         const extraLegal = showLegalActs && !locked && hi.has(`act:${a.key}`);
-        return `<button class="action ${extraLegal ? "is-legal" : ""} ${extraLegal && coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}" ${locked || a.used || !extraLegal ? "disabled" : ""}>${esc(a.label)}</button>`;
+        const extraInert = locked || a.used || !extraLegal;
+        return `<button class="action ${extraLegal ? "is-legal" : "is-inert"} ${extraLegal && coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}" ${extraInert ? "disabled" : ""}>${esc(a.label)}</button>`;
       }).join("")}</div>` : ""}
     </div>
   </section>`;

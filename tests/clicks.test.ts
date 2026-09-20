@@ -3,6 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { applyInput } from "../src/engine/game";
+import { renderPlay } from "../src/ui/app";
 import { resolveBoardClick } from "../src/ui/clicks";
 import { barePlayState } from "./helpers";
 
@@ -69,6 +70,23 @@ describe("location click routing", () => {
     const btn = root.querySelector<HTMLButtonElement>("[data-move]")!;
     const input = resolveBoardClick(btn, state);
     expect(input).toEqual({ type: "selectLocation", locationId: "skullRock" });
+  });
+
+  it("ignores a current-location action click while the captain still must move", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "move";
+    state.pending = null;
+    state.hangmansUnlocked = false;
+
+    const root = document.createElement("div");
+    root.innerHTML = renderPlay(state, { coachEnabled: false, briefEnabled: false, reasonsEnabled: false });
+    const hereGain = root.querySelector<HTMLButtonElement>('[data-loc="jollyRoger"] [data-act="jr-gain"]');
+    const hereVanquish = root.querySelector<HTMLButtonElement>('[data-loc="jollyRoger"] [data-act="jr-vanquish"]');
+    expect(hereGain?.disabled).toBe(true);
+    expect(hereVanquish?.disabled).toBe(true);
+    expect(resolveBoardClick(hereGain!, state)).toBeNull();
+    expect(resolveBoardClick(hereVanquish!, state)).toBeNull();
   });
 
   it("still fires selectAction on an enabled current-location action after moving", () => {

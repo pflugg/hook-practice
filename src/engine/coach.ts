@@ -64,7 +64,7 @@ function peterReadyToFinish(state: GameState): boolean {
 }
 
 function slotsAt(state: GameState, id: LocationId): ActionSlot[] {
-  return availableActions({ ...state, villainLocation: id });
+  return availableActions({ ...state, villainLocation: id }, { asIfOnActionStretch: true });
 }
 
 function liveSlots(state: GameState, id: LocationId): ActionSlot[] {

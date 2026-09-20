@@ -208,8 +208,8 @@ describe("hour playtest Must: Cunning stays put without an Ally", () => {
   });
 });
 
-describe("hour playtest Should: move-phase actions stay dark", () => {
-  it("disables printed and extra actions during the required move and writes no post-selection", () => {
+describe("hour playtest Must: move-phase actions stay dark", () => {
+  it("disables printed and extra actions at the current stop and writes no post-selection", () => {
     const state = barePlayState();
     state.hangmansUnlocked = true;
     state.villainLocation = "jollyRoger";
@@ -218,10 +218,19 @@ describe("hour playtest Should: move-phase actions stay dark", () => {
     give(state, "hooksCase");
 
     const html = renderPlay(state, { coachEnabled: true, briefEnabled: false, reasonsEnabled: true });
-    expect(html).toMatch(/data-act="jr-vanquish"[^>]*disabled|disabled[^>]*data-act="jr-vanquish"/);
-    expect(html).toMatch(/data-act="jr-play"[^>]*disabled|disabled[^>]*data-act="jr-play"/);
-    expect(html).toMatch(/data-act="jr-gain"[^>]*disabled|disabled[^>]*data-act="jr-gain"/);
-    expect(html).not.toMatch(/class="action[^"]*is-legal[^"]*"[^>]*data-act="jr-vanquish"/);
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    const here = root.querySelector<HTMLElement>('[data-loc="jollyRoger"]');
+    expect(here).toBeTruthy();
+    const hereActs = [...here!.querySelectorAll<HTMLButtonElement>("[data-act]")];
+    expect(hereActs.map((btn) => btn.dataset.act)).toEqual(
+      expect.arrayContaining(["jr-vanquish", "jr-play", "jr-gain"]),
+    );
+    for (const btn of hereActs) {
+      expect(btn.disabled).toBe(true);
+      expect(btn.classList.contains("is-inert")).toBe(true);
+      expect(btn.classList.contains("is-legal")).toBe(false);
+    }
 
     const after = applyInput(state, { type: "selectAction", actionKey: "jr-vanquish" });
     expect(after.phase).toBe("move");
@@ -237,7 +246,11 @@ describe("hour playtest Should: move-phase actions stay dark", () => {
     moving.phase = "move";
     moving.power = 2;
     const gainHtml = renderPlay(moving, { coachEnabled: true, briefEnabled: false, reasonsEnabled: true });
-    expect(gainHtml).toMatch(/data-act="ml-gain"[^>]*disabled|disabled[^>]*data-act="ml-gain"/);
+    const lagoon = document.createElement("div");
+    lagoon.innerHTML = gainHtml;
+    const gain = lagoon.querySelector<HTMLButtonElement>('[data-loc="mermaidLagoon"] [data-act="ml-gain"]');
+    expect(gain?.disabled).toBe(true);
+    expect(gain?.classList.contains("is-inert")).toBe(true);
     const ghostGain = applyInput(moving, { type: "selectAction", actionKey: "ml-gain" });
     expect(ghostGain.phase).toBe("move");
     expect(ghostGain.power).toBe(2);
@@ -245,6 +258,8 @@ describe("hour playtest Should: move-phase actions stay dark", () => {
     const ghostWhy = explainSelection(moving, { type: "selectAction", actionKey: "ml-gain" }, ghostGain);
     expect(ghostWhy).toBeNull();
     expect(ghostWhy?.chose ?? "").not.toMatch(/You took Gain/);
+    const liveGhost = liveMoveReason(ghostGain, ghostWhy);
+    expect(liveGhost.chose).not.toMatch(/You took Gain/);
   });
 });
 
