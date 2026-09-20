@@ -17,6 +17,7 @@ import {
   strategyBrief,
   explainSelection,
   IDLE_MOVE_REASON,
+  liveMoveReason,
   titleState,
   type CardInstance,
   type CoachAdvice,
@@ -973,6 +974,7 @@ export function mount(root: HTMLElement): void {
     state = applyInput(state, input);
     const explained = explainSelection(before, input, state);
     if (explained) lastReason = explained;
+    lastReason = liveMoveReason(state, lastReason);
     render();
   };
 

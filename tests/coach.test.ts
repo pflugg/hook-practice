@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { advise } from "../src/engine/coach";
 import { applyInput, createGame, highlightSet } from "../src/engine/game";
-import { barePlayState, give, putAlly, putHero } from "./helpers";
+import { availableActions } from "../src/engine/queries";
+import { barePlayState, give, putAlly, putHero, putItem } from "./helpers";
 
 function expectLegalHighlights(state: ReturnType<typeof barePlayState>, highlights: string[]) {
   const legal = highlightSet(state);
@@ -42,6 +43,8 @@ describe("coach suggestions", () => {
 
     const before = advise(state);
     expect(before.do).toMatch(/Play a Card/i);
+    expect(before.do).toMatch(/Never Land Map/);
+    expect(before.do).toMatch(/click/i);
     expect(before.highlights).toContain("act:sr-play");
     expect(before.why).toMatch(/Map|Hangman’s Tree|Hangman's Tree/i);
     expectLegalHighlights(state, before.highlights);
@@ -49,6 +52,8 @@ describe("coach suggestions", () => {
     const choosing = applyInput(state, { type: "selectAction", actionKey: "sr-play" });
     const pick = advise(choosing);
     expect(pick.do).toMatch(/Never Land Map/);
+    expect(pick.do).toMatch(/click/i);
+    expect(pick.do).toMatch(/Choose this place/i);
     expect(pick.highlights).toContain(`card:${map.instanceId}`);
     expectLegalHighlights(choosing, pick.highlights);
 
@@ -56,8 +61,52 @@ describe("coach suggestions", () => {
     const drop = advise(placing);
     expect(drop.do).toMatch(/Never Land Map/);
     expect(drop.do).toMatch(/Skull Rock|Jolly Roger|Mermaid Lagoon|Hangman/);
+    expect(drop.do).toMatch(/Choose this place/i);
     expect(drop.highlights.some((h) => h.startsWith("loc:"))).toBe(true);
     expectLegalHighlights(placing, drop.highlights);
+  });
+
+  it("gives full play-card directions naming the card, place, and next clicks", () => {
+    const state = barePlayState();
+    state.villainLocation = "mermaidLagoon";
+    state.phase = "actions";
+    state.power = 2;
+    state.hangmansUnlocked = true;
+    give(state, "boardingParty");
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Boarding Party/);
+    expect(advice.do).toMatch(/Jolly Roger/);
+    expect(advice.do).toMatch(/Play a Card/);
+    expect(advice.do).toMatch(/click/i);
+    expect(advice.do).toMatch(/Choose this place/i);
+    expect(advice.do).not.toMatch(/where it would help|if it helps/i);
+    expect(advice.highlights).toContain("act:ml-play1");
+    expectLegalHighlights(state, advice.highlights);
+
+    const choosing = applyInput(state, { type: "selectAction", actionKey: "ml-play1" });
+    const pick = advise(choosing);
+    expect(pick.do).toMatch(/Boarding Party/);
+    expect(pick.do).toMatch(/Jolly Roger/);
+    expect(pick.do).toMatch(/click/i);
+    expect(pick.do).toMatch(/Choose this place/i);
+    expectLegalHighlights(choosing, pick.highlights);
+  });
+
+  it("gives full move-then-act directions when Peter waits at the tree", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.phase = "move";
+    state.villainLocation = "jollyRoger";
+    putHero(state, "peterPan", "hangmansTree");
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Move to Hangman’s Tree|Hangman's Tree/);
+    expect(advice.do).toMatch(/Move here/i);
+    expect(advice.do).toMatch(/Move a Hero/);
+    expect(advice.do).toMatch(/Peter/);
+    expect(advice.highlights).toContain("loc:hangmansTree");
+    expectLegalHighlights(state, advice.highlights);
   });
 
   it("walks Peter from an unlocked Hangman’s Tree toward the ship", () => {
@@ -192,6 +241,86 @@ describe("coach suggestions", () => {
     expect(advice.highlights).toContain("loc:skullRock");
     expectLegalHighlights(state, advice.highlights);
     expect(highlightSet(state).has("loc:hangmansTree")).toBe(false);
+  });
+
+  it("never suggests Move a Hero unless that action is available at the captain's place", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.villainLocation = "mermaidLagoon";
+    state.phase = "actions";
+    state.power = 4;
+    putHero(state, "peterPan", "skullRock");
+    putHero(state, "michael", "mermaidLagoon");
+    putItem(state, "hooksCase", "mermaidLagoon");
+    putItem(state, "hooksCase", "mermaidLagoon");
+
+    const acts = availableActions(state).filter((a) => a.available);
+    expect(acts.some((a) => a.kind === "moveHero")).toBe(false);
+
+    const advice = advise(state);
+    expect(advice.do).not.toMatch(/Move a Hero|Move Peter/i);
+    expect(advice.highlights.some((h) => h.includes("moveHero"))).toBe(false);
+    expectLegalHighlights(state, advice.highlights);
+
+    const atTree = structuredClone(state);
+    atTree.villainLocation = "hangmansTree";
+    const treeAdvice = advise(atTree);
+    expect(treeAdvice.do).toMatch(/Move a Hero/);
+    expect(treeAdvice.highlights).toContain("act:ht-moveHero");
+    expectLegalHighlights(atTree, treeAdvice.highlights);
+  });
+
+  it("names real Gain tokens and never invents a fused Gain 3", () => {
+    const onlyCases = barePlayState();
+    onlyCases.hangmansUnlocked = true;
+    onlyCases.villainLocation = "mermaidLagoon";
+    onlyCases.phase = "actions";
+    onlyCases.power = 2;
+    putHero(onlyCases, "peterPan", "skullRock");
+    putItem(onlyCases, "hooksCase", "mermaidLagoon");
+    putItem(onlyCases, "hooksCase", "mermaidLagoon");
+    onlyCases.usedActions = ["ml-gain"];
+
+    const leftover = availableActions(onlyCases).filter((a) => a.available && a.kind === "gainPower");
+    expect(leftover.every((a) => (a.amount ?? 1) === 1)).toBe(true);
+    expect(leftover.some((a) => a.amount === 3)).toBe(false);
+
+    const caseAdvice = advise(onlyCases);
+    expect(caseAdvice.do).toMatch(/Gain 1 \(Case\)/);
+    expect(caseAdvice.do).not.toMatch(/Gain 3/);
+    expect(caseAdvice.why).toMatch(/Gain 1 \(Case\)/);
+    expect(caseAdvice.why).not.toMatch(/fused|Gain 3/);
+    expectLegalHighlights(onlyCases, caseAdvice.highlights);
+
+    const skull = barePlayState();
+    skull.villainLocation = "skullRock";
+    skull.phase = "actions";
+    skull.power = 1;
+    skull.hangmansUnlocked = false;
+    putItem(skull, "hooksCase", "skullRock");
+    putItem(skull, "hooksCase", "skullRock");
+
+    const skullGains = availableActions(skull).filter((a) => a.available && a.kind === "gainPower");
+    expect(skullGains.some((a) => (a.amount ?? 1) === 3)).toBe(false);
+    const skullAdvice = advise(skull);
+    expect(skullAdvice.do).toMatch(/Gain 1/);
+    expect(skullAdvice.do).not.toMatch(/Gain 3/);
+    expectLegalHighlights(skull, skullAdvice.highlights);
+
+    const lagoon = barePlayState();
+    lagoon.villainLocation = "mermaidLagoon";
+    lagoon.phase = "actions";
+    lagoon.power = 0;
+    lagoon.hangmansUnlocked = false;
+    const printed = availableActions(lagoon).find((a) => a.key === "ml-gain");
+    expect(printed?.available).toBe(true);
+    expect(printed?.amount).toBe(3);
+    const lagoonAdvice = advise(lagoon);
+    if (lagoonAdvice.do.includes("Gain")) {
+      expect(lagoonAdvice.do).toMatch(/Gain 3/);
+      expect(lagoonAdvice.highlights).toContain("act:ml-gain");
+    }
+    expectLegalHighlights(lagoon, lagoonAdvice.highlights);
   });
 
   it("recommends the ship clash when Peter is vanquishable at the Jolly Roger", () => {

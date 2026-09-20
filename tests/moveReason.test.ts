@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyInput, createGame } from "../src/engine/game";
-import { explainSelection } from "../src/engine/moveReason";
-import { barePlayState, give, inst, putHero } from "./helpers";
+import { explainSelection, liveMoveReason } from "../src/engine/moveReason";
+import { barePlayState, give, inst, putHero, putItem } from "./helpers";
 
 describe("move reasons after selection", () => {
   it("explains a legal opening move to Mermaid Lagoon", () => {
@@ -138,6 +138,83 @@ describe("idle vs coach/brief roles", () => {
     expect(reason?.why).toMatch(/Fate discard/);
     expect(reason?.why).not.toMatch(/banish/i);
     expect(after.fateDiscard.map((c) => c.defId)).toEqual(expect.arrayContaining(["tickTock", "splittingHeadache"]));
+  });
+
+  it("keeps Why this move click-by-click while a Play selection is active", () => {
+    const state = barePlayState();
+    state.villainLocation = "mermaidLagoon";
+    state.phase = "actions";
+    state.power = 2;
+    const party = give(state, "boardingParty");
+
+    const choosing = applyInput(state, { type: "selectAction", actionKey: "ml-play1" });
+    const opened = explainSelection(state, { type: "selectAction", actionKey: "ml-play1" }, choosing);
+    const liveOpen = liveMoveReason(choosing, opened);
+    expect(liveOpen.chose).toMatch(/Play a Card/);
+    expect(liveOpen.why.length).toBeGreaterThan(80);
+    expect(`${liveOpen.why} ${liveOpen.next}`).toMatch(/click|Choose this place|hand/i);
+
+    const placing = applyInput(choosing, { type: "selectCard", instanceId: party.instanceId });
+    const picked = explainSelection(choosing, { type: "selectCard", instanceId: party.instanceId }, placing);
+    const livePick = liveMoveReason(placing, picked);
+    expect(livePick.chose).toMatch(/Boarding Party/);
+    expect(livePick.why.length).toBeGreaterThan(80);
+    expect(`${livePick.why} ${livePick.next}`).toMatch(/Jolly Roger|Choose this place|click/i);
+  });
+
+  it("drops Worthy Opponent card-pick copy once the action stretch is current", () => {
+    const state = barePlayState();
+    state.villainLocation = "mermaidLagoon";
+    state.phase = "actions";
+    state.power = 4;
+    state.hangmansUnlocked = true;
+    putHero(state, "peterPan", "skullRock");
+    putHero(state, "michael", "mermaidLagoon");
+    putItem(state, "hooksCase", "mermaidLagoon");
+
+    const stale = {
+      chose: "You chose Worthy Opponent from hand.",
+      why: "Worthy Opponent is a hunt: +2 Power and you reveal Fate cards until a Hero appears. That is how you find Peter without waiting for a Fate action or the computer’s turn.",
+      next: "If the Hero is Peter, he still lands at Hangman’s Tree. If it is Tick Tock, park him off the lagoon and the tree.",
+    };
+    const live = liveMoveReason(state, stale);
+    expect(live.chose).not.toMatch(/Worthy Opponent/);
+    expect(live.why).not.toMatch(/Worthy Opponent is a hunt/i);
+    expect(live.chose).toMatch(/action stretch|Mermaid Lagoon/i);
+    expect(live.why).toMatch(/available actions|Gain|End/i);
+  });
+
+  it("rewrites a Worthy Opponent pick that already resolved into seating or the action stretch", () => {
+    const state = barePlayState();
+    state.villainLocation = "mermaidLagoon";
+    state.phase = "actions";
+    state.power = 2;
+    const worthy = give(state, "worthyOpponent");
+    state.fateDeck = [inst("wendy"), inst("john")];
+
+    const choosing = applyInput(state, { type: "selectAction", actionKey: "ml-play2" });
+    const afterPick = applyInput(choosing, { type: "selectCard", instanceId: worthy.instanceId });
+    const pickReason = explainSelection(choosing, { type: "selectCard", instanceId: worthy.instanceId }, afterPick);
+    const live = liveMoveReason(afterPick, pickReason);
+
+    expect(live.chose).not.toMatch(/from hand/i);
+    if (afterPick.pending?.kind === "worthyLocation") {
+      expect(live.chose).toMatch(/Worthy Opponent found|Wendy/i);
+      const seated = applyInput(afterPick, { type: "selectLocation", locationId: "jollyRoger" });
+      const seatReason = explainSelection(afterPick, { type: "selectLocation", locationId: "jollyRoger" }, seated);
+      const afterSeat = seated.pending?.kind === "fateReport" ? applyInput(seated, { type: "acknowledgeFate" }) : seated;
+      const last =
+        seated.pending?.kind === "fateReport"
+          ? explainSelection(seated, { type: "acknowledgeFate" }, afterSeat)
+          : seatReason;
+      const actionLive = liveMoveReason(afterSeat, last);
+      expect(afterSeat.phase).toBe("actions");
+      expect(actionLive.chose).not.toMatch(/from hand/i);
+      expect(actionLive.why).not.toMatch(/Worthy Opponent is a hunt/i);
+    } else {
+      expect(afterPick.phase).toBe("actions");
+      expect(live.chose).toMatch(/played Worthy Opponent|action stretch/i);
+    }
   });
 
   it("names Peter on the tree as a helpful Fate find", () => {

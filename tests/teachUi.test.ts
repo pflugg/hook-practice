@@ -12,6 +12,7 @@ import {
   vanquishClashScene,
   vanquishLocalScene,
 } from "../src/engine/scenes";
+import { liveMoveReason } from "../src/engine/moveReason";
 import { renderOverlay, renderPlay } from "../src/ui/app";
 import { barePlayState, give, inst, putAlly, putHero, putItem } from "./helpers";
 
@@ -62,6 +63,31 @@ describe("teaching UI for Must fixes", () => {
     expect(html).toContain("Tick Tock");
     expect(html).toMatch(/class="card[^"]*reveal/);
     expect(html).toContain("discard every card in hand");
+  });
+
+  it("Why this move leaves Worthy Opponent card-pick copy once the action stretch is current", () => {
+    const state = barePlayState();
+    state.villainLocation = "mermaidLagoon";
+    state.phase = "actions";
+    state.hangmansUnlocked = true;
+    putHero(state, "peterPan", "skullRock");
+    putHero(state, "michael", "mermaidLagoon");
+    putItem(state, "hooksCase", "mermaidLagoon");
+
+    const stale = {
+      chose: "You chose Worthy Opponent from hand.",
+      why: "Worthy Opponent is a hunt: +2 Power and you reveal Fate cards until a Hero appears.",
+      next: "If the Hero is Peter, he still lands at Hangman’s Tree.",
+    };
+    const html = renderPlay(state, {
+      coachEnabled: true,
+      briefEnabled: false,
+      reasonsEnabled: true,
+      reason: liveMoveReason(state, stale),
+    });
+    expect(html).toContain("action stretch");
+    expect(html).not.toContain("You chose Worthy Opponent from hand");
+    expect(html).not.toContain("Worthy Opponent is a hunt");
   });
 
   it("shows the found Hero face-up while Worthy is seating them", () => {
