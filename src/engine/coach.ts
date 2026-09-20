@@ -1049,9 +1049,19 @@ function advisePending(state: GameState): CoachAdvice {
       );
     }
     case "conditionOffer": {
+      const cond = findCard(state, p.conditionId);
+      const allies = state.hand.filter((c) => def(c.defId).type === "ally");
+      if (cond?.defId === "cunning" && allies.length === 0) {
+        return say(
+          "Not now — Cunning needs an Ally in hand",
+          "The trigger is live, but there is no Ally to slip ashore. Skip the Condition so it stays in hand.",
+          ["btn:skip-cond"],
+          state,
+        );
+      }
       return say(
         "Play the Condition",
-        p.reason.includes("Cunning") || state.hand.some((c) => c.defId === "cunning")
+        p.reason.includes("Cunning") || cond?.defId === "cunning"
           ? "A free Ally now is a gift — put that Strength on the ship."
           : "If Peter is still hidden, this hunt can flip him onto Hangman’s Tree.",
         ["btn:accept-cond"],

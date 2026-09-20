@@ -359,6 +359,31 @@ export function hourPlaytestMoveScene(): GameState {
   return state;
 }
 
+/** Game 2 equal-strength clash: Tinker Bell 2 vs Swashbuckler 2 at the same stop. */
+export function hourEqualVanquishScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.power = 2;
+  state.turn = 6;
+  state.hangmansUnlocked = false;
+  state.villainLocation = "jollyRoger";
+  state.phase = "actions";
+  const tinker = inst(state, "tinkerBell");
+  const swash = inst(state, "swashbuckler");
+  const peter = inst(state, "peterPan");
+  const dust = inst(state, "pixieDust");
+  const tick = inst(state, "tickTock");
+  state.locations.jollyRoger.heroes.push(tinker);
+  state.locations.jollyRoger.allies.push(swash);
+  state.locations.hangmansTree.heroes.push(peter);
+  state.locations.skullRock.heroes.push(tick);
+  state.attachments.push({ item: dust, attachedTo: peter.instanceId });
+  state.peterPanRevealed = true;
+  state.peterPanLocation = "hangmansTree";
+  state.hand.push(inst(state, "worthyOpponent"), inst(state, "hooksCase"));
+  return state;
+}
+
 /** Hour-playtest Play-a-Card so Why can name live Peter Strength. */
 export function hourPlaytestWhyScene(): GameState {
   const state = hourPlaytestTauntScene();

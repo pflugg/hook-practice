@@ -385,7 +385,7 @@ function playCardWhy(defId: string, state: GameState): { why: string; next: stri
       };
     case "cunning":
       return {
-        why: "Cunning is a Condition: when a Strength 4+ Hero is ashore, you may slip an Ally in for free. That is how the ship stack grows without spending the Play action’s Power.",
+        why: "Cunning is a Condition: when a Strength 4+ Hero is ashore and you hold an Ally, you may slip that Ally in for free. Without an Ally in hand the Condition stays put.",
         next: "Put that free Ally on the Jolly Roger. You can still take other actions this stop.",
       };
     case "obsession":
@@ -598,6 +598,13 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
     );
   }
   if (input.type === "acceptCondition") {
+    if (after.bannerNote && /Cunning needs an Ally/i.test(after.bannerNote)) {
+      return pack(
+        "Cunning stays in hand.",
+        after.bannerNote,
+        "Draw or keep an Ally, then the Condition can fire. Do not spend it on an empty gift.",
+      );
+    }
     return pack(
       "You played the ready Condition.",
       "Conditions fire because the table already meets their trigger — a strong Hero ashore for Cunning, or Peter still hidden for Obsession. That is free or discounted progress on the chain.",

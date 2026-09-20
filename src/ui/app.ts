@@ -49,6 +49,7 @@ import {
   peterSoftConfirmScene,
   tickTockOntoCaptainScene,
   tickTockReportScene,
+  hourEqualVanquishScene,
   hourPlaytestMoveScene,
   hourPlaytestTauntScene,
   hourPlaytestWhyScene,
@@ -833,6 +834,7 @@ function bootState(): GameState {
       if (scene === "hourtaunt") return hourPlaytestTauntScene();
       if (scene === "hourmove") return hourPlaytestMoveScene();
       if (scene === "hourwhy") return hourPlaytestWhyScene();
+      if (scene === "hourequal") return hourEqualVanquishScene();
     }
   } catch {
     /* ignore */

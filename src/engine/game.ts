@@ -15,6 +15,7 @@ import {
   availableActions,
   canPlayCunning,
   canPlayObsession,
+  handAllies,
   clashAndCrocLine,
   coveringHero,
   fateEmptyLine,
@@ -960,17 +961,19 @@ export function applyInput(prev: GameState, input: Input): GameState {
   }
   if (input.type === "acceptCondition") {
     if (state.pending?.kind !== "conditionOffer") return state;
+    const offered = findCard(state, state.pending.conditionId);
+    if (offered?.defId === "cunning" && handAllies(state).length === 0) {
+      const why = "Cunning needs an Ally in hand. The Condition stays put.";
+      log(state, why);
+      state.bannerNote = why;
+      state.pending = null;
+      state.phase = "actions";
+      return state;
+    }
     const cond = takeFromHand(state, state.pending.conditionId);
     if (!cond) return state;
     discardVillainCard(state, cond);
     if (cond.defId === "cunning") {
-      const allies = state.hand.filter((c) => def(c.defId).type === "ally");
-      if (allies.length === 0) {
-        log(state, "Cunning finds no Ally in hand.");
-        state.pending = null;
-        state.phase = "actions";
-        return state;
-      }
       state.phase = "resolving";
       state.pending = { kind: "cunningAlly" };
       return state;
@@ -1152,12 +1155,20 @@ function handleCard(state: GameState, instanceId: string): GameState {
   if (state.phase === "actions" && !state.pending) {
     const card = state.hand.find((c) => c.instanceId === instanceId);
     if (!card) return state;
-    if (card.defId === "cunning" && canPlayCunning(state)) {
-      state.pending = {
-        kind: "conditionOffer",
-        conditionId: card.instanceId,
-        reason: "A Strength 4+ Hero is ashore. Play Cunning to slip an Ally in for free?",
-      };
+    if (card.defId === "cunning") {
+      if (canPlayCunning(state)) {
+        state.pending = {
+          kind: "conditionOffer",
+          conditionId: card.instanceId,
+          reason: "A Strength 4+ Hero is ashore. Play Cunning to slip an Ally in for free?",
+        };
+        return state;
+      }
+      if (handAllies(state).length === 0) {
+        const why = "Cunning needs an Ally in hand.";
+        log(state, why);
+        state.bannerNote = why;
+      }
       return state;
     }
     if (card.defId === "obsession" && canPlayObsession(state)) {

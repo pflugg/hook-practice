@@ -136,8 +136,16 @@ export function strongestHeroInRealm(state: GameState): number {
   return Math.max(...heroes.map(({ hero }) => heroStrength(state, hero)));
 }
 
+export function handAllies(state: GameState): CardInstance[] {
+  return state.hand.filter((c) => def(c.defId).type === "ally");
+}
+
 export function canPlayCunning(state: GameState): boolean {
-  return state.hand.some((c) => c.defId === "cunning") && strongestHeroInRealm(state) >= 4;
+  return (
+    state.hand.some((c) => c.defId === "cunning") &&
+    strongestHeroInRealm(state) >= 4 &&
+    handAllies(state).length > 0
+  );
 }
 
 export function canPlayObsession(state: GameState): boolean {
@@ -369,6 +377,7 @@ export function vanquishableHeroes(state: GameState): { hero: CardInstance; loca
     if (pool.length === 0) return false;
     if (hero.defId === "lostBoys" && pool.length < 2) return false;
     const total = pool.reduce((sum, a) => sum + allyStrength(state, a.ally), 0);
+    // Equal Strength is legal: ally total >= heroStrength (2 vs 2 opens the clash).
     return total >= heroStrength(state, hero);
   });
 }
