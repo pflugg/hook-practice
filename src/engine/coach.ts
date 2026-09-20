@@ -20,6 +20,8 @@ import {
   playableHandCards,
   anyTauntInRealm,
   clashAndCrocLine,
+  cutlassStrapLine,
+  preferredAttachAlly,
   vanquishAllyPool,
   vanquishBlockedReason,
   vanquishableHeroes,
@@ -280,9 +282,22 @@ function playCta(state: GameState, card: CardInstance, phase: "open" | "pick" | 
   const name = cardName(card);
   const d = def(card.defId);
   if (d.id === "cutlass") {
-    if (phase === "open") return `Play ${name} (click Play a Card, then click ${name} in your hand, then strap it to an Ally).`;
-    if (phase === "pick") return `Play ${name} (click ${name} in your hand, then strap it to an Ally).`;
-    return `Strap ${name} to an Ally (click that Ally on the board).`;
+    const host = preferredAttachAlly(state);
+    if (!host) {
+      const need = cutlassStrapLine(state);
+      if (phase === "open") return `Play ${name} (click Play a Card, then click ${name} in your hand). ${need}`;
+      return need;
+    }
+    const ally = cardName(host.ally);
+    const place = host.location === "jollyRoger" ? "the Jolly Roger" : locName(host.location);
+    const how = `click ${ally} in the ally picker / drag Cutlass onto ${ally}`;
+    if (phase === "open") {
+      return `Play ${name} and strap it to ${ally} at ${place} (click Play a Card, then click ${name} in your hand, then ${how}).`;
+    }
+    if (phase === "pick") {
+      return `Play ${name} and strap it to ${ally} at ${place} (click ${name} in your hand, then ${how}).`;
+    }
+    return cutlassStrapLine(state);
   }
   if (d.type === "effect") {
     const pay = d.cost > 0 ? ", then click Pay with Power" : "";
@@ -316,7 +331,13 @@ function plannedAfterMove(state: GameState, dest: LocationId): string {
     const card = usefulPlay(next);
     if (card) {
       const d = def(card.defId);
-      if (d.type === "effect" || d.id === "cutlass") return `then play ${cardName(card)}`;
+      if (d.id === "cutlass") {
+        const host = preferredAttachAlly(next);
+        return host
+          ? `then ${cutlassStrapLine(next)}`
+          : `then play ${cardName(card)}`;
+      }
+      if (d.type === "effect") return `then play ${cardName(card)}`;
       return `then play ${cardName(card)} to ${locName(playHome(next, card))}`;
     }
     return "then take Play a Card";
@@ -390,7 +411,7 @@ function fullActionDo(state: GameState, slot: ActionSlot): string {
       const pick = ally ?? (pieces[0] ? { c: pieces[0], loc: findCardLocation(state, pieces[0].instanceId) } : null);
       const dest = pick?.loc ? towardRoger(pick.loc) : null;
       return pick
-        ? `Take Move Ally/Item at ${here} (click that action), then click ${cardName(pick.c)} and ${dest ? placeVerb(dest) : "Choose this place on a glowing square"} toward the Jolly Roger.`
+        ? `Take Move Ally/Item at ${here} (click that action), then click ${cardName(pick.c)} at ${pick.loc ? locName(pick.loc) : "this place"} and ${dest ? placeVerb(dest) : `Choose this place on ${locName("jollyRoger")}`} to slide toward the Jolly Roger.`
         : `Take Move Ally/Item at ${here} (click that action).`;
     }
     default:
@@ -649,13 +670,13 @@ function advisePending(state: GameState): CoachAdvice {
       );
     }
     case "playChooseAllyAttach": {
-      const allies = allAllies(state);
-      const atRoger = allies.find((a) => a.location === "jollyRoger");
-      const pick = atRoger ?? allies.sort((a, b) => allyStrength(state, b.ally) - allyStrength(state, a.ally))[0];
+      const pick = preferredAttachAlly(state);
       if (!pick) return say("Cancel", "There is no Ally to arm. Cancel and play a crew member first.", ["btn:cancel"], state);
+      const ally = cardName(pick.ally);
+      const place = pick.location === "jollyRoger" ? "the Jolly Roger" : locName(pick.location);
       return say(
-        `Strap the Cutlass to ${cardName(pick.ally)}`,
-        `Use the picker — tap “Strap Cutlass to ${cardName(pick.ally)}” — or click that Ally on the board. A stronger Ally on the ship makes Peter’s clash safer.`,
+        cutlassStrapLine(state),
+        `${ally} at ${place} is a legal attach the picker will accept. Click ${ally} in the ally picker or drag Cutlass onto ${ally}. +2 Strength there makes Peter’s clash safer.`,
         [`card:${pick.ally.instanceId}`, `btn:attach:${pick.ally.instanceId}`],
         state,
       );
@@ -780,8 +801,12 @@ function advisePending(state: GameState): CoachAdvice {
         .sort((a, b) => LOCATION_IDS.indexOf(b.loc) - LOCATION_IDS.indexOf(a.loc))[0];
       const pick = ally?.c ?? pieces[0];
       if (!pick) return say("Cancel", "Nothing useful to slide.", ["btn:cancel"], state);
+      const from = findCardLocation(state, pick.instanceId);
+      const dest = from ? towardRoger(from) : null;
       return say(
-        `Move ${cardName(pick)} toward the ship (click that card, then Choose this place on the glowing square toward the Jolly Roger).`,
+        dest && from
+          ? `Move ${cardName(pick)} from ${locName(from)} to ${locName(dest)} (click ${cardName(pick)}, then ${placeVerb(dest)}).`
+          : `Move ${cardName(pick)} (click that card, then ${dest ? placeVerb(dest) : placeVerb("jollyRoger")}).`,
         "Crew belongs at the Jolly Roger before Peter arrives.",
         [`card:${pick.instanceId}`],
         state,
@@ -867,7 +892,7 @@ function advisePending(state: GameState): CoachAdvice {
       const pick = allies[0] ?? allAllies(state)[0];
       if (!pick) return say("Cancel", "No Ally to reposition.", ["btn:cancel"], state);
       return say(
-        `Reposition ${cardName(pick.ally)} (click that Ally, then Choose this place toward the Jolly Roger).`,
+        `Reposition ${cardName(pick.ally)} at ${locName(pick.location)} (click ${cardName(pick.ally)}, then ${pick.location !== "jollyRoger" && towardRoger(pick.location) ? placeVerb(towardRoger(pick.location)!) : placeVerb("jollyRoger")}).`,
         "Aye Aye Sir also grants +2 Strength this turn — point that bonus at the ship if you can.",
         [`card:${pick.ally.instanceId}`],
         state,

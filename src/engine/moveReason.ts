@@ -11,6 +11,8 @@ import {
   heroStrength,
   mapInRealm,
   playableHandCards,
+  preferredAttachAlly,
+  cutlassStrapLine,
   promptText,
 } from "./queries";
 import { LOCATION_IDS, type CardInstance, type GameState, type Input, type LocationId } from "./types";
@@ -355,11 +357,17 @@ function playCardWhy(defId: string, state: GameState): { why: string; next: stri
         why: "Give Them a Scare peeks the top of Fate without finding Peter. Looking is not revealing: a peek will not force him onto the tree. It lets you send trouble to the Fate discard or stack Peter on top for the next real Fate flip.",
         next: "If Tick Tock or Splitting Headache is in the peek, discarding both is often kinder — they can still return when Fate reshuffles. If Peter is there, return him on top so the next Fate action can find him.",
       };
-    case "cutlass":
+    case "cutlass": {
+      const host = preferredAttachAlly(state);
+      const ally = host ? cardName(host.ally) : null;
+      const place = host ? (host.location === "jollyRoger" ? "the Jolly Roger" : locName(host.location)) : null;
       return {
-        why: "The Cutlass is +2 Strength on one Ally already ashore. That is how a thin ship becomes a honest clash without drawing another Brute.",
-        next: "Strap it to crew on the Jolly Roger, or to the Ally you will walk there. It needs an Ally in the realm — play a crew member first if the picker is empty.",
+        why: host
+          ? `The Cutlass is +2 Strength on ${ally} at ${place}. That is how a thin ship becomes a honest clash without drawing another Brute.`
+          : "The Cutlass is +2 Strength on one Ally already ashore. It needs a crew member in the realm first.",
+        next: cutlassStrapLine(state),
       };
+    }
     case "cannon":
       return {
         why: "The Cannon is a local Vanquish you can take from the place it sits. Useful for clearing Tick Tock or a covering Hero without standing on the Jolly Roger.",
@@ -815,7 +823,7 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
       `You chose ${name} from hand.`,
       lesson.why,
       card.defId === "cutlass"
-        ? "The picker will ask which Ally wears it. Cancel returns to Play a Card."
+        ? `${cutlassStrapLine(after)} Cancel returns to Play a Card.`
         : def(card.defId).type === "effect"
           ? lesson.next
           : `Click a glowing location next. ${lesson.next}`,

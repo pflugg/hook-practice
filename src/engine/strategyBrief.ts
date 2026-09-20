@@ -12,6 +12,8 @@ import {
   fateEmptyLine,
   mapInRealm,
   playableHandCards,
+  cutlassStrapLine,
+  preferredAttachAlly,
   vanquishableHeroes,
 } from "./queries";
 import { LOCATION_IDS, type CardInstance, type GameState, type LocationId } from "./types";
@@ -209,7 +211,12 @@ function thisMoment(state: GameState): string {
         ? "An Item is asking for its cost. The Never Land Map is in the realm, so you may spend Power or discard the Map instead. Once the tree is open, keeping the Map is usually wiser."
         : "This card is asking for its printed Power cost. Pay with Power to finish the play — there is no Map in the realm to substitute.";
     case "playChooseAllyAttach":
-      return "The Cutlass wants an Ally to wear it — that is +2 Strength on that crew. Use the picker and tap Strap Cutlass to the Ally you want, or click that Ally’s card on the board. Prefer someone already on the Jolly Roger, or the Ally you will walk there. Cancel puts you back on Play a Card if this was the wrong tool.";
+      {
+        const host = preferredAttachAlly(state);
+        return host
+          ? `${cutlassStrapLine(state)} ${cardName(host.ally)} ${host.location === "jollyRoger" ? "at the Jolly Roger" : `at ${locName(host.location)}`} is a legal attach. Cancel puts you back on Play a Card if this was the wrong tool.`
+          : "The Cutlass needs an Ally already ashore. Cancel and play a crew member first.";
+      }
     case "discardSelect":
       return "A Discard action lets you throw cards away so the deck can offer new ones. It still spends the action even if you toss nothing. Keep the Map. Keep hunt cards while Peter is hidden. Keep Allies you can still afford if the ship is light. Toss the rest — digging for the Map is how most opening voyages actually start.";
     case "vanquishHero":

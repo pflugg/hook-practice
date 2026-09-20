@@ -192,6 +192,27 @@ export function clashBesideCroc(state: GameState): {
   return null;
 }
 
+/** Same preference the Cutlass attach picker uses: ship first, then strongest legal Ally. */
+export function preferredAttachAlly(state: GameState): { ally: CardInstance; location: LocationId } | null {
+  const allies = allAllies(state);
+  if (!allies.length) return null;
+  const atRoger = allies.find((a) => a.location === "jollyRoger");
+  if (atRoger) return atRoger;
+  return [...allies].sort((a, b) => allyStrength(state, b.ally) - allyStrength(state, a.ally))[0] ?? null;
+}
+
+function atPlace(id: LocationId): string {
+  const name = locName(id);
+  return name === "Jolly Roger" ? "at the Jolly Roger" : `at ${name}`;
+}
+
+export function cutlassStrapLine(state: GameState): string {
+  const host = preferredAttachAlly(state);
+  if (!host) return "The Cutlass needs an Ally already ashore. Play a crew member first.";
+  const ally = cardName(host.ally);
+  return `Strap the Cutlass to ${ally} ${atPlace(host.location)} (click ${ally} in the ally picker / drag Cutlass onto ${ally}).`;
+}
+
 export function clashAndCrocLine(state: GameState): string {
   const pair = clashBesideCroc(state);
   if (!pair) return "";
@@ -462,7 +483,7 @@ export function promptText(state: GameState): string {
         `Click a glowing location to play ${cardName(findCard(state, p.cardId)!)}.`,
       );
     case "playChooseAllyAttach":
-      return "Use the picker to strap this to an Ally, or click that Ally on the board. Cancel returns to your hand.";
+      return `${cutlassStrapLine(state)} Cancel returns to your hand.`;
     case "playChoosePayment": {
       const card = findCard(state, p.cardId);
       const cost = card ? def(card.defId).cost : 0;
