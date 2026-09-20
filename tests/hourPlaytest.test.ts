@@ -148,6 +148,9 @@ describe("hour playtest Should: move-phase actions stay dark", () => {
     expect(after.phase).toBe("move");
     expect(after.pending).toBeNull();
     expect(explainSelection(state, { type: "selectAction", actionKey: "jr-vanquish" }, after)).toBeNull();
+    const stay = applyInput(state, { type: "selectLocation", locationId: "jollyRoger" });
+    expect(stay.villainLocation).toBe("jollyRoger");
+    expect(explainSelection(state, { type: "selectLocation", locationId: "jollyRoger" }, stay)).toBeNull();
   });
 });
 

@@ -358,3 +358,12 @@ export function hourPlaytestMoveScene(): GameState {
   state.pending = null;
   return state;
 }
+
+/** Hour-playtest Play-a-Card so Why can name live Peter Strength. */
+export function hourPlaytestWhyScene(): GameState {
+  const state = hourPlaytestTauntScene();
+  state.pending = { kind: "playChooseCard" };
+  state.phase = "resolving";
+  state.actionKey = "jr-play";
+  return state;
+}

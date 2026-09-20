@@ -51,6 +51,7 @@ import {
   tickTockReportScene,
   hourPlaytestMoveScene,
   hourPlaytestTauntScene,
+  hourPlaytestWhyScene,
   vanquishClashScene,
   vanquishLocalScene,
 } from "../engine/scenes";
@@ -831,6 +832,7 @@ function bootState(): GameState {
       if (scene === "lagoon") return lagoonCoverScene();
       if (scene === "hourtaunt") return hourPlaytestTauntScene();
       if (scene === "hourmove") return hourPlaytestMoveScene();
+      if (scene === "hourwhy") return hourPlaytestWhyScene();
     }
   } catch {
     /* ignore */

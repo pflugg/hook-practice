@@ -634,7 +634,7 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
 function explainLocation(before: GameState, after: GameState, locationId: LocationId): MoveReason | null {
   const p = before.pending;
   if (before.phase === "move" && !p) {
-    if (after.villainLocation !== locationId) return null;
+    if (before.villainLocation === locationId || after.villainLocation !== locationId) return null;
     const snap = after.pending?.kind === "fateReport" && after.pending.played?.defId === "tickTock" && /snaps/i.test(after.pending.note);
     return pack(
       `You moved the captain to ${locName(locationId)}.`,
