@@ -123,6 +123,7 @@ While a Play, Move a Hero, Move Ally/Item, Aye Aye, or Cutlass attach is open, g
 - `src/ui/` — original CSS/SVG interface
 - `tests/` — Vitest coverage for the objective chain
 - `RULES_NOTES.md` — intentional simplifications versus a full table game
+- `FIDELITY_AUDIT.md` — engine + teaching-copy compared to table Hook (base game)
 - `LEGAL.md` — unofficial-practice disclaimer
 
 ## Controls
