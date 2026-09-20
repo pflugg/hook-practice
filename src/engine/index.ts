@@ -16,6 +16,7 @@ export { CARDS, def } from "./cards";
 export { REALM, actionLabel, adjacentIds, locName } from "./realm";
 export {
   allyStrength,
+  actionsAreLive,
   availableActions,
   cardName,
   findCard,

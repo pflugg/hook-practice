@@ -277,10 +277,19 @@ export function coveringHero(state: GameState, id: LocationId): CardInstance | n
   return heroes[0] ?? null;
 }
 
-export function availableActions(state: GameState): ActionSlot[] {
+/** Printed / extra actions may be taken only on the action stretch — never during the required move. */
+export function actionsAreLive(state: GameState): boolean {
+  return state.phase === "actions" && !state.pending;
+}
+
+export function availableActions(
+  state: GameState,
+  opts?: { asIfOnActionStretch?: boolean },
+): ActionSlot[] {
   const locId = state.villainLocation;
   const loc = REALM[locId];
   const covered = coveringHero(state, locId) !== null;
+  const live = Boolean(opts?.asIfOnActionStretch || actionsAreLive(state));
   const slots: ActionSlot[] = loc.actions.map((printed) => {
     const isCovered = printed.row === "top" && covered;
     const used = state.usedActions.includes(printed.key);
@@ -293,7 +302,7 @@ export function availableActions(state: GameState): ActionSlot[] {
       amount: printed.amount,
       covered: isCovered,
       used,
-      available: !isCovered && !used && clashReady,
+      available: live && !isCovered && !used && clashReady,
       label: actionLabel(printed.kind, printed.amount),
     };
   });
@@ -318,7 +327,7 @@ export function availableActions(state: GameState): ActionSlot[] {
       amount: extra.kind === "gainPower" ? 1 : undefined,
       covered: false,
       used,
-      available: !used && extraReady,
+      available: live && !used && extraReady,
       label: extra.label,
       source: item.instanceId,
     });

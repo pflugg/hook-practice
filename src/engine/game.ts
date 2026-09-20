@@ -1090,6 +1090,7 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
 }
 
 function handleAction(state: GameState, actionKey: string): GameState {
+  if (state.phase === "move") return state;
   if (state.phase !== "actions" && !(state.phase === "resolving" && !state.pending)) return state;
   const slot = availableActions(state).find((a) => a.key === actionKey);
   if (!slot) return state;

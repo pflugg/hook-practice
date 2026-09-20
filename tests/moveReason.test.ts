@@ -101,6 +101,27 @@ describe("move reasons after selection", () => {
 });
 
 describe("idle vs coach/brief roles", () => {
+  it("does not credit Gain or Vanquish when applyInput only cleared a banner", () => {
+    const state = barePlayState();
+    state.villainLocation = "mermaidLagoon";
+    state.phase = "actions";
+    state.power = 2;
+    state.bannerNote = "A leftover prompt.";
+    const after = applyInput(state, { type: "selectAction", actionKey: "ml-gain" });
+    expect(after.power).toBe(5);
+    expect(explainSelection(state, { type: "selectAction", actionKey: "ml-gain" }, after)?.chose).toMatch(/Gain 3/);
+
+    const moving = barePlayState();
+    moving.villainLocation = "mermaidLagoon";
+    moving.phase = "move";
+    moving.power = 2;
+    moving.bannerNote = "Move the captain to a different unlocked location.";
+    const ignored = applyInput(moving, { type: "selectAction", actionKey: "ml-gain" });
+    expect(ignored.power).toBe(2);
+    expect(ignored.phase).toBe("move");
+    expect(explainSelection(moving, { type: "selectAction", actionKey: "ml-gain" }, ignored)).toBeNull();
+  });
+
   it("does not treat a no-op location click as a new reason", () => {
     const state = barePlayState();
     state.phase = "actions";
