@@ -249,6 +249,8 @@ Docs-first tonight on purpose. When you want engine work, this order repairs **t
 
 ## Tests
 
-`npm test` was run on this branch after the audit file landed. Results and tip SHA are recorded in the PR description and the commit that added this file.
+`npm test` (Vitest 3.2.7) on this branch: **26 files, 150 tests, all passed** (~4.4s).
+
+Audited engine is `main` `7b56748` (merge of PR #18). This PR is docs-only on `cursor/hook-fidelity-audit-f6d6`; the branch tip SHA is in the PR description.
 
 No engine or UI behavior was changed in this PR.
