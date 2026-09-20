@@ -3,9 +3,11 @@ import { locName } from "./realm";
 import {
   allHeroes,
   allyStrength,
+  anyTauntInRealm,
   availableActions,
   cardName,
   coveringHero,
+  hasTaunt,
   heroStrength,
   fateEmptyLine,
   mapInRealm,
@@ -19,6 +21,7 @@ export interface ObjectiveLine {
   label: string;
   done: boolean;
   status: string;
+  current?: boolean;
 }
 
 export interface StrategyBrief {
@@ -96,20 +99,38 @@ function objectiveLines(state: GameState): ObjectiveLine[] {
   let clashStatus: string;
   const need = peter ? heroStrength(state, peter.hero) : 8;
   const have = jrStrength(state);
+  const taunted = allHeroes(state).find(({ hero }) => hasTaunt(state, hero.instanceId));
+  const tauntBlocks = Boolean(taunted && anyTauntInRealm(state) && !ready);
   if (ready) {
-    clashStatus = `Ready. Allies at the Jolly Roger can meet Peter’s Strength (${need}). A Vanquish action on the ship completes the chain.`;
+    clashStatus = `Ready to vanquish. Allies at the Jolly Roger can meet Peter’s Strength (${need}). A Vanquish action on the ship completes the chain.`;
+  } else if (tauntBlocks && taunted) {
+    clashStatus = `Taunt is in the way: ${cardName(taunted.hero)} at ${locName(taunted.location)} must be vanquished first. Peter’s live Strength is ${need}; ship crew is about ${have}.`;
   } else if (atShip) {
     clashStatus = `Peter is on the ship, but the crew there totals about ${have} Strength against his ${need}. Play or slide more Allies onto the Jolly Roger before you open the clash.`;
   } else {
     clashStatus = `The winning clash only counts at the Jolly Roger. Station Allies there now (you have about ${have} Strength on the ship) so you are not scrambling after Peter arrives.`;
   }
 
-  return [
+  const clashDone = state.won || ready;
+  const lines: ObjectiveLine[] = [
     { key: "map", label: "Open Hangman’s Tree", done: mapDone, status: mapStatus },
-    { key: "peter", label: "Find Peter", done: peterDone, status: peterStatus },
-    { key: "walk", label: "Walk him to the ship", done: Boolean(atShip), status: walkStatus },
-    { key: "clash", label: "Vanquish him there", done: state.won || ready, status: clashStatus },
+    { key: "peter", label: peterDone ? "Peter found" : "Find Peter", done: peterDone, status: peterStatus },
+    {
+      key: "walk",
+      label: atShip ? "Peter is on the ship" : "Walk him to the ship",
+      done: Boolean(atShip),
+      status: walkStatus,
+    },
+    {
+      key: "clash",
+      label: ready ? "Ready to vanquish" : tauntBlocks ? "Taunt is in the way" : "Vanquish him there",
+      done: clashDone,
+      status: clashStatus,
+    },
   ];
+  const current = lines.find((line) => !line.done);
+  if (current) current.current = true;
+  return lines;
 }
 
 function whereYouAre(state: GameState): string {

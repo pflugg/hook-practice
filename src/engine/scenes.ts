@@ -320,3 +320,41 @@ export function vanquishLocalScene(): GameState {
   state.actionKey = "jr-vanquish";
   return state;
 }
+
+/** Hour-playtest Turn 15: Peter 9 on the ship, Taunt on Michael, Tick Tock one stop away. */
+export function hourPlaytestTauntScene(): GameState {
+  const state = createGame("easy", 1);
+  emptyRealm(state);
+  state.power = 5;
+  state.turn = 15;
+  state.hangmansUnlocked = true;
+  state.villainLocation = "jollyRoger";
+  state.phase = "actions";
+  const peter = inst(state, "peterPan");
+  const michael = inst(state, "michael");
+  const wendy = inst(state, "wendy");
+  const tick = inst(state, "tickTock");
+  const john = inst(state, "john");
+  const taunt = inst(state, "taunt");
+  state.locations.jollyRoger.heroes.push(peter);
+  state.locations.jollyRoger.allies.push(
+    inst(state, "boardingParty"),
+    inst(state, "pirateBrute"),
+    inst(state, "swashbuckler"),
+    inst(state, "swashbuckler"),
+  );
+  state.locations.skullRock.heroes.push(michael, wendy, tick, john);
+  state.attachments.push({ item: taunt, attachedTo: michael.instanceId });
+  state.peterPanRevealed = true;
+  state.peterPanLocation = "jollyRoger";
+  state.hand.push(inst(state, "giveThemAScare"), inst(state, "cannon"), inst(state, "ingeniousDevice"), inst(state, "swashbuckler"));
+  return state;
+}
+
+/** Hour-playtest required move: actions at the current stop must stay dark. */
+export function hourPlaytestMoveScene(): GameState {
+  const state = hourPlaytestTauntScene();
+  state.phase = "move";
+  state.pending = null;
+  return state;
+}

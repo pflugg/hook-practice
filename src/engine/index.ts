@@ -28,6 +28,7 @@ export {
   clashAndCrocLine,
   fateEmptyLine,
   promptText,
+  vanquishBlockedReason,
   vanquishClashMath,
   vanquishableHeroes,
 } from "./queries";

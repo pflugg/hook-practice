@@ -151,6 +151,8 @@ export interface GameState {
   log: LogEntry[];
   lastComputerFateNote: string;
   lastFateShow: FateShow | null;
+  /** Visible prompt banner for a refused or empty action (e.g. Vanquish with no legal Hero). */
+  bannerNote: string;
   actionKey?: string;
   heldCard?: CardInstance;
 }

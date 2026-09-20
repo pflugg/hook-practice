@@ -18,8 +18,10 @@ import {
   movableAlliesAndItems,
   movableHeroes,
   playableHandCards,
+  anyTauntInRealm,
   clashAndCrocLine,
   vanquishAllyPool,
+  vanquishBlockedReason,
   vanquishableHeroes,
 } from "./queries";
 import { highlightSet } from "./game";
@@ -149,6 +151,14 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
   const slideNow = Boolean(croc && crocCanSlideOnto(state, state.villainLocation) && heroSlideReady(state));
   const pair = clashAndCrocLine(state);
   const moveOrSlide = state.phase === "move" || heroSlideReady(state);
+  if (
+    state.phase === "actions" &&
+    anyTauntInRealm(state) &&
+    vanquishableHeroes(state).length === 0 &&
+    availableActions(state).some((a) => a.kind === "vanquish" && !a.used && !a.covered)
+  ) {
+    notes.push(vanquishBlockedReason(state));
+  }
   if (pair) {
     notes.push(pair);
   } else if (slideNow) {
@@ -466,6 +476,14 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
   }
 
   const peter = peterCard(state);
+  if (peter && peter.location === "jollyRoger" && anyTauntInRealm(state) && !peterReadyToFinish(state)) {
+    const mh = find("moveHero");
+    if (mh && mh.available && movableHeroes(state).length > 0) return mh;
+    const escort = usefulPlay(state);
+    if (escort && (escort.defId === "ingeniousDevice" || escort.defId === "ayeAyeSir" || escort.defId === "mrStarkey") && find("playCard")) {
+      return find("playCard")!;
+    }
+  }
   if (peter && state.hangmansUnlocked && peter.location !== "jollyRoger") {
     const mh = find("moveHero");
     if (mh && mh.available && movableHeroes(state).some((h) => h.defId === "peterPan")) return mh;
@@ -516,6 +534,15 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
 function actionWhy(state: GameState, slot: ActionSlot): string {
   if (slot.kind === "vanquish" && peterReadyToFinish(state)) {
     return "Peter is on the Jolly Roger and your Allies can meet his Strength. The clash there completes the objective.";
+  }
+  if (slot.kind === "vanquish" && anyTauntInRealm(state) && vanquishableHeroes(state).length === 0) {
+    return vanquishBlockedReason(state);
+  }
+  if (slot.kind === "playCard" && anyTauntInRealm(state) && vanquishableHeroes(state).length === 0) {
+    const card = usefulPlay(state);
+    if (card?.defId === "cannon") {
+      return `${vanquishBlockedReason(state)} Playing Cannon adds another Vanquish token — it does not ignore Taunt or add Strength.`;
+    }
   }
   if (slot.kind === "moveHero") {
     const step = peterStep(state);

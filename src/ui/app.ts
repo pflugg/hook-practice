@@ -49,6 +49,8 @@ import {
   peterSoftConfirmScene,
   tickTockOntoCaptainScene,
   tickTockReportScene,
+  hourPlaytestMoveScene,
+  hourPlaytestTauntScene,
   vanquishClashScene,
   vanquishLocalScene,
 } from "../engine/scenes";
@@ -153,14 +155,14 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
   const extras = id === state.villainLocation ? actions.filter((a) => a.row === "extra") : [];
   const top = printed.filter((a) => a.row === "top");
   const bottom = printed.filter((a) => a.row === "bottom");
-  const showLegalActs = state.villainLocation === id;
+  const showLegalActs = state.phase === "actions" && !state.pending && state.villainLocation === id;
 
   const actBtns = (list: typeof printed) =>
     `<div class="row">${list
       .map((a) => {
         const legalAct = showLegalActs && !locked && hi.has(`act:${a.key}`);
         const coachAct = legalAct && coached.has(`act:${a.key}`);
-        return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : ""} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${a.covered || a.used || !showLegalActs || locked ? "disabled" : ""}>${esc(a.label)}</button>`;
+        return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : ""} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${a.covered || a.used || !legalAct ? "disabled" : ""}>${esc(a.label)}</button>`;
       })
       .join("")}</div>`;
 
@@ -207,7 +209,10 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
       ${zone("Allies", cards("No crew stationed.", loc.allies))}
       ${zone("Items", cards("No gear here.", loc.items))}
       ${actBtns(bottom)}
-      ${extras.length ? `<div class="row">${extras.map((a) => `<button class="action ${!locked && hi.has(`act:${a.key}`) ? "is-legal" : ""} ${!locked && coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}" ${locked ? "disabled" : ""}>${esc(a.label)}</button>`).join("")}</div>` : ""}
+      ${extras.length ? `<div class="row">${extras.map((a) => {
+        const extraLegal = showLegalActs && !locked && hi.has(`act:${a.key}`);
+        return `<button class="action ${extraLegal ? "is-legal" : ""} ${extraLegal && coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}" ${locked || a.used || !extraLegal ? "disabled" : ""}>${esc(a.label)}</button>`;
+      }).join("")}</div>` : ""}
     </div>
   </section>`;
 }
@@ -598,9 +603,9 @@ function strategySidebar(brief: StrategyBrief): string {
       <ol class="brief-objectives">
         ${brief.objective
           .map(
-            (line) => `<li class="${line.done ? "is-done" : ""}">
+            (line) => `<li class="${line.done ? "is-done" : ""}${line.current ? " is-current" : ""}">
           <div class="brief-obj-title"><span class="brief-pip"></span><strong>${esc(line.label)}</strong></div>
-          <p>${esc(line.status)}</p>
+          ${line.done ? "" : `<p>${esc(line.status)}</p>`}
         </li>`,
           )
           .join("")}
@@ -824,6 +829,8 @@ function bootState(): GameState {
       if (scene === "fatepick") return easyFizzleScene();
       if (scene === "fatespent") return fateSpentScene();
       if (scene === "lagoon") return lagoonCoverScene();
+      if (scene === "hourtaunt") return hourPlaytestTauntScene();
+      if (scene === "hourmove") return hourPlaytestMoveScene();
     }
   } catch {
     /* ignore */
