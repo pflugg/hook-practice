@@ -57,3 +57,9 @@ export function give(state: GameState, defId: string): CardInstance {
   state.hand.push(card);
   return card;
 }
+
+export function attachTo(state: GameState, defId: string, heroId: string): CardInstance {
+  const card = inst(defId);
+  state.attachments.push({ item: card, attachedTo: heroId });
+  return card;
+}

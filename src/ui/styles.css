@@ -660,6 +660,12 @@ h1.wordmark {
   box-shadow: 0 0 8px var(--lagoon);
 }
 .brief-objectives li.is-done .brief-obj-title { color: #d8f4ea; }
+.brief-objectives li.is-done { padding-bottom: 4px; }
+.brief-objectives li.is-current .brief-pip {
+  background: #e8c36a;
+  box-shadow: 0 0 8px #e8c36a;
+}
+.brief-objectives li.is-current .brief-obj-title { color: #fff4d4; }
 .brief-objectives p { font-size: 14.5px; }
 
 .board-wrap { overflow-x: auto; padding: 12px 14px 8px; min-width: 0; max-width: 100%; flex: 1 1 auto; }

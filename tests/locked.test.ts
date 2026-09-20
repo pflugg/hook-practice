@@ -65,6 +65,8 @@ describe("hero coverage", () => {
     const next = applyInput(state, { type: "selectAction", actionKey: "jr-gain" });
     expect(next.power).toBe(state.power);
     const vanquish = applyInput(state, { type: "selectAction", actionKey: "jr-vanquish" });
-    expect(vanquish.pending?.kind === "vanquishHero" || vanquish.usedActions.includes("jr-vanquish")).toBe(true);
+    expect(vanquish.pending?.kind).not.toBe("vanquishHero");
+    expect(vanquish.usedActions.includes("jr-vanquish")).toBe(false);
+    expect(vanquish.bannerNote).toMatch(/Allies here total|No Hero/i);
   });
 });

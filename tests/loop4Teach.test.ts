@@ -27,15 +27,15 @@ describe("loop-4 Should teaching", () => {
     putAlly(state, "smee", "jollyRoger");
     give(state, "cannon");
 
-    const line = clashAndCrocLine(state);
-    expect(line).toMatch(/Tinker Bell is 2 and Smee is 4/);
-    expect(line).toMatch(/discards your hand/);
-    expect(promptText(state)).toContain(line);
+    expect(clashAndCrocLine(state)).toBe("");
+    expect(promptText(state)).not.toMatch(/standing here/);
 
     const advice = advise(state);
-    expect(advice.warning ?? "").toBe(line);
+    expect(advice.warning ?? "").toMatch(/Tick Tock/);
+    expect(advice.warning ?? "").not.toMatch(/standing here/);
 
     const snapped = applyInput(state, { type: "selectLocation", locationId: "jollyRoger" });
+    expect(clashAndCrocLine(snapped)).toMatch(/Tinker Bell is 2 and Smee is 4/);
     expect(snapped.log.some((e) => /Tick Tock snaps/.test(e.text) && /Tinker Bell is 2/.test(e.text))).toBe(true);
     if (snapped.pending?.kind !== "fateReport") throw new Error("expected snap report");
     expect(snapped.pending.note).toMatch(/Tick Tock snaps/);

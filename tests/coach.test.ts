@@ -323,6 +323,41 @@ describe("coach suggestions", () => {
     expectLegalHighlights(lagoon, lagoonAdvice.highlights);
   });
 
+  it("names a real Ally and place for Cutlass, never “best place”", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    state.power = 1;
+    const cutlass = give(state, "cutlass");
+    putAlly(state, "boardingParty", "jollyRoger");
+    putAlly(state, "swashbuckler", "skullRock");
+
+    const open = advise(state);
+    expect(open.do).toMatch(/Cutlass/);
+    expect(open.do).toMatch(/Boarding Party/);
+    expect(open.do).toMatch(/Jolly Roger/);
+    expect(open.do).not.toMatch(/best place/i);
+    expect(open.do).not.toMatch(/strap it to an Ally/i);
+    expectLegalHighlights(state, open.highlights);
+
+    const choosing = applyInput(state, { type: "selectAction", actionKey: "jr-play" });
+    const pick = advise(choosing);
+    expect(pick.do).toMatch(/Boarding Party/);
+    expect(pick.do).toMatch(/Jolly Roger/);
+    expect(pick.do).not.toMatch(/best place/i);
+    expectLegalHighlights(choosing, pick.highlights);
+
+    const attaching = applyInput(choosing, { type: "selectCard", instanceId: cutlass.instanceId });
+    expect(attaching.pending?.kind).toBe("playChooseAllyAttach");
+    const strap = advise(attaching);
+    expect(strap.do).toMatch(/Strap the Cutlass to Boarding Party at the Jolly Roger/);
+    expect(strap.do).toMatch(/click Boarding Party in the ally picker \/ drag Cutlass onto Boarding Party/);
+    expect(strap.do).not.toMatch(/best place/i);
+    expect(strap.why).toMatch(/Boarding Party at the Jolly Roger/);
+    expect(strap.why).not.toMatch(/best place|somewhere useful/i);
+    expectLegalHighlights(attaching, strap.highlights);
+  });
+
   it("recommends the ship clash when Peter is vanquishable at the Jolly Roger", () => {
     const state = barePlayState();
     state.hangmansUnlocked = true;

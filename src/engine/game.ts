@@ -30,6 +30,7 @@ import {
   playableHandCards,
   unlockedLocations,
   vanquishAllyPool,
+  vanquishBlockedReason,
   vanquishableHeroes,
 } from "./queries";
 import { locName } from "./realm";
@@ -78,6 +79,7 @@ export function titleState(): GameState {
     log: [],
     lastComputerFateNote: "",
     lastFateShow: null,
+    bannerNote: "",
   };
 }
 
@@ -772,6 +774,9 @@ export function createGame(difficulty: GameState["difficulty"] = "normal", seed 
 
 export function applyInput(prev: GameState, input: Input): GameState {
   const state = structuredClone(prev);
+  if (input.type !== "openHelp" && input.type !== "closeHelp") {
+    state.bannerNote = "";
+  }
 
   if (input.type === "start") {
     return createGame(input.difficulty, input.seed ?? Date.now());
@@ -1084,7 +1089,14 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
 function handleAction(state: GameState, actionKey: string): GameState {
   if (state.phase !== "actions" && !(state.phase === "resolving" && !state.pending)) return state;
   const slot = availableActions(state).find((a) => a.key === actionKey);
-  if (!slot || !slot.available) return state;
+  if (!slot) return state;
+  if (slot.kind === "vanquish" && !slot.used && !slot.covered && vanquishableHeroes(state).length === 0) {
+    const why = vanquishBlockedReason(state);
+    log(state, why);
+    state.bannerNote = why;
+    return state;
+  }
+  if (!slot.available) return state;
 
   if (slot.kind === "gainPower") {
     const amt = slot.amount ?? 1;
@@ -1112,11 +1124,6 @@ function handleAction(state: GameState, actionKey: string): GameState {
     return state;
   }
   if (slot.kind === "vanquish") {
-    if (vanquishableHeroes(state).length === 0) {
-      log(state, "No Hero can be vanquished right now.");
-      markActionUsed(state, slot.key);
-      return state;
-    }
     beginAction(state, slot.key, { kind: "vanquishHero" });
     return state;
   }

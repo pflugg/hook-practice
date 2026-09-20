@@ -26,8 +26,11 @@ export {
   playableHandCards,
   fateShowStillInPlay,
   clashAndCrocLine,
+  cutlassStrapLine,
   fateEmptyLine,
+  preferredAttachAlly,
   promptText,
+  vanquishBlockedReason,
   vanquishClashMath,
   vanquishableHeroes,
 } from "./queries";

@@ -192,10 +192,61 @@ export function clashBesideCroc(state: GameState): {
   return null;
 }
 
+/** Same preference the Cutlass attach picker uses: ship first, then strongest legal Ally. */
+export function preferredAttachAlly(state: GameState): { ally: CardInstance; location: LocationId } | null {
+  const allies = allAllies(state);
+  if (!allies.length) return null;
+  const atRoger = allies.find((a) => a.location === "jollyRoger");
+  if (atRoger) return atRoger;
+  return [...allies].sort((a, b) => allyStrength(state, b.ally) - allyStrength(state, a.ally))[0] ?? null;
+}
+
+function atPlace(id: LocationId): string {
+  const name = locName(id);
+  return name === "Jolly Roger" ? "at the Jolly Roger" : `at ${name}`;
+}
+
+export function cutlassStrapLine(state: GameState): string {
+  const host = preferredAttachAlly(state);
+  if (!host) return "The Cutlass needs an Ally already ashore. Play a crew member first.";
+  const ally = cardName(host.ally);
+  return `Strap the Cutlass to ${ally} ${atPlace(host.location)} (click ${ally} in the ally picker / drag Cutlass onto ${ally}).`;
+}
+
 export function clashAndCrocLine(state: GameState): string {
   const pair = clashBesideCroc(state);
   if (!pair) return "";
+  if (state.villainLocation !== pair.location) return "";
   return `${pair.heroName} is ${pair.heroNeed} and ${pair.allyName} is ${pair.allyHave}, but standing here, or sliding the crocodile onto you, discards your hand.`;
+}
+
+/** Why Vanquish is dark — Taunt first, then live Strength vs the Allies that can actually reach. */
+export function vanquishBlockedReason(state: GameState): string {
+  const taunted = allHeroes(state).find(({ hero }) => hasTaunt(state, hero.instanceId));
+  if (taunted) {
+    const pool = vanquishAllyPoolAt(state, taunted.location);
+    const have = pool.reduce((sum, a) => sum + allyStrength(state, a.ally), 0);
+    const need = heroStrength(state, taunted.hero);
+    const name = cardName(taunted.hero);
+    const place = locName(taunted.location);
+    if (!canVanquishAt(state, taunted.location)) {
+      return `Taunt: ${name} must be vanquished first. ${name} is at ${place} — stand there, or send a Boarding Party to that neighboring unlocked place. Allies who can reach him total ${have} vs his ${need}.`;
+    }
+    return `Taunt: ${name} must be vanquished first, and your Allies here total ${have} vs his ${need}.`;
+  }
+
+  const inRange = allHeroes(state).filter(({ location }) => canVanquishAt(state, location));
+  if (inRange.length === 0) {
+    return "No Hero is in range of a Vanquish here. Name a Hero at the captain’s place, or a neighboring unlocked Hero a Boarding Party can reach.";
+  }
+  const bits = inRange.map(({ hero, location }) => {
+    const pool = vanquishAllyPoolAt(state, location);
+    const have = pool.reduce((sum, a) => sum + allyStrength(state, a.ally), 0);
+    const need = heroStrength(state, hero);
+    const boys = hero.defId === "lostBoys" && pool.length < 2 ? " (Lost Boys need two Allies)" : "";
+    return `${cardName(hero)} is ${need} and your Allies here total ${have}${boys}`;
+  });
+  return `No Hero can be vanquished right now. ${bits.join("; ")}.`;
 }
 
 export function playableHandCards(state: GameState): CardInstance[] {
@@ -225,6 +276,8 @@ export function availableActions(state: GameState): ActionSlot[] {
   const slots: ActionSlot[] = loc.actions.map((printed) => {
     const isCovered = printed.row === "top" && covered;
     const used = state.usedActions.includes(printed.key);
+    const clashReady =
+      printed.kind !== "vanquish" || vanquishableHeroes(state).length > 0;
     return {
       key: printed.key,
       kind: printed.kind,
@@ -232,7 +285,7 @@ export function availableActions(state: GameState): ActionSlot[] {
       amount: printed.amount,
       covered: isCovered,
       used,
-      available: !isCovered && !used,
+      available: !isCovered && !used && clashReady,
       label: actionLabel(printed.kind, printed.amount),
     };
   });
@@ -249,6 +302,7 @@ export function availableActions(state: GameState): ActionSlot[] {
     if (!extra) continue;
     const key = `extra:${item.instanceId}`;
     const used = state.usedActions.includes(key);
+    const extraReady = extra.kind !== "vanquish" || vanquishableHeroes(state).length > 0;
     slots.push({
       key,
       kind: extra.kind,
@@ -256,7 +310,7 @@ export function availableActions(state: GameState): ActionSlot[] {
       amount: extra.kind === "gainPower" ? 1 : undefined,
       covered: false,
       used,
-      available: !used,
+      available: !used && extraReady,
       label: extra.label,
       source: item.instanceId,
     });
@@ -402,16 +456,21 @@ export function promptText(state: GameState): string {
   if (state.phase === "title") return "Choose a heading and set sail.";
   if (state.won) return "Peter Pan is vanquished at the Jolly Roger. The duel is yours.";
   if (state.lost) return state.loseReason || "The tide has turned against you.";
+  if (state.bannerNote) return state.bannerNote;
   if (state.phase === "move") {
     return withClashAndCroc(state, "Move the captain to a different unlocked location.");
   }
   const p = state.pending;
   if (!p) {
     if (state.phase === "actions") {
-      return withClashAndCroc(
-        state,
-        "Perform any available actions, play a ready Condition, or end the turn.",
-      );
+      const clashLocked =
+        availableActions(state).some((a) => a.kind === "vanquish" && !a.used && !a.covered) &&
+        vanquishableHeroes(state).length === 0 &&
+        (anyTauntInRealm(state) || allHeroes(state).some(({ location }) => canVanquishAt(state, location)));
+      const base = clashLocked
+        ? `Perform any available actions, play a ready Condition, or end the turn. ${vanquishBlockedReason(state)}`
+        : "Perform any available actions, play a ready Condition, or end the turn.";
+      return withClashAndCroc(state, base);
     }
     return "";
   }
@@ -424,7 +483,7 @@ export function promptText(state: GameState): string {
         `Click a glowing location to play ${cardName(findCard(state, p.cardId)!)}.`,
       );
     case "playChooseAllyAttach":
-      return "Use the picker to strap this to an Ally, or click that Ally on the board. Cancel returns to your hand.";
+      return `${cutlassStrapLine(state)} Cancel returns to your hand.`;
     case "playChoosePayment": {
       const card = findCard(state, p.cardId);
       const cost = card ? def(card.defId).cost : 0;

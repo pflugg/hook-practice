@@ -1,13 +1,18 @@
 import { def } from "./cards";
 import { locName } from "./realm";
 import {
+  allAllies,
+  allHeroes,
   availableActions,
   cardName,
   coveringHero,
   findCard,
   findCardLocation,
+  heroStrength,
   mapInRealm,
   playableHandCards,
+  preferredAttachAlly,
+  cutlassStrapLine,
   promptText,
 } from "./queries";
 import { LOCATION_IDS, type CardInstance, type GameState, type Input, type LocationId } from "./types";
@@ -26,28 +31,31 @@ export const IDLE_MOVE_REASON: MoveReason = {
   soft: true,
 };
 
+function isPlayPending(state: GameState): boolean {
+  const kind = state.pending?.kind;
+  return (
+    kind === "playChooseCard" ||
+    kind === "playChooseLocation" ||
+    kind === "playChoosePayment" ||
+    kind === "playChooseAllyAttach" ||
+    kind === "cunningAlly" ||
+    kind === "cunningLocation"
+  );
+}
+
 function isCardPickCopy(reason: MoveReason): boolean {
   return (
     /from hand/i.test(reason.chose) ||
     /You chose Worthy Opponent/i.test(reason.chose) ||
     /You opened Play a Card/i.test(reason.chose) ||
+    /Play .+ to .+ \(click/i.test(reason.chose) ||
     (/Worthy Opponent is a hunt/i.test(reason.why) && /chose|from hand/i.test(reason.chose))
   );
 }
 
 function isStaleReason(state: GameState, last: MoveReason): boolean {
-  const p = state.pending;
-  if (isCardPickCopy(last)) {
-    if (
-      p?.kind === "playChooseCard" ||
-      p?.kind === "playChooseLocation" ||
-      p?.kind === "playChoosePayment" ||
-      p?.kind === "playChooseAllyAttach" ||
-      p?.kind === "cunningAlly" ||
-      p?.kind === "cunningLocation"
-    ) {
-      return false;
-    }
+  if (isCardPickCopy(last) && !isPlayPending(state)) return true;
+  if (/You opened Vanquish/i.test(last.chose) && state.pending?.kind !== "vanquishHero" && state.pending?.kind !== "vanquishAllies") {
     return true;
   }
   return false;
@@ -256,6 +264,64 @@ function locationToolbox(id: LocationId): string {
   }
 }
 
+function peterLiveStrength(state: GameState): { n: number; line: string } {
+  const peter = allHeroes(state).find((h) => h.hero.defId === "peterPan");
+  if (!peter) {
+    return { n: 8, line: "Peter will be Strength 8 before Wendy or Pixie Dust" };
+  }
+  const n = heroStrength(state, peter.hero);
+  const wendy = LOCATION_IDS.some((id) => state.locations[id].heroes.some((h) => h.defId === "wendy"));
+  if (wendy) {
+    return { n, line: `Peter is Strength ${n} with Wendy’s +1` };
+  }
+  return { n, line: `Peter is Strength ${n}` };
+}
+
+function crewThatExists(state: GameState): { id: string; name: string; count: number }[] {
+  const counts = new Map<string, { name: string; count: number }>();
+  const bump = (defId: string) => {
+    const d = def(defId);
+    if (d.type !== "ally") return;
+    const cur = counts.get(d.id) ?? { name: d.name, count: 0 };
+    cur.count += 1;
+    counts.set(d.id, cur);
+  };
+  for (const { ally } of allAllies(state)) bump(ally.defId);
+  for (const card of state.hand) bump(card.defId);
+  return [...counts.entries()].map(([id, v]) => ({ id, name: v.name, count: v.count }));
+}
+
+function finishPeterPlan(state: GameState): string {
+  const { line } = peterLiveStrength(state);
+  const crew = crewThatExists(state);
+  const count = (id: string) => crew.find((c) => c.id === id)?.count ?? 0;
+  const names = crew.map((c) => (c.count > 1 ? `${c.count} ${c.name}s` : c.name));
+  const have = names.length ? names.join(", ") : "no Allies in the realm or hand";
+  const brutes = count("pirateBrute");
+  const smee = count("smee");
+  let plan: string;
+  if (brutes >= 2) {
+    plan = "The two Pirate Brutes you have will finish him on the Jolly Roger.";
+  } else if (brutes === 1 && smee) {
+    plan = "Your Pirate Brute and Smee will finish him on the Jolly Roger.";
+  } else if (brutes === 1) {
+    const rest = names.filter((n) => !/Pirate Brute/i.test(n));
+    plan = rest.length
+      ? `Your Pirate Brute plus ${rest.join(", ")} is how the ship clash is built.`
+      : "Your Pirate Brute is how the ship clash is built.";
+  } else if (smee) {
+    const rest = names.filter((n) => !/Smee/i.test(n));
+    plan = rest.length
+      ? `Smee plus ${rest.join(", ")} will finish him on the Jolly Roger.`
+      : "Smee will finish him on the Jolly Roger.";
+  } else if (crew.length) {
+    plan = `Your crew (${have}) is the Strength that will meet him.`;
+  } else {
+    plan = "Station crew on the Jolly Roger so Strength is waiting when he arrives.";
+  }
+  return `${line}. ${plan}`;
+}
+
 function playCardWhy(defId: string, state: GameState): { why: string; next: string } {
   switch (defId) {
     case "neverLandMap":
@@ -268,7 +334,7 @@ function playCardWhy(defId: string, state: GameState): { why: string; next: stri
     case "swashbuckler":
     case "boardingParty":
       return {
-        why: `${def(defId).name} is crew Strength. Peter is Strength 8 unbuffed; two Pirate Brutes, or Smee plus help, will finish him on the Jolly Roger. Stationing that Strength now is how the late-game clash arrives early.`,
+        why: `${def(defId).name} is crew Strength. ${finishPeterPlan(state)} Stationing that Strength now is how the late-game clash arrives early.`,
         next: "Drop Allies on the Jolly Roger whenever you can. Walking Peter across a thin ship is how voyages stall. Fate will try to cover rich actions and park Tick Tock on the path — keep the chain in mind while you stack.",
       };
     case "mrStarkey":
@@ -291,11 +357,17 @@ function playCardWhy(defId: string, state: GameState): { why: string; next: stri
         why: "Give Them a Scare peeks the top of Fate without finding Peter. Looking is not revealing: a peek will not force him onto the tree. It lets you send trouble to the Fate discard or stack Peter on top for the next real Fate flip.",
         next: "If Tick Tock or Splitting Headache is in the peek, discarding both is often kinder — they can still return when Fate reshuffles. If Peter is there, return him on top so the next Fate action can find him.",
       };
-    case "cutlass":
+    case "cutlass": {
+      const host = preferredAttachAlly(state);
+      const ally = host ? cardName(host.ally) : null;
+      const place = host ? (host.location === "jollyRoger" ? "the Jolly Roger" : locName(host.location)) : null;
       return {
-        why: "The Cutlass is +2 Strength on one Ally already ashore. That is how a thin ship becomes a honest clash without drawing another Brute.",
-        next: "Strap it to crew on the Jolly Roger, or to the Ally you will walk there. It needs an Ally in the realm — play a crew member first if the picker is empty.",
+        why: host
+          ? `The Cutlass is +2 Strength on ${ally} at ${place}. That is how a thin ship becomes a honest clash without drawing another Brute.`
+          : "The Cutlass is +2 Strength on one Ally already ashore. It needs a crew member in the realm first.",
+        next: cutlassStrapLine(state),
       };
+    }
     case "cannon":
       return {
         why: "The Cannon is a local Vanquish you can take from the place it sits. Useful for clearing Tick Tock or a covering Hero without standing on the Jolly Roger.",
@@ -407,7 +479,8 @@ function sameTable(before: GameState, after: GameState): boolean {
     before.usedActions.join() === after.usedActions.join() &&
     before.hand.length === after.hand.length &&
     before.won === after.won &&
-    before.lost === after.lost
+    before.lost === after.lost &&
+    (before.bannerNote ?? "") === (after.bannerNote ?? "")
   );
 }
 
@@ -477,6 +550,15 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
     return explainLocation(before, after, input.locationId);
   }
   if (input.type === "selectAction") {
+    if (before.phase !== "actions") return null;
+    if (after.bannerNote) {
+      return pack(
+        "Vanquish cannot name a Hero right now.",
+        after.bannerNote,
+        "Clear Taunt or bring more Strength to that Hero before you open the clash. The Vanquish action is still unused.",
+      );
+    }
+    if (sameTable(before, after)) return null;
     return explainAction(before, after, input.actionKey);
   }
   if (input.type === "selectCard") {
@@ -566,7 +648,7 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
 function explainLocation(before: GameState, after: GameState, locationId: LocationId): MoveReason | null {
   const p = before.pending;
   if (before.phase === "move" && !p) {
-    if (after.villainLocation !== locationId) return null;
+    if (before.villainLocation === locationId || after.villainLocation !== locationId) return null;
     const snap = after.pending?.kind === "fateReport" && after.pending.played?.defId === "tickTock" && /snaps/i.test(after.pending.note);
     return pack(
       `You moved the captain to ${locName(locationId)}.`,
@@ -635,7 +717,7 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
       `You slid that piece to ${locName(locationId)}.`,
       "This is logistics for the ship. Crew and loose gear on Skull Rock or the lagoon is late-game Strength that has not arrived yet.",
       locationId === "jollyRoger"
-        ? "Good — the clash lives here. Confirm you still have enough Strength for Peter (8 unbuffed, more if Wendy or dust is out)."
+        ? `Good — the clash lives here. Confirm you still have enough Strength for Peter (${peterLiveStrength(after).line}).`
         : "Another step later can still finish the delivery. Aye Aye’s +2 is only until the turn ends.",
     );
   }
@@ -741,7 +823,7 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
       `You chose ${name} from hand.`,
       lesson.why,
       card.defId === "cutlass"
-        ? "The picker will ask which Ally wears it. Cancel returns to Play a Card."
+        ? `${cutlassStrapLine(after)} Cancel returns to Play a Card.`
         : def(card.defId).type === "effect"
           ? lesson.next
           : `Click a glowing location next. ${lesson.next}`,
