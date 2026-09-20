@@ -7,6 +7,7 @@ import {
   findCard,
   findCardLocation,
   mapInRealm,
+  promptText,
 } from "./queries";
 import { LOCATION_IDS, type CardInstance, type GameState, type Input, type LocationId } from "./types";
 
@@ -23,6 +24,90 @@ export const IDLE_MOVE_REASON: MoveReason = {
   next: "The practice chain is always the same: play the Never Land Map to unlock Hangman’s Tree, find Peter, walk him to the Jolly Roger, and vanquish him there. Fate will try to cover useful actions and park trouble on the path.",
   soft: true,
 };
+
+function isCardPickCopy(reason: MoveReason): boolean {
+  return (
+    /from hand/i.test(reason.chose) ||
+    /You chose Worthy Opponent/i.test(reason.chose) ||
+    /You opened Play a Card/i.test(reason.chose) ||
+    (/Worthy Opponent is a hunt/i.test(reason.why) && /chose|from hand/i.test(reason.chose))
+  );
+}
+
+function isStaleReason(state: GameState, last: MoveReason): boolean {
+  const p = state.pending;
+  if (isCardPickCopy(last)) {
+    if (
+      p?.kind === "playChooseCard" ||
+      p?.kind === "playChooseLocation" ||
+      p?.kind === "playChoosePayment" ||
+      p?.kind === "playChooseAllyAttach" ||
+      p?.kind === "cunningAlly" ||
+      p?.kind === "cunningLocation"
+    ) {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+function explainCurrentMoment(state: GameState): MoveReason {
+  const p = state.pending;
+  if (state.phase === "actions" && !p) {
+    const live = availableActions(state).filter((a) => a.available);
+    const names = live.map((a) => a.label).join(", ") || "none still unused";
+    return pack(
+      `No new click this beat — you are on the action stretch at ${locName(state.villainLocation)}.`,
+      `${promptText(state)} Available right now: ${names}. ${chainLine(state)}`,
+      `Take an uncovered action that serves the next gate, or end the turn to refill and face Fate.${crocWatch(state)}`,
+      true,
+    );
+  }
+  if (p?.kind === "worthyLocation") {
+    const hero = state.heldCard ?? findCard(state, p.heroId);
+    const name = hero ? cardName(hero) : "the Hero";
+    return pack(
+      `Worthy Opponent found ${name}.`,
+      hero?.defId === "tickTock"
+        ? "Park the crocodile off Mermaid Lagoon and Hangman’s Tree so Power and escort stay usable."
+        : `Seat ${name} where they cover the fewest actions you still need. ${chainLine(state)}`,
+      "Then you return to the action stretch at this stop.",
+    );
+  }
+  if (p?.kind === "fateReport") {
+    const played = p.played;
+    if (played) {
+      const lesson = fateCardLesson(played, p.note, heroSeat(state, played));
+      return pack(
+        p.resume === "nextTurn"
+          ? `Fate played ${def(played.defId).name}.`
+          : `Read ${def(played.defId).name} before you continue.`,
+        lesson.why,
+        lesson.next,
+      );
+    }
+    return pack("Fate has something to read.", p.note || promptText(state), "Acknowledge, then take the next legal click.");
+  }
+  if (p?.kind === "playChooseCard") {
+    return pack(
+      "You opened Play a Card.",
+      "Affordable cards in hand are the legal picks. The Map opens the tree. Hunt cards fish Fate. Allies belong on the Jolly Roger.",
+      "Click a glowing card, or cancel to keep the rest of this stop.",
+    );
+  }
+  return {
+    ...IDLE_MOVE_REASON,
+    why: `${promptText(state)} ${IDLE_MOVE_REASON.why}`,
+  };
+}
+
+/** Keep Why-this-move aligned with the current prompt — card-pick copy must not linger after Play resolves. */
+export function liveMoveReason(state: GameState, last: MoveReason | null): MoveReason {
+  if (state.phase === "title") return IDLE_MOVE_REASON;
+  if (!last || isStaleReason(state, last)) return explainCurrentMoment(state);
+  return last;
+}
 
 function tickTockAt(state: GameState): LocationId | null {
   for (const id of LOCATION_IDS) {
@@ -538,6 +623,23 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
 
   if (p.kind === "playChooseCard") {
     if (!card) return null;
+    if (
+      after.pending?.kind &&
+      after.pending.kind !== "playChooseCard" &&
+      after.pending.kind !== "playChooseLocation" &&
+      after.pending.kind !== "playChoosePayment" &&
+      after.pending.kind !== "playChooseAllyAttach"
+    ) {
+      return liveMoveReason(after, null);
+    }
+    if (after.phase === "actions" && !after.pending) {
+      const lesson = playCardWhy(card.defId, after);
+      return pack(
+        `You played ${name}.`,
+        `${lesson.why} That Play action is spent — you are back on the action stretch.`,
+        lesson.next,
+      );
+    }
     const lesson = playCardWhy(card.defId, after);
     return pack(
       `You chose ${name} from hand.`,

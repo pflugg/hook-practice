@@ -43,4 +43,4 @@ export {
 } from "./game";
 export { advise, type CoachAdvice } from "./coach";
 export { strategyBrief, type ObjectiveLine, type StrategyBrief } from "./strategyBrief";
-export { explainSelection, IDLE_MOVE_REASON, type MoveReason } from "./moveReason";
+export { explainSelection, IDLE_MOVE_REASON, liveMoveReason, type MoveReason } from "./moveReason";

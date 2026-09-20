@@ -22,6 +22,7 @@ import {
   vanquishAllyPool,
   vanquishableHeroes,
 } from "./queries";
+import { highlightSet } from "./game";
 import { LOCATION_IDS, type ActionSlot, type CardInstance, type GameState, type LocationId } from "./types";
 
 export interface CoachAdvice {
@@ -288,8 +289,12 @@ function usefulPlay(state: GameState): CardInstance | null {
   return playable[0] ?? null;
 }
 
+function liveActions(state: GameState): ActionSlot[] {
+  return availableActions(state).filter((a) => a.available);
+}
+
 function pickAction(state: GameState): ActionSlot | "end" | null {
-  const acts = availableActions(state).filter((a) => a.available);
+  const acts = liveActions(state);
   if (acts.length === 0) return "end";
 
   const find = (kind: ActionSlot["kind"]) => acts.find((a) => a.kind === kind);
@@ -302,7 +307,7 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
   const peter = peterCard(state);
   if (peter && state.hangmansUnlocked && peter.location !== "jollyRoger") {
     const mh = find("moveHero");
-    if (mh && movableHeroes(state).some((h) => h.defId === "peterPan")) return mh;
+    if (mh && mh.available && movableHeroes(state).some((h) => h.defId === "peterPan")) return mh;
   }
 
   if (playableMap(state)) {
@@ -370,10 +375,15 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
     }
   }
   if (slot.kind === "gainPower") {
+    const tokens = liveActions(state).filter((a) => a.kind === "gainPower");
+    const tokenLine =
+      tokens.length > 1
+        ? ` Power tokens you can still take here: ${tokens.map((t) => t.label).join(", ")}.`
+        : ` This token is ${slot.label}.`;
     if (needPowerForMap(state)) {
-      return "Bank Power now so the Never Land Map is affordable. Allies for the final clash will want a reserve too.";
+      return `Bank Power now so the Never Land Map is affordable. Allies for the final clash will want a reserve too.${tokenLine}`;
     }
-    return "Bank Power as a reserve for the next Item or Ally you draw. That is why Gain still matters even when the Map is not in hand.";
+    return `Bank Power as a reserve for the next Item or Ally you draw. That is why ${slot.label} still matters even when the Map is not in hand.${tokenLine}`;
   }
   if (slot.kind === "discard") {
     return "Toss cards you do not need so the deck can yield the Never Land Map — the tree stays locked without it.";
@@ -613,8 +623,15 @@ function advisePending(state: GameState): CoachAdvice {
     }
     case "moveHeroSelect":
     case "starkeyHero": {
-      const peter = movableHeroes(state).find((h) => h.defId === "peterPan");
-      if (peter && state.hangmansUnlocked) {
+      const legalHeroes =
+        p.kind === "starkeyHero"
+          ? (() => {
+              const loc = findCardLocation(state, p.starkeyId);
+              return loc ? state.locations[loc].heroes : [];
+            })()
+          : movableHeroes(state);
+      const peter = legalHeroes.find((h) => h.defId === "peterPan");
+      if (peter && (p.kind === "starkeyHero" || state.hangmansUnlocked)) {
         return say(
           "Move Peter Pan toward the Jolly Roger",
           "He travels one unlocked step at a time. The win only counts if you vanquish him on the ship.",
@@ -622,8 +639,8 @@ function advisePending(state: GameState): CoachAdvice {
           state,
         );
       }
-      const croc = movableHeroes(state).find((h) => h.defId === "tickTock");
-      const pick = croc ?? movableHeroes(state)[0];
+      const croc = legalHeroes.find((h) => h.defId === "tickTock");
+      const pick = croc ?? legalHeroes[0];
       if (!pick) return say("Cancel", "No Hero can step right now.", ["btn:cancel"], state);
       return say(
         `Move ${cardName(pick)}`,
@@ -867,7 +884,29 @@ function advisePending(state: GameState): CoachAdvice {
   }
 }
 
-export function advise(state: GameState): CoachAdvice {
+function clampToLegal(state: GameState, advice: CoachAdvice): CoachAdvice {
+  const legal = highlightSet(state);
+  const highlights = advice.highlights.filter((key) => key.startsWith("btn:") || legal.has(key));
+  const cleaned = highlights.length === advice.highlights.length ? advice : { ...advice, highlights };
+
+  if (state.phase === "actions" && !state.pending) {
+    const acts = liveActions(state);
+    const wantsHeroWalk = /Move a Hero|Move Peter/i.test(cleaned.do);
+    if (wantsHeroWalk && !acts.some((a) => a.kind === "moveHero")) {
+      return adviseActions(state);
+    }
+    if (cleaned.do.startsWith("Take ")) {
+      const label = cleaned.do.slice("Take ".length);
+      if (!acts.some((a) => a.label === label)) {
+        return adviseActions(state);
+      }
+    }
+  }
+
+  return cleaned;
+}
+
+function adviseUnchecked(state: GameState): CoachAdvice {
   if (state.phase === "title") {
     return {
       do: "Start a Tutorial voyage",
@@ -893,4 +932,8 @@ export function advise(state: GameState): CoachAdvice {
   if (state.pending) return advisePending(state);
   if (state.phase === "actions") return adviseActions(state);
   return say("Watch the prompt", "The next legal click will light up as soon as the realm is ready.", [], state);
+}
+
+export function advise(state: GameState): CoachAdvice {
+  return clampToLegal(state, adviseUnchecked(state));
 }
