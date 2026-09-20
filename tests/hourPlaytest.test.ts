@@ -7,12 +7,15 @@ import { applyInput, highlightSet } from "../src/engine/game";
 import { explainSelection, liveMoveReason } from "../src/engine/moveReason";
 import {
   availableActions,
+  canPlayCunning,
   clashAndCrocLine,
   heroStrength,
   promptText,
+  vanquishClashMath,
   vanquishableHeroes,
 } from "../src/engine/queries";
 import { strategyBrief } from "../src/engine/strategyBrief";
+import { hourEqualVanquishScene } from "../src/engine/scenes";
 import { renderPlay } from "../src/ui/app";
 import { attachTo, barePlayState, give, putAlly, putHero } from "./helpers";
 
@@ -129,6 +132,82 @@ describe("hour playtest Must: Why-text uses the live board", () => {
   });
 });
 
+describe("hour playtest Must: equal-strength vanquish opens the clash", () => {
+  it("opens Tinker Bell 2 vs Swashbuckler 2 at the same place and never burns an empty Vanquish", () => {
+    const state = hourEqualVanquishScene();
+    const tinker = state.locations.jollyRoger.heroes.find((h) => h.defId === "tinkerBell");
+    const swash = state.locations.jollyRoger.allies.find((a) => a.defId === "swashbuckler");
+    expect(tinker).toBeTruthy();
+    expect(swash).toBeTruthy();
+    expect(heroStrength(state, tinker!)).toBe(2);
+    expect(vanquishableHeroes(state).map((h) => h.hero.defId)).toEqual(["tinkerBell"]);
+    expect(availableActions(state).find((a) => a.key === "jr-vanquish")?.available).toBe(true);
+
+    const opened = applyInput(state, { type: "selectAction", actionKey: "jr-vanquish" });
+    expect(opened.pending?.kind).toBe("vanquishHero");
+    expect(opened.usedActions).not.toContain("jr-vanquish");
+    expect(opened.bannerNote).toBe("");
+    expect(opened.log.some((e) => e.text === "No Hero can be vanquished right now.")).toBe(false);
+
+    const named = applyInput(opened, { type: "selectCard", instanceId: tinker!.instanceId });
+    expect(named.pending?.kind).toBe("vanquishAllies");
+    expect(promptText(named)).toMatch(/Clash Strength 0 \/ 2/);
+
+    const picked = applyInput(named, { type: "selectCard", instanceId: swash!.instanceId });
+    expect(vanquishClashMath(picked)).toMatchObject({ need: 2, selected: 2, ready: true });
+    expect(promptText(picked)).toMatch(/Clash Strength 2 \/ 2/);
+
+    const done = applyInput(picked, { type: "confirm" });
+    expect(done.locations.jollyRoger.heroes.some((h) => h.defId === "tinkerBell")).toBe(false);
+    expect(done.usedActions).toContain("jr-vanquish");
+
+    const empty = barePlayState();
+    empty.villainLocation = "jollyRoger";
+    empty.phase = "actions";
+    putHero(empty, "tinkerBell", "jollyRoger");
+    expect(vanquishableHeroes(empty)).toEqual([]);
+    const refused = applyInput(empty, { type: "selectAction", actionKey: "jr-vanquish" });
+    expect(refused.pending).toBeNull();
+    expect(refused.usedActions).not.toContain("jr-vanquish");
+    expect(refused.bannerNote).toMatch(/Tinker Bell is 2 and your Allies here total 0/);
+  });
+});
+
+describe("hour playtest Must: Cunning stays put without an Ally", () => {
+  it("does not offer Play it or a free-Ally coach when the hand has no Ally", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    state.power = 2;
+    putHero(state, "lostBoys", "skullRock");
+    const cunning = give(state, "cunning");
+    give(state, "hooksCase");
+    expect(canPlayCunning(state)).toBe(false);
+    expect(highlightSet(state).has(`card:${cunning.instanceId}`)).toBe(false);
+
+    const html = renderPlay(state, { coachEnabled: true, briefEnabled: false, reasonsEnabled: true });
+    expect(html).not.toMatch(/Play it/);
+    expect(html).not.toMatch(/A Condition is ready/);
+    expect(advise(state).why).not.toMatch(/free Ally now is a gift/);
+    expect(advise(state).do).not.toMatch(/Play the Condition|Cunning/);
+
+    const clicked = applyInput(state, { type: "selectCard", instanceId: cunning.instanceId });
+    expect(clicked.pending).toBeNull();
+    expect(clicked.hand.some((c) => c.instanceId === cunning.instanceId)).toBe(true);
+    expect(clicked.bannerNote).toMatch(/Cunning needs an Ally in hand/);
+    expect(clicked.villainDiscard.some((c) => c.instanceId === cunning.instanceId)).toBe(false);
+
+    const forced = structuredClone(clicked);
+    forced.pending = { kind: "conditionOffer", conditionId: cunning.instanceId, reason: "Play Cunning?" };
+    const accepted = applyInput(forced, { type: "acceptCondition" });
+    expect(accepted.hand.some((c) => c.instanceId === cunning.instanceId)).toBe(true);
+    expect(accepted.pending).toBeNull();
+    expect(accepted.bannerNote).toMatch(/Cunning needs an Ally in hand/);
+    expect(accepted.villainDiscard.some((c) => c.instanceId === cunning.instanceId)).toBe(false);
+    expect(explainSelection(forced, { type: "acceptCondition" }, accepted)?.chose).toMatch(/stays in hand/);
+  });
+});
+
 describe("hour playtest Should: move-phase actions stay dark", () => {
   it("disables printed and extra actions during the required move and writes no post-selection", () => {
     const state = barePlayState();
@@ -151,6 +230,21 @@ describe("hour playtest Should: move-phase actions stay dark", () => {
     const stay = applyInput(state, { type: "selectLocation", locationId: "jollyRoger" });
     expect(stay.villainLocation).toBe("jollyRoger");
     expect(explainSelection(state, { type: "selectLocation", locationId: "jollyRoger" }, stay)).toBeNull();
+
+    const moving = barePlayState();
+    moving.hangmansUnlocked = true;
+    moving.villainLocation = "mermaidLagoon";
+    moving.phase = "move";
+    moving.power = 2;
+    const gainHtml = renderPlay(moving, { coachEnabled: true, briefEnabled: false, reasonsEnabled: true });
+    expect(gainHtml).toMatch(/data-act="ml-gain"[^>]*disabled|disabled[^>]*data-act="ml-gain"/);
+    const ghostGain = applyInput(moving, { type: "selectAction", actionKey: "ml-gain" });
+    expect(ghostGain.phase).toBe("move");
+    expect(ghostGain.power).toBe(2);
+    expect(ghostGain.usedActions).not.toContain("ml-gain");
+    const ghostWhy = explainSelection(moving, { type: "selectAction", actionKey: "ml-gain" }, ghostGain);
+    expect(ghostWhy).toBeNull();
+    expect(ghostWhy?.chose ?? "").not.toMatch(/You took Gain/);
   });
 });
 
