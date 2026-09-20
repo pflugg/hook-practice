@@ -7,6 +7,7 @@ import {
   findCard,
   findCardLocation,
   mapInRealm,
+  playableHandCards,
   promptText,
 } from "./queries";
 import { LOCATION_IDS, type CardInstance, type GameState, type Input, type LocationId } from "./types";
@@ -52,6 +53,19 @@ function isStaleReason(state: GameState, last: MoveReason): boolean {
   return false;
 }
 
+function placeVerb(id: LocationId): string {
+  switch (id) {
+    case "jollyRoger":
+      return "Choose this place on the ship";
+    case "skullRock":
+      return "Choose this place on Skull Rock";
+    case "mermaidLagoon":
+      return "Choose this place on the lagoon";
+    case "hangmansTree":
+      return "Choose this place on Hangman’s Tree";
+  }
+}
+
 function explainCurrentMoment(state: GameState): MoveReason {
   const p = state.pending;
   if (state.phase === "actions" && !p) {
@@ -64,14 +78,101 @@ function explainCurrentMoment(state: GameState): MoveReason {
       true,
     );
   }
+  if (p?.kind === "playChooseCard") {
+    const playable = playableHandCards(state);
+    const map = playable.find((c) => c.defId === "neverLandMap");
+    const ally = playable.find((c) => def(c.defId).type === "ally");
+    const card = map ?? ally ?? playable[0];
+    const name = card ? cardName(card) : "a glowing card";
+    const dest =
+      card && def(card.defId).type === "ally"
+        ? "jollyRoger"
+        : state.villainLocation;
+    return pack(
+      `You opened Play a Card at ${locName(state.villainLocation)}.`,
+      `Click ${name} in your hand — affordable cards are outlined in gold. ${
+        card && def(card.defId).type === "ally"
+          ? `${name} belongs on the Jolly Roger so Strength is waiting.`
+          : card?.defId === "neverLandMap"
+            ? "The Map can sit on any unlocked square — playing it is what opens Hangman’s Tree."
+            : "Pick the card that serves the Map, the escort, or the ship clash."
+      } ${chainLine(state)}`,
+      card && def(card.defId).type !== "effect" && card.defId !== "cutlass"
+        ? `After you click ${name}, click ${placeVerb(dest)}.`
+        : `After you click ${name}, follow the next prompt (pay, strap, or the hunt resolves). Cancel returns you to the action stretch.`,
+    );
+  }
+  if (p?.kind === "playChooseLocation") {
+    const card = findCard(state, p.cardId);
+    const name = card ? cardName(card) : "that card";
+    const dest =
+      card && (def(card.defId).type === "ally" || card.defId === "cannon" || card.defId === "hooksCase")
+        ? "jollyRoger"
+        : state.villainLocation;
+    return pack(
+      `You chose ${name} and still need a place.`,
+      `${promptText(state)} Click ${placeVerb(dest)} to drop ${name} on ${locName(dest)}. Allies and ship gear want the Jolly Roger; the Map can sit anywhere unlocked. ${chainLine(state)}`,
+      `If a payment prompt appears next, click Pay with Power (or Cancel to keep the rest of this stop).`,
+    );
+  }
+  if (p?.kind === "playChoosePayment") {
+    const card = findCard(state, p.cardId);
+    const name = card ? cardName(card) : "this card";
+    const cost = card ? def(card.defId).cost : 0;
+    return pack(
+      `You still owe Power for ${name}.`,
+      `${name} costs ${cost} and you have ${state.power}. Click Pay with Power to finish the play${mapInRealm(state) ? ", or Discard the Map if the tree is already open and you are short" : ""}.`,
+      "After you pay, the card lands and you return to the action stretch at this stop.",
+    );
+  }
+  if (p?.kind === "moveHeroSelect" || p?.kind === "starkeyHero") {
+    return pack(
+      "You opened a Hero walk.",
+      `${promptText(state)} Click Peter Pan if he is glowing, then Choose this place on the adjacent square toward the Jolly Roger — never away, and never a mid-path clash.`,
+      "Other Heroes are worth moving only to uncover a top-row action or to ease Tick Tock off your path.",
+    );
+  }
+  if (p?.kind === "moveHeroDest" || p?.kind === "starkeyDest") {
+    const hero = findCard(state, p.heroId);
+    const name = hero ? cardName(hero) : "that Hero";
+    return pack(
+      `You picked ${name} to walk.`,
+      `${promptText(state)} Click Choose this place on the glowing adjacent square${hero?.defId === "peterPan" ? " toward the Jolly Roger" : ""}.`,
+      hero?.defId === "peterPan"
+        ? "Each step west is the escort you are practicing. Do not vanquish him anywhere except the ship."
+        : `${chainLine(state)}${crocWatch(state)}`,
+    );
+  }
+  if (p?.kind === "vanquishHero") {
+    return pack(
+      `You opened Vanquish at ${locName(state.villainLocation)}.`,
+      `${promptText(state)} Click the glowing Hero you mean to clash — Peter Pan only on the Jolly Roger. Then tap Allies until Strength meets him and Confirm.`,
+      "Cancel if the glowing target is Peter away from the ship.",
+    );
+  }
+  if (p?.kind === "vanquishAllies") {
+    return pack(
+      "You named a vanquish target.",
+      `${promptText(state)} Click glowing Allies until the Strength meter meets the Hero, then click Confirm.`,
+      "You do not have to spend every Ally if a smaller group meets the number.",
+    );
+  }
+  if (p?.kind === "discardSelect") {
+    return pack(
+      `You opened Discard at ${locName(state.villainLocation)}.`,
+      `${promptText(state)} Click cards in hand to mark them, then click Confirm. Discarding none still spends the action. Keep the Map and hunt cards while Peter is hidden.`,
+      `${chainLine(state)}`,
+    );
+  }
   if (p?.kind === "worthyLocation") {
     const hero = state.heldCard ?? findCard(state, p.heroId);
     const name = hero ? cardName(hero) : "the Hero";
+    const dest = hero?.defId === "tickTock" ? "skullRock" : "jollyRoger";
     return pack(
       `Worthy Opponent found ${name}.`,
       hero?.defId === "tickTock"
-        ? "Park the crocodile off Mermaid Lagoon and Hangman’s Tree so Power and escort stay usable."
-        : `Seat ${name} where they cover the fewest actions you still need. ${chainLine(state)}`,
+        ? `Click ${placeVerb("skullRock")} or another quiet unlocked square — not Mermaid Lagoon or Hangman’s Tree — so Power and escort stay usable.`
+        : `Click ${placeVerb(dest)} to seat ${name} where they cover the fewest actions you still need. ${chainLine(state)}`,
       "Then you return to the action stretch at this stop.",
     );
   }
@@ -83,22 +184,17 @@ function explainCurrentMoment(state: GameState): MoveReason {
         p.resume === "nextTurn"
           ? `Fate played ${def(played.defId).name}.`
           : `Read ${def(played.defId).name} before you continue.`,
-        lesson.why,
+        `${lesson.why} Click Continue when you have read the full text.`,
         lesson.next,
       );
     }
-    return pack("Fate has something to read.", p.note || promptText(state), "Acknowledge, then take the next legal click.");
-  }
-  if (p?.kind === "playChooseCard") {
-    return pack(
-      "You opened Play a Card.",
-      "Affordable cards in hand are the legal picks. The Map opens the tree. Hunt cards fish Fate. Allies belong on the Jolly Roger.",
-      "Click a glowing card, or cancel to keep the rest of this stop.",
-    );
+    return pack("Fate has something to read.", p.note || promptText(state), "Click Continue, then take the next legal click.");
   }
   return {
     ...IDLE_MOVE_REASON,
+    chose: promptText(state) || IDLE_MOVE_REASON.chose,
     why: `${promptText(state)} ${IDLE_MOVE_REASON.why}`,
+    next: "Click the glowing card, place, or button the prompt names.",
   };
 }
 
@@ -570,8 +666,8 @@ function explainAction(before: GameState, after: GameState, actionKey: string): 
     case "playCard":
       return pack(
         `You opened Play a Card at ${here}.`,
-        "This is not “play something because it glows.” The Map opens the tree. Allies belong on the Jolly Roger. Hunt cards fish Fate. Escort pieces matter after the hideout is open.",
-        "Affordable cards are outlined. Cancel returns you to the action stretch if this was the wrong tool.",
+        "This is not “play something because it glows.” Click a glowing card in your hand next. The Map opens the tree. Allies belong on the Jolly Roger. Hunt cards fish Fate. Escort pieces matter after the hideout is open.",
+        "Affordable cards are outlined. After you click the card, click Choose this place on the square you want (Allies want the Jolly Roger). Cancel returns you to the action stretch if this was the wrong tool.",
       );
     case "fate":
       return pack(
@@ -588,7 +684,7 @@ function explainAction(before: GameState, after: GameState, actionKey: string): 
     case "moveHero":
       return pack(
         `You opened Move a Hero at ${here}.`,
-        "This is a one-step walk on the unlocked realm. The educational job is almost always Peter: slide him toward the Jolly Roger, never away, and never clash him mid-path.",
+        "Click the glowing Hero next — almost always Peter Pan. Then click Choose this place on the adjacent unlocked square toward the Jolly Roger, never away, and never a mid-path clash.",
         "Other Heroes are worth moving only to uncover a top-row action you still need, or to ease Tick Tock off a place you must visit.",
       );
     case "moveItemAlly":

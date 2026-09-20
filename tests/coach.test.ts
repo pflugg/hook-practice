@@ -43,6 +43,8 @@ describe("coach suggestions", () => {
 
     const before = advise(state);
     expect(before.do).toMatch(/Play a Card/i);
+    expect(before.do).toMatch(/Never Land Map/);
+    expect(before.do).toMatch(/click/i);
     expect(before.highlights).toContain("act:sr-play");
     expect(before.why).toMatch(/Map|Hangman’s Tree|Hangman's Tree/i);
     expectLegalHighlights(state, before.highlights);
@@ -50,6 +52,8 @@ describe("coach suggestions", () => {
     const choosing = applyInput(state, { type: "selectAction", actionKey: "sr-play" });
     const pick = advise(choosing);
     expect(pick.do).toMatch(/Never Land Map/);
+    expect(pick.do).toMatch(/click/i);
+    expect(pick.do).toMatch(/Choose this place/i);
     expect(pick.highlights).toContain(`card:${map.instanceId}`);
     expectLegalHighlights(choosing, pick.highlights);
 
@@ -57,8 +61,52 @@ describe("coach suggestions", () => {
     const drop = advise(placing);
     expect(drop.do).toMatch(/Never Land Map/);
     expect(drop.do).toMatch(/Skull Rock|Jolly Roger|Mermaid Lagoon|Hangman/);
+    expect(drop.do).toMatch(/Choose this place/i);
     expect(drop.highlights.some((h) => h.startsWith("loc:"))).toBe(true);
     expectLegalHighlights(placing, drop.highlights);
+  });
+
+  it("gives full play-card directions naming the card, place, and next clicks", () => {
+    const state = barePlayState();
+    state.villainLocation = "mermaidLagoon";
+    state.phase = "actions";
+    state.power = 2;
+    state.hangmansUnlocked = true;
+    give(state, "boardingParty");
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Boarding Party/);
+    expect(advice.do).toMatch(/Jolly Roger/);
+    expect(advice.do).toMatch(/Play a Card/);
+    expect(advice.do).toMatch(/click/i);
+    expect(advice.do).toMatch(/Choose this place/i);
+    expect(advice.do).not.toMatch(/where it would help|if it helps/i);
+    expect(advice.highlights).toContain("act:ml-play1");
+    expectLegalHighlights(state, advice.highlights);
+
+    const choosing = applyInput(state, { type: "selectAction", actionKey: "ml-play1" });
+    const pick = advise(choosing);
+    expect(pick.do).toMatch(/Boarding Party/);
+    expect(pick.do).toMatch(/Jolly Roger/);
+    expect(pick.do).toMatch(/click/i);
+    expect(pick.do).toMatch(/Choose this place/i);
+    expectLegalHighlights(choosing, pick.highlights);
+  });
+
+  it("gives full move-then-act directions when Peter waits at the tree", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.phase = "move";
+    state.villainLocation = "jollyRoger";
+    putHero(state, "peterPan", "hangmansTree");
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Move to Hangman’s Tree|Hangman's Tree/);
+    expect(advice.do).toMatch(/Move here/i);
+    expect(advice.do).toMatch(/Move a Hero/);
+    expect(advice.do).toMatch(/Peter/);
+    expect(advice.highlights).toContain("loc:hangmansTree");
+    expectLegalHighlights(state, advice.highlights);
   });
 
   it("walks Peter from an unlocked Hangman’s Tree toward the ship", () => {

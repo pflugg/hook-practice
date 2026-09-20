@@ -140,6 +140,28 @@ describe("idle vs coach/brief roles", () => {
     expect(after.fateDiscard.map((c) => c.defId)).toEqual(expect.arrayContaining(["tickTock", "splittingHeadache"]));
   });
 
+  it("keeps Why this move click-by-click while a Play selection is active", () => {
+    const state = barePlayState();
+    state.villainLocation = "mermaidLagoon";
+    state.phase = "actions";
+    state.power = 2;
+    const party = give(state, "boardingParty");
+
+    const choosing = applyInput(state, { type: "selectAction", actionKey: "ml-play1" });
+    const opened = explainSelection(state, { type: "selectAction", actionKey: "ml-play1" }, choosing);
+    const liveOpen = liveMoveReason(choosing, opened);
+    expect(liveOpen.chose).toMatch(/Play a Card/);
+    expect(liveOpen.why.length).toBeGreaterThan(80);
+    expect(`${liveOpen.why} ${liveOpen.next}`).toMatch(/click|Choose this place|hand/i);
+
+    const placing = applyInput(choosing, { type: "selectCard", instanceId: party.instanceId });
+    const picked = explainSelection(choosing, { type: "selectCard", instanceId: party.instanceId }, placing);
+    const livePick = liveMoveReason(placing, picked);
+    expect(livePick.chose).toMatch(/Boarding Party/);
+    expect(livePick.why.length).toBeGreaterThan(80);
+    expect(`${livePick.why} ${livePick.next}`).toMatch(/Jolly Roger|Choose this place|click/i);
+  });
+
   it("drops Worthy Opponent card-pick copy once the action stretch is current", () => {
     const state = barePlayState();
     state.villainLocation = "mermaidLagoon";

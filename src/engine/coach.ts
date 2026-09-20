@@ -235,16 +235,172 @@ function pickMove(state: GameState): LocationId {
   return ranked[0] ?? legal[0] ?? "skullRock";
 }
 
+function placeVerb(id: LocationId): string {
+  switch (id) {
+    case "jollyRoger":
+      return "Choose this place on the ship";
+    case "skullRock":
+      return "Choose this place on Skull Rock";
+    case "mermaidLagoon":
+      return "Choose this place on the lagoon";
+    case "hangmansTree":
+      return "Choose this place on Hangman’s Tree";
+  }
+}
+
+function playHome(state: GameState, card: CardInstance): LocationId {
+  const legal = legalPlayLocations(state);
+  if (def(card.defId).type === "ally" || card.defId === "cannon" || card.defId === "hooksCase") {
+    const home = bestAllyHome(state);
+    return legal.includes(home) ? home : (legal[0] ?? "jollyRoger");
+  }
+  if (legal.includes(state.villainLocation)) return state.villainLocation;
+  return legal[0] ?? "jollyRoger";
+}
+
+function peterStep(state: GameState): { from: LocationId; dest: LocationId } | null {
+  const peter = peterCard(state);
+  if (!peter) return null;
+  const dest = towardRoger(peter.location);
+  if (!dest || !adjacentUnlocked(state, peter.location).includes(dest)) return null;
+  return { from: peter.location, dest };
+}
+
+function playCta(state: GameState, card: CardInstance, phase: "open" | "pick" | "place"): string {
+  const name = cardName(card);
+  const d = def(card.defId);
+  if (d.id === "cutlass") {
+    if (phase === "open") return `Play ${name} (click Play a Card, then click ${name} in your hand, then strap it to an Ally).`;
+    if (phase === "pick") return `Play ${name} (click ${name} in your hand, then strap it to an Ally).`;
+    return `Strap ${name} to an Ally (click that Ally on the board).`;
+  }
+  if (d.type === "effect") {
+    const pay = d.cost > 0 ? ", then click Pay with Power" : "";
+    if (phase === "open") return `Play ${name} (click Play a Card, then click ${name} in your hand${pay}).`;
+    return `Play ${name} (click ${name} in your hand${pay}).`;
+  }
+  const dest = playHome(state, card);
+  const place = placeVerb(dest);
+  if (phase === "open") {
+    return `Play ${name} to ${locName(dest)} (click Play a Card, then click ${name} in your hand, then ${place}).`;
+  }
+  if (phase === "pick") {
+    return `Play ${name} to ${locName(dest)} (click ${name} in your hand, then ${place}).`;
+  }
+  return `Play ${name} to ${locName(dest)} (click ${place}).`;
+}
+
+function plannedAfterMove(state: GameState, dest: LocationId): string {
+  const next: GameState = { ...state, villainLocation: dest, usedActions: [], pending: null, phase: "actions" };
+  const pick = pickAction(next);
+  if (!pick || pick === "end") {
+    return "then End the turn if no uncovered action still serves the chain";
+  }
+  if (pick.kind === "moveHero") {
+    const step = peterStep(next);
+    return step
+      ? `then take Move a Hero to slide Peter Pan one step toward the ship (${locName(step.from)} → ${locName(step.dest)})`
+      : "then take Move a Hero to slide Peter Pan one unlocked step toward the Jolly Roger";
+  }
+  if (pick.kind === "playCard") {
+    const card = usefulPlay(next);
+    if (card) {
+      const d = def(card.defId);
+      if (d.type === "effect" || d.id === "cutlass") return `then play ${cardName(card)}`;
+      return `then play ${cardName(card)} to ${locName(playHome(next, card))}`;
+    }
+    return "then take Play a Card";
+  }
+  if (pick.kind === "gainPower") return `then take ${pick.label}`;
+  if (pick.kind === "vanquish") {
+    const targets = vanquishableHeroes(next);
+    const peter = targets.find((h) => h.hero.defId === "peterPan" && h.location === "jollyRoger");
+    const hero = peter ?? targets[0];
+    return hero
+      ? `then take Vanquish and click ${cardName(hero.hero)} at ${locName(hero.location)}`
+      : "then take Vanquish";
+  }
+  if (pick.kind === "discard") {
+    const junk = next.hand.find((c) => !keepOnDiscard(next, c));
+    return junk ? `then take Discard and click ${cardName(junk)}` : "then take Discard";
+  }
+  if (pick.kind === "fate") return "then take Fate to hunt Peter Pan";
+  if (pick.kind === "moveItemAlly") {
+    const piece = movableAlliesAndItems(next).find(
+      (c) => def(c.defId).type === "ally" && findCardLocation(next, c.instanceId) !== "jollyRoger",
+    );
+    return piece ? `then take Move Ally/Item and click ${cardName(piece)} toward the ship` : "then take Move Ally/Item";
+  }
+  return `then take ${pick.label}`;
+}
+
+function fullActionDo(state: GameState, slot: ActionSlot): string {
+  const here = locName(state.villainLocation);
+  switch (slot.kind) {
+    case "playCard": {
+      const card = usefulPlay(state) ?? playableHandCards(state)[0];
+      if (card) return playCta(state, card, "open");
+      return `Take Play a Card at ${here} (click that action), then click a glowing card in your hand.`;
+    }
+    case "moveHero": {
+      const step = peterStep(state);
+      if (step && movableHeroes(state).some((h) => h.defId === "peterPan")) {
+        return `Take ${slot.label} at ${here} (click that action), then click Peter Pan and ${placeVerb(step.dest)} to slide him one step toward the Jolly Roger.`;
+      }
+      const hero = movableHeroes(state)[0];
+      return hero
+        ? `Take ${slot.label} at ${here} (click that action), then click ${cardName(hero)} and Choose this place on a glowing adjacent square.`
+        : `Take ${slot.label} at ${here} (click that action).`;
+    }
+    case "gainPower":
+      return `Take ${slot.label} at ${here} (click that action token).`;
+    case "vanquish": {
+      const targets = vanquishableHeroes(state);
+      const peter = targets.find((h) => h.hero.defId === "peterPan" && h.location === "jollyRoger");
+      const hero = peter ?? targets[0];
+      return hero
+        ? `Take Vanquish at ${here} (click that action), then click ${cardName(hero.hero)} at ${locName(hero.location)}, tap Allies until Strength meets the Hero, then Confirm.`
+        : `Take Vanquish at ${here} (click that action).`;
+    }
+    case "discard": {
+      const junk = state.hand.find((c) => !keepOnDiscard(state, c));
+      return junk
+        ? `Take Discard at ${here} (click that action), then click ${cardName(junk)} in your hand, then Confirm.`
+        : `Take Discard at ${here} (click that action), then Confirm — discarding none still spends the action.`;
+    }
+    case "fate":
+      return `Take Fate at ${here} (click that action). Play Peter Pan if he appears — he lands at Hangman’s Tree.`;
+    case "moveItemAlly": {
+      const pieces = movableAlliesAndItems(state);
+      const ally = pieces
+        .filter((c) => def(c.defId).type === "ally")
+        .map((c) => ({ c, loc: findCardLocation(state, c.instanceId)! }))
+        .filter((x) => x.loc && x.loc !== "jollyRoger" && towardRoger(x.loc))
+        .sort((a, b) => LOCATION_IDS.indexOf(b.loc) - LOCATION_IDS.indexOf(a.loc))[0];
+      const pick = ally ?? (pieces[0] ? { c: pieces[0], loc: findCardLocation(state, pieces[0].instanceId) } : null);
+      const dest = pick?.loc ? towardRoger(pick.loc) : null;
+      return pick
+        ? `Take Move Ally/Item at ${here} (click that action), then click ${cardName(pick.c)} and ${dest ? placeVerb(dest) : "Choose this place on a glowing square"} toward the Jolly Roger.`
+        : `Take Move Ally/Item at ${here} (click that action).`;
+    }
+    default:
+      return `Take ${slot.label} at ${here} (click that action).`;
+  }
+}
+
 function moveWhy(state: GameState, dest: LocationId): string {
   const peter = peterCard(state);
   if (peterReadyToFinish(state) && dest === "jollyRoger") {
     return "Peter is already on the ship and your crew can finish the clash. Take the Vanquish action there — that is the only place the win counts.";
   }
   if (peter && state.hangmansUnlocked && peter.location !== "jollyRoger" && hasKind(state, dest, "moveHero")) {
-    return "The tree is open and Peter is ashore. A Move a Hero action walks him one step toward the Jolly Roger.";
+    const step = peterStep(state);
+    return step
+      ? `The tree is open and Peter is at ${locName(step.from)}. After you land, click Move a Hero, then Peter Pan, then ${placeVerb(step.dest)} (${locName(step.from)} → ${locName(step.dest)}).`
+      : "The tree is open and Peter is ashore. After you land, click Move a Hero, then Peter Pan, then the glowing square toward the Jolly Roger.";
   }
   if (playableMap(state) && hasKind(state, dest, "playCard")) {
-    return "You are holding the Never Land Map with enough Power. Play it to unlock Hangman’s Tree so Peter can leave the hideout.";
+    return "You are holding the Never Land Map with enough Power. After you land, click Play a Card, then the Map in your hand, then Choose this place on any unlocked square.";
   }
   if (needPowerForMap(state) && dest === "mermaidLagoon") {
     return "Gain 3 Power here — you are holding the Never Land Map and still need 4 to play it.";
@@ -263,7 +419,12 @@ function moveWhy(state: GameState, dest: LocationId): string {
 
 function adviseMove(state: GameState): CoachAdvice {
   const dest = pickMove(state);
-  return say(`Move to ${locName(dest)}`, moveWhy(state, dest), [`loc:${dest}`], state);
+  return say(
+    `Move to ${locName(dest)} (click Move here on ${locName(dest)}), ${plannedAfterMove(state, dest)}.`,
+    moveWhy(state, dest),
+    [`loc:${dest}`],
+    state,
+  );
 }
 
 function usefulPlay(state: GameState): CardInstance | null {
@@ -357,21 +518,24 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
     return "Peter is on the Jolly Roger and your Allies can meet his Strength. The clash there completes the objective.";
   }
   if (slot.kind === "moveHero") {
-    return "Walk Peter one unlocked step toward the Jolly Roger. He only loses the duel if you vanquish him anywhere else.";
+    const step = peterStep(state);
+    return step
+      ? `Click ${slot.label}, then Peter Pan, then ${placeVerb(step.dest)} to walk him ${locName(step.from)} → ${locName(step.dest)}. He only loses the duel if you vanquish him anywhere else.`
+      : "Click Move a Hero, then Peter Pan, then the glowing square toward the Jolly Roger. He only loses the duel if you vanquish him anywhere else.";
   }
   if (slot.kind === "playCard" && playableMap(state)) {
-    return "The Never Land Map unlocks Hangman’s Tree. Until that hideout opens, Peter cannot start the walk to the ship.";
+    return "Click Play a Card, then Never Land Map in your hand, then Choose this place on any unlocked square. The Map unlocks Hangman’s Tree — until that hideout opens, Peter cannot start the walk to the ship.";
   }
   if (slot.kind === "playCard") {
     const card = usefulPlay(state);
     if (card && def(card.defId).type === "ally") {
-      return "An Ally on the Jolly Roger is Strength waiting for Peter. Play one while this action is open.";
+      return `Click Play a Card, then ${cardName(card)} in your hand, then ${placeVerb(playHome(state, card))}. An Ally on the Jolly Roger is Strength waiting for Peter.`;
     }
     if (card && (card.defId === "worthyOpponent" || card.defId === "giveThemAScare")) {
-      return "These hunts can flip Peter onto Hangman’s Tree without waiting on a Fate action.";
+      return `Click Play a Card, then ${cardName(card)} in your hand. These hunts can flip Peter onto Hangman’s Tree without waiting on a Fate action.`;
     }
     if (card) {
-      return `Play ${cardName(card)} if it helps the Map, the escort, or the ship’s clash.`;
+      return playCta(state, card, "open");
     }
   }
   if (slot.kind === "gainPower") {
@@ -404,13 +568,13 @@ function adviseActions(state: GameState): CoachAdvice {
   const pick = pickAction(state);
   if (!pick || pick === "end") {
     return say(
-      "End the turn",
-      "You have spent the useful actions. Draw back to four, then Fate will answer — stay ready to move again.",
+      "End the turn (click End turn). Draw back to four, then Fate will answer.",
+      "You have spent the useful actions at this stop. Ending is the refill — stay ready to move again next turn.",
       ["btn:end"],
       state,
     );
   }
-  return say(`Take ${pick.label}`, actionWhy(state, pick), [`act:${pick.key}`], state);
+  return say(fullActionDo(state, pick), actionWhy(state, pick), [`act:${pick.key}`], state);
 }
 
 function playTargetWhy(card: CardInstance, dest: LocationId): string {
@@ -425,7 +589,7 @@ function playTargetWhy(card: CardInstance, dest: LocationId): string {
   if (card.defId === "ingeniousDevice") {
     return "The Device adds a Move a Hero action — the fastest escort once the tree is open.";
   }
-  return `Drop ${cardName(card)} where it helps the Map → Tree → Peter → ship plan.`;
+  return `Play ${cardName(card)} to ${locName(dest)} — click ${placeVerb(dest)} next so it serves the Map → Tree → Peter → ship plan.`;
 }
 
 function advisePending(state: GameState): CoachAdvice {
@@ -436,33 +600,22 @@ function advisePending(state: GameState): CoachAdvice {
     case "playChooseCard": {
       const card = usefulPlay(state) ?? playableHandCards(state)[0];
       if (!card) {
-        return say("Cancel the play", "Nothing in hand is worth the action right now.", ["btn:cancel"], state);
+        return say("Cancel the play (click Cancel)", "Nothing in hand is worth the action right now.", ["btn:cancel"], state);
       }
-      const destHint =
-        card.defId === "neverLandMap"
-          ? `Play ${cardName(card)}`
-          : def(card.defId).type === "ally"
-            ? `Play ${cardName(card)} to the Jolly Roger`
-            : `Play ${cardName(card)}`;
       const why =
         card.defId === "neverLandMap"
-          ? "The Map is the only key to Hangman’s Tree. Play it while you can afford it."
+          ? "The Map is the only key to Hangman’s Tree. Click it in your hand, then Choose this place on any unlocked square."
           : def(card.defId).type === "ally"
-            ? "Allies at the Jolly Roger become the clash that finishes Peter."
-            : playTargetWhy(card, bestAllyHome(state));
-      return say(destHint, why, [`card:${card.instanceId}`], state);
+            ? `Click ${cardName(card)} in your hand, then ${placeVerb(playHome(state, card))}. Allies at the Jolly Roger become the clash that finishes Peter.`
+            : playTargetWhy(card, playHome(state, card));
+      return say(playCta(state, card, "pick"), why, [`card:${card.instanceId}`], state);
     }
     case "playChooseLocation": {
       const card = findCard(state, p.cardId);
-      if (!card) return say("Choose a glowing location", "Drop the card on an unlocked place.", [], state);
-      const dest =
-        def(card.defId).type === "ally" || card.defId === "cannon" || card.defId === "hooksCase"
-          ? bestAllyHome(state)
-          : legalPlayLocations(state).includes(state.villainLocation)
-            ? state.villainLocation
-            : (legalPlayLocations(state)[0] ?? "jollyRoger");
+      if (!card) return say("Choose a glowing location (click Choose this place on an unlocked square).", "Drop the card on an unlocked place.", [], state);
+      const dest = playHome(state, card);
       return say(
-        `Play ${cardName(card)} to ${locName(dest)}`,
+        playCta(state, card, "place"),
         playTargetWhy(card, dest),
         [`loc:${dest}`],
         state,
@@ -487,25 +640,25 @@ function advisePending(state: GameState): CoachAdvice {
       const mapOut = mapInRealm(state);
       if (state.power >= cost) {
         return say(
-          "Pay with Power",
+          `Pay with Power (click Pay with Power) — ${name} costs ${cost} and you have ${state.power}.`,
           mapOut
             ? "Keep the Never Land Map in the realm. You already used it to open the tree, and later Items can still lean on it if you are short."
-            : `${name} costs ${cost}. You have ${state.power}. Pay with Power.`,
+            : `${name} costs ${cost}. You have ${state.power}. Click Pay with Power to finish the play.`,
           ["btn:pay-power"],
           state,
         );
       }
       if (mapOut) {
         return say(
-          "Discard the Map to pay",
+          "Discard the Map to pay (click Discard the Map)",
           "Power is short. The tree is already open, so spending the Map keeps the plan moving.",
           ["btn:pay-map"],
           state,
         );
       }
       return say(
-        "Cancel — not enough Power",
-        `${name} costs ${cost} and you have ${state.power}. Cancel and Gain more Power before you play it.`,
+        "Cancel — not enough Power (click Cancel)",
+        `${name} costs ${cost} and you have ${state.power}. Click Cancel, then Gain more Power before you play it.`,
         ["btn:cancel"],
         state,
       );
@@ -514,17 +667,17 @@ function advisePending(state: GameState): CoachAdvice {
       const junk = state.hand.filter((c) => !keepOnDiscard(state, c) && !p.selected.includes(c.instanceId));
       if (junk[0]) {
         return say(
-          `Discard ${cardName(junk[0])}`,
+          `Discard ${cardName(junk[0])} (click that card in your hand, then Confirm).`,
           "Let go of the spare card so the deck can offer the Map or the next escort piece.",
           [`card:${junk[0].instanceId}`],
           state,
         );
       }
       return say(
-        "Confirm the discard",
+        "Confirm the discard (click Confirm)",
         p.selected.length
-          ? "Those cards can go. Confirm and keep hunting the Map."
-          : "Nothing extra to toss. Confirm to spend the action and stay on tempo.",
+          ? "Those cards can go. Click Confirm and keep hunting the Map."
+          : "Nothing extra to toss. Click Confirm to spend the action and stay on tempo.",
         ["btn:confirm"],
         state,
       );
@@ -534,7 +687,7 @@ function advisePending(state: GameState): CoachAdvice {
       const peter = targets.find((h) => h.hero.defId === "peterPan");
       if (peter && peter.location === "jollyRoger") {
         return say(
-          "Vanquish Peter Pan at the Jolly Roger",
+          "Vanquish Peter Pan at the Jolly Roger (click Peter Pan, then tap Allies until Strength meets him, then Confirm).",
           "This is the last link. The clash only wins if it happens on the ship.",
           [`card:${peter.hero.instanceId}`],
           state,
@@ -552,7 +705,7 @@ function advisePending(state: GameState): CoachAdvice {
         );
       }
       return say(
-        `Vanquish ${cardName(pick.hero)} at ${locName(pick.location)}`,
+        `Vanquish ${cardName(pick.hero)} at ${locName(pick.location)} (click ${cardName(pick.hero)}, then tap Allies, then Confirm).`,
         pick.hero.defId === "tickTock"
           ? "The crocodile empties your hand if you step onto his space. Clear him if the Strength is there."
           : "Clear the blocker so your next actions — Play, Gain, or Move a Hero — are uncovered.",
@@ -570,10 +723,10 @@ function advisePending(state: GameState): CoachAdvice {
       }, 0);
       if (selectedStr >= need && p.selected.length > 0) {
         return say(
-          "Confirm the clash",
+          "Confirm the clash (click Confirm)",
           hero?.defId === "peterPan"
-            ? "The Strength is there. Confirm and the objective chain is complete."
-            : "That is enough Strength. Confirm so you can return to the rest of the turn.",
+            ? "The Strength is there. Click Confirm and the objective chain is complete."
+            : "That is enough Strength. Click Confirm so you can return to the rest of the turn.",
           ["btn:confirm"],
           state,
         );
@@ -585,8 +738,8 @@ function advisePending(state: GameState): CoachAdvice {
         return say("Cancel the clash", "You do not have the Strength. Back out and gather more crew.", ["btn:cancel"], state);
       }
       return say(
-        `Add ${cardName(nextAlly.ally)} to the clash`,
-        `You need ${need} Strength. Keep tapping Allies at this place until the total meets the Hero.`,
+        `Add ${cardName(nextAlly.ally)} to the clash (click that Ally). You need ${need} Strength.`,
+        `Click ${cardName(nextAlly.ally)} now. Keep tapping Allies at this place until the total meets the Hero, then Confirm.`,
         [`card:${nextAlly.ally.instanceId}`],
         state,
       );
@@ -601,7 +754,7 @@ function advisePending(state: GameState): CoachAdvice {
       const pick = ally?.c ?? pieces[0];
       if (!pick) return say("Cancel", "Nothing useful to slide.", ["btn:cancel"], state);
       return say(
-        `Move ${cardName(pick)} toward the ship`,
+        `Move ${cardName(pick)} toward the ship (click that card, then Choose this place on the glowing square toward the Jolly Roger).`,
         "Crew belongs at the Jolly Roger before Peter arrives.",
         [`card:${pick.instanceId}`],
         state,
@@ -615,7 +768,7 @@ function advisePending(state: GameState): CoachAdvice {
       if (!dest) return say("Cancel", "No adjacent unlocked step.", ["btn:cancel"], state);
       const card = findCard(state, p.pieceId);
       return say(
-        `Move ${card ? cardName(card) : "that card"} to ${locName(dest)}`,
+        `Move ${card ? cardName(card) : "that card"} to ${locName(dest)} (click ${placeVerb(dest)}).`,
         "One step closer to the Jolly Roger keeps the final clash supplied.",
         [`loc:${dest}`],
         state,
@@ -632,8 +785,14 @@ function advisePending(state: GameState): CoachAdvice {
           : movableHeroes(state);
       const peter = legalHeroes.find((h) => h.defId === "peterPan");
       if (peter && (p.kind === "starkeyHero" || state.hangmansUnlocked)) {
+        const from = findCardLocation(state, peter.instanceId);
+        const dest = from ? towardRoger(from) : null;
+        const dests = from ? adjacentUnlocked(state, from) : [];
+        const step = dest && dests.includes(dest) ? dest : dests[0];
         return say(
-          "Move Peter Pan toward the Jolly Roger",
+          step
+            ? `Move Peter Pan toward the Jolly Roger (click Peter Pan, then ${placeVerb(step)}).`
+            : "Move Peter Pan toward the Jolly Roger (click Peter Pan, then Choose this place on the glowing square toward the ship).",
           "He travels one unlocked step at a time. The win only counts if you vanquish him on the ship.",
           [`card:${peter.instanceId}`],
           state,
@@ -641,9 +800,9 @@ function advisePending(state: GameState): CoachAdvice {
       }
       const croc = legalHeroes.find((h) => h.defId === "tickTock");
       const pick = croc ?? legalHeroes[0];
-      if (!pick) return say("Cancel", "No Hero can step right now.", ["btn:cancel"], state);
+      if (!pick) return say("Cancel (click Cancel)", "No Hero can step right now.", ["btn:cancel"], state);
       return say(
-        `Move ${cardName(pick)}`,
+        `Move ${cardName(pick)} (click that Hero, then Choose this place on a glowing adjacent square).`,
         pick.defId === "tickTock"
           ? "Nudge the crocodile off the path you still need to walk."
           : "Slide the Hero off a useful action so Play, Gain, or Fate comes back.",
@@ -668,7 +827,7 @@ function advisePending(state: GameState): CoachAdvice {
             : (awayFromCroc ?? dests[0]);
       if (!dest) return say("Cancel", "No adjacent unlocked step.", ["btn:cancel"], state);
       return say(
-        `Move ${hero ? cardName(hero) : "that Hero"} to ${locName(dest)}`,
+        `Move ${hero ? cardName(hero) : "that Hero"} to ${locName(dest)} (click ${placeVerb(dest)}).`,
         hero?.defId === "peterPan"
           ? "Each step west brings him closer to the Jolly Roger, where the final clash must happen."
           : "Park the Hero where they block you least.",
@@ -681,7 +840,7 @@ function advisePending(state: GameState): CoachAdvice {
       const pick = allies[0] ?? allAllies(state)[0];
       if (!pick) return say("Cancel", "No Ally to reposition.", ["btn:cancel"], state);
       return say(
-        `Reposition ${cardName(pick.ally)}`,
+        `Reposition ${cardName(pick.ally)} (click that Ally, then Choose this place toward the Jolly Roger).`,
         "Aye Aye Sir also grants +2 Strength this turn — point that bonus at the ship if you can.",
         [`card:${pick.ally.instanceId}`],
         state,
@@ -693,7 +852,7 @@ function advisePending(state: GameState): CoachAdvice {
       const dests = from ? adjacentUnlocked(state, from) : [];
       const dest = toward && dests.includes(toward) ? toward : dests[0];
       if (!dest) return say("Cancel", "No unlocked adjacent step.", ["btn:cancel"], state);
-      return say(`Move that Ally to ${locName(dest)}`, "Close the gap to the Jolly Roger.", [`loc:${dest}`], state);
+      return say(`Move that Ally to ${locName(dest)} (click ${placeVerb(dest)}).`, "Close the gap to the Jolly Roger.", [`loc:${dest}`], state);
     }
     case "vanquishConfirmLoss": {
       return say(
@@ -707,7 +866,7 @@ function advisePending(state: GameState): CoachAdvice {
       const ally = state.hand.filter((c) => def(c.defId).type === "ally").sort((a, b) => def(b.defId).strength - def(a.defId).strength)[0];
       if (!ally) return say("Skip Cunning", "No Ally in hand to sneak ashore.", ["btn:skip-cond"], state);
       return say(
-        `Play ${cardName(ally)} for free`,
+        `Play ${cardName(ally)} for free (click ${cardName(ally)} in your hand, then ${placeVerb(bestAllyHome(state))}).`,
         "Cunning spends no Play action. Drop the strongest Ally you can onto the ship.",
         [`card:${ally.instanceId}`],
         state,
@@ -715,7 +874,7 @@ function advisePending(state: GameState): CoachAdvice {
     }
     case "cunningLocation": {
       const dest = bestAllyHome(state);
-      return say(`Place the Ally at ${locName(dest)}`, "Free crew belongs at the Jolly Roger.", [`loc:${dest}`], state);
+      return say(`Place the Ally at ${locName(dest)} (click ${placeVerb(dest)}).`, "Free crew belongs at the Jolly Roger.", [`loc:${dest}`], state);
     }
     case "fateChooseCard": {
       const peter = p.cards.find((c) => c.defId === "peterPan");
@@ -744,7 +903,7 @@ function advisePending(state: GameState): CoachAdvice {
       const dest = card ? parkHeroLocation(state, card) : legalPlayLocations(state)[0];
       if (!dest) return say("Choose an unlocked location", "Heroes need an open place to land.", [], state);
       return say(
-        `Place ${card ? cardName(card) : "the Hero"} at ${locName(dest)}`,
+        `Place ${card ? cardName(card) : "the Hero"} at ${locName(dest)} (click ${placeVerb(dest)}).`,
         card?.defId === "tickTock"
           ? "Keep the crocodile off Mermaid Lagoon and Hangman’s Tree so your Power and escort stay usable."
           : "Park this Hero where they cover the fewest actions you still need.",
@@ -880,7 +1039,12 @@ function advisePending(state: GameState): CoachAdvice {
       );
     }
     default:
-      return say("Follow the glowing prompts", "Take the highlighted legal option to keep the objective chain moving.", [], state);
+      return say(
+        "Follow the glowing prompts (click the gold-outlined card, place, or button the prompt names).",
+        "Take the highlighted legal option to keep the objective chain moving.",
+        [],
+        state,
+      );
   }
 }
 
@@ -895,11 +1059,13 @@ function clampToLegal(state: GameState, advice: CoachAdvice): CoachAdvice {
     if (wantsHeroWalk && !acts.some((a) => a.kind === "moveHero")) {
       return adviseActions(state);
     }
-    if (cleaned.do.startsWith("Take ")) {
-      const label = cleaned.do.slice("Take ".length);
-      if (!acts.some((a) => a.label === label)) {
-        return adviseActions(state);
-      }
+    const actHi = cleaned.highlights.find((key) => key.startsWith("act:"));
+    if (actHi && !acts.some((a) => a.key === actHi.slice(4))) {
+      return adviseActions(state);
+    }
+    const gainAmt = cleaned.do.match(/Gain (\d+)/);
+    if (gainAmt && !acts.some((a) => a.kind === "gainPower" && (a.amount ?? 1) === Number(gainAmt[1]))) {
+      return adviseActions(state);
     }
   }
 
