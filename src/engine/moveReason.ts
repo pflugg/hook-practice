@@ -303,9 +303,15 @@ function finishPeterPlan(state: GameState): string {
   } else if (brutes === 1 && smee) {
     plan = "Your Pirate Brute and Smee will finish him on the Jolly Roger.";
   } else if (brutes === 1) {
-    plan = `Your Pirate Brute plus the rest of this crew (${have}) is how the ship clash is built.`;
+    const rest = names.filter((n) => !/Pirate Brute/i.test(n));
+    plan = rest.length
+      ? `Your Pirate Brute plus ${rest.join(", ")} is how the ship clash is built.`
+      : "Your Pirate Brute is how the ship clash is built.";
   } else if (smee) {
-    plan = `Smee plus the crew you already have (${have}) will finish him on the Jolly Roger.`;
+    const rest = names.filter((n) => !/Smee/i.test(n));
+    plan = rest.length
+      ? `Smee plus ${rest.join(", ")} will finish him on the Jolly Roger.`
+      : "Smee will finish him on the Jolly Roger.";
   } else if (crew.length) {
     plan = `Your crew (${have}) is the Strength that will meet him.`;
   } else {
