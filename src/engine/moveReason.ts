@@ -230,7 +230,7 @@ function coverNote(state: GameState, id: LocationId): string {
 function crocWatch(state: GameState): string {
   const croc = tickTockAt(state);
   return croc
-    ? ` Tick Tock waits at ${locName(croc)} — sharing that place with the captain (stepping there, or sliding the crocodile onto him) empties the whole hand.`
+    ? ` Tick Tock waits at ${locName(croc)} — the hand empties only if the captain moves onto that place. Seating or sliding the crocodile onto the captain does not snap.`
     : " Tick Tock is not ashore yet, so movement is safer than it will be later.";
 }
 
@@ -239,7 +239,7 @@ function chainLine(state: GameState): string {
     return "Hangman’s Tree is still locked, so the immediate job is Power and the Never Land Map. Until that hideout opens, Peter cannot walk toward the ship even if Fate drops him there.";
   }
   if (!state.peterPanRevealed) {
-    return "The tree is open. The next gate is finding Peter — a Fate action or a hunt card such as Worthy Opponent — so you can walk him west.";
+    return "The tree is open. The next gate is finding Peter — hunt cards such as Worthy Opponent, or being Fated. At a table your Fate action hits another villain; here taking Fate yourself is practice self-Fate.";
   }
   if (state.peterPanLocation !== "jollyRoger") {
     return `Peter is ashore at ${state.peterPanLocation ? locName(state.peterPanLocation) : "the realm"}. The remaining job is walking him to the Jolly Roger and meeting him with enough Strength there.`;
@@ -256,7 +256,7 @@ function locationToolbox(id: LocationId): string {
     case "mermaidLagoon":
       return "Mermaid Lagoon is the Power engine: Gain 3 plus two Play slots. Most opening voyages come here to buy the Never Land Map (cost 4) that unlocks Hangman’s Tree.";
     case "skullRock":
-      return "Skull Rock is the digging and hunting stop: Discard and a Fate action live here. Use it when the hand is clogged or you want to flip Fate yourself instead of waiting on the computer.";
+      return "Skull Rock is the digging and hunting stop: Discard and a Fate action live here. Hunt cards and being Fated are how Hook finds Peter at a table; taking Fate yourself here is practice self-Fate.";
     case "jollyRoger":
       return "The Jolly Roger is the finish line. Vanquish and Play live here. Allies and ship gear belong on this deck so Strength is waiting when Peter arrives.";
     case "hangmansTree":
@@ -349,13 +349,13 @@ function playCardWhy(defId: string, state: GameState): { why: string; next: stri
       };
     case "worthyOpponent":
       return {
-        why: "Worthy Opponent is a hunt: +2 Power and you reveal Fate cards until a Hero appears. That is how you find Peter without waiting for a Fate action or the computer’s turn.",
+        why: "Worthy Opponent is a hunt: +2 Power and you reveal Fate cards until a Hero appears. Hunt cards, plus being Fated, are how Hook finds Peter at a table. The computer always Fates you here after each turn.",
         next: "If the Hero is Peter, he still lands at Hangman’s Tree. If it is Tick Tock, park him off the lagoon and the tree. You will still need the Map if the hideout is locked.",
       };
     case "giveThemAScare":
       return {
         why: "Give Them a Scare peeks the top of Fate without finding Peter. Looking is not revealing: a peek will not force him onto the tree. It lets you send trouble to the Fate discard or stack Peter on top for the next real Fate flip.",
-        next: "If Tick Tock or Splitting Headache is in the peek, discarding both is often kinder — they can still return when Fate reshuffles. If Peter is there, return him on top so the next Fate action can find him.",
+        next: "If Tick Tock or Splitting Headache is in the peek, discarding both is often kinder — they can still return when Fate reshuffles. If Peter is there, return him on top so a hunt or being Fated can find him.",
       };
     case "cutlass": {
       const host = preferredAttachAlly(state);
@@ -385,12 +385,12 @@ function playCardWhy(defId: string, state: GameState): { why: string; next: stri
       };
     case "cunning":
       return {
-        why: "Cunning is a Condition: when a Strength 4+ Hero is ashore and you hold an Ally, you may slip that Ally in for free. Without an Ally in hand the Condition stays put.",
+        why: "Cunning is a printed Condition. At a table it waits for another player’s turn and a strong Ally in another realm. Here the trigger is rewritten: when a Strength 4+ Hero is ashore and you hold an Ally, you may slip that Ally in for free. Without an Ally in hand the Condition stays put.",
         next: "Put that free Ally on the Jolly Roger. You can still take other actions this stop.",
       };
     case "obsession":
       return {
-        why: "Obsession hunts Fate for a Hero while Peter is still hidden. It is a practice-only trigger on your own turn because there is no opponent sitting across the table.",
+        why: "Obsession is a printed Condition. At a table it waits for another player to defeat a strong Hero. Here the trigger is rewritten so you may hunt Fate for a Hero on your own turn while Peter is still hidden.",
         next: "If it finds Peter, play him — he goes to Hangman’s Tree. If it finds Tick Tock, banishing him saves the hand later.",
       };
     default:
@@ -599,7 +599,7 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
     return pack(
       "You discarded both peeked Fate cards.",
       "Those cards go to the Fate discard, so they will not sit on top for the next Fate flip. They can still return when Fate reshuffles — this is not a remove-from-game pile.",
-      "You did not find Peter this way — a peek never forces him onto the tree. Hunt again with a real Fate action or Worthy Opponent if he is still hidden.",
+      "You did not find Peter this way — a peek never forces him onto the tree. Hunt again with Worthy Opponent, or wait to be Fated, if he is still hidden.",
     );
   }
   if (input.type === "scareReturn") {
@@ -787,7 +787,7 @@ function explainAction(before: GameState, after: GameState, actionKey: string): 
     case "fate":
       return pack(
         `You took the Fate action at ${here}.`,
-        "You are flipping the other deck yourself. If Peter is in the pair, play him: he lands at Hangman’s Tree. That is how you hunt without waiting for the computer’s end-of-turn Fate.",
+        "This is practice self-Fate: you are flipping Hook’s own Fate deck. At a table that action hits another villain; Hook finds Peter with hunt cards and by being Fated. If Peter is in the pair, play him: he lands at Hangman’s Tree.",
         "Park Tick Tock off the lagoon and the tree if you can. Read the full text of whatever you seat before you Continue.",
       );
     case "vanquish":

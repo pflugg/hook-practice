@@ -1,7 +1,7 @@
 import { def } from "./cards";
 import { LOCATION_IDS, type CardInstance, type GameState, type LocationId } from "./types";
 import { adjacentIds } from "./realm";
-import { allAllies, allLocationItems, allyStrength, heroStrength, isUnlocked } from "./queries";
+import { allAllies, allLocationItems, allyStrength, attachableHeroes, heroStrength, isUnlocked } from "./queries";
 import { pickIndex } from "./rng";
 
 export function blockValue(state: GameState, id: LocationId): number {
@@ -61,15 +61,11 @@ export function scoreFateCard(state: GameState, card: CardInstance): number {
   if (d.id === "tinkerBell") return allAllies(state).length > 0 ? 65 : 25;
   if (d.id === "wendy") return 50;
   if (d.id === "lostBoys") return 48;
-  if (d.id === "taunt") return allHeroesSafe(state) ? 45 : -10;
-  if (d.id === "pixieDust") return allHeroesSafe(state) ? 40 : -10;
+  if (d.id === "taunt") return attachableHeroes(state, "taunt").length > 0 ? 45 : -10;
+  if (d.id === "pixieDust") return attachableHeroes(state, "pixieDust").length > 0 ? 40 : -10;
   if (d.id === "john") return 28;
   if (d.id === "michael") return 32;
   return 10;
-}
-
-function allHeroesSafe(state: GameState): boolean {
-  return LOCATION_IDS.some((id) => state.locations[id].heroes.length > 0);
 }
 
 function fatePlayPool(state: GameState, cards: CardInstance[]): CardInstance[] {
@@ -83,10 +79,8 @@ export function chooseFateCard(
   cards: CardInstance[],
   difficulty: "easy" | "normal",
 ): { card: CardInstance; rng: number } {
-  if (difficulty !== "easy") {
-    const peter = cards.find((c) => c.defId === "peterPan");
-    if (peter) return { card: peter, rng: state.rng };
-  }
+  const peter = cards.find((c) => c.defId === "peterPan");
+  if (peter) return { card: peter, rng: state.rng };
   const pool = fatePlayPool(state, cards);
   if (difficulty === "easy") {
     const pick = pickIndex(pool.length, state.rng);
@@ -104,8 +98,12 @@ export function chooseFateCard(
   return { card: best, rng: state.rng };
 }
 
-export function chooseAttachHero(state: GameState, preferPeter: boolean): CardInstance | null {
-  const heroes = LOCATION_IDS.flatMap((id) => state.locations[id].heroes);
+export function chooseAttachHero(
+  state: GameState,
+  preferPeter: boolean,
+  itemDefId = "pixieDust",
+): CardInstance | null {
+  const heroes = attachableHeroes(state, itemDefId);
   if (heroes.length === 0) return null;
   if (preferPeter) {
     const peter = heroes.find((h) => h.defId === "peterPan");
@@ -146,20 +144,21 @@ export function chooseHeroLocation(
 export function chooseAttachTarget(
   state: GameState,
   difficulty: "easy" | "normal",
+  itemDefId = "pixieDust",
 ): { hero: CardInstance | null; rng: number } {
-  const heroes = LOCATION_IDS.flatMap((id) => state.locations[id].heroes);
+  const heroes = attachableHeroes(state, itemDefId);
   if (heroes.length === 0) return { hero: null, rng: state.rng };
   if (difficulty === "easy") {
     const pick = pickIndex(heroes.length, state.rng);
     return { hero: heroes[pick.index], rng: pick.rng };
   }
-  return { hero: chooseAttachHero(state, true), rng: state.rng };
+  return { hero: chooseAttachHero(state, true, itemDefId), rng: state.rng };
 }
 
 function fateCardWouldFizzle(state: GameState, card: CardInstance): boolean {
   const d = def(card.defId);
   if (d.id === "pixieDust" || d.id === "taunt") {
-    return !LOCATION_IDS.some((id) => state.locations[id].heroes.length > 0);
+    return attachableHeroes(state, d.id).length === 0;
   }
   if (d.id === "splittingHeadache") return allLocationItems(state).length === 0;
   return false;
@@ -199,6 +198,9 @@ export function explainFateChoice(
   difficulty: "easy" | "normal",
 ): string {
   if (difficulty === "easy") {
+    if (played.defId === "peterPan") {
+      return "Peter was revealed, so Easy plays him to Hangman’s Tree and discards the other card — same as at a table.";
+    }
     const other = drawn.find((c) => c.instanceId !== played.instanceId);
     let line = "Easy Fate picked at random among the legal cards.";
     if (other) line += ` ${def(other.defId).name} stays down.`;

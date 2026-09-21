@@ -5,13 +5,31 @@ This practice tool aims for a playable Hook-style objective, not FAQ-perfect par
 ## Intentional simplifications
 
 ### Solo Fate adversary
-There is no second villain board. After you end your turn and refill to four cards, the computer always performs **one Fate action** against you (Easy: random legal play; Normal: heuristic). Your own Fate actions still let you hunt Peter Pan.
+There is no second villain board. After you end your turn and refill to four cards, the computer always performs **one Fate action** against you (Easy: random legal play among the pair, except Peter; Normal: heuristic). That pressure stands in for another player choosing to Fate you.
+
+At a table, Hook finds Peter when **someone Fates Hook**, or when Hook’s own hunt cards (Worthy Opponent, Give Them a Scare, Obsession) flip his Fate deck. Hook’s printed Fate **action** is aimed at another villain.
+
+### Practice self-Fate
+Your Fate action in this tool draws from Hook’s own Fate deck so you can practice the “find Peter” motion without a second human. The overlay labels that as **practice self-Fate**. It is not how the printed Fate action works at a table.
+
+### Tick Tock
+The hand empties only when the **captain moves onto** Tick Tock’s place. Seating the crocodile on the captain (Fate) or sliding him onto the captain (Move a Hero / Starkey) does **not** discard the hand. Those plays are a cover / Strength problem, not a snap.
+
+### Easy Fate and Peter
+When Peter is one of the two revealed Fate cards, Easy and Normal both play him to Hangman’s Tree and discard the other card — same as the published reveal rule and the player Fate path. Easy does not bury a revealed Peter.
 
 ### Conditions (Cunning, Obsession)
-In a two-player game those cards wait for an opponent’s turn. In solo play they would almost never trigger, so they are adapted:
+Cunning and Obsession **are printed two-player Conditions**. At a table they wait for **another player’s turn** and look at **that player’s** board:
 
-- **Cunning** — During your action phase, if a Hero of Strength 4+ is in the realm, you may play Cunning without using a Play a Card action, then play an Ally from hand for free.
-- **Obsession** — During your action phase, if Peter Pan has not yet been revealed, you may play Obsession without using a Play a Card action, then reveal Fate cards until a Hero and play or banish that Hero.
+- Printed **Cunning** watches for a strong Ally in another realm.
+- Printed **Obsession** watches for another player defeating a strong Hero.
+
+Those triggers almost never happen in solo play, so this tool **rewrites the triggers** (not the cards) so they can fire during your action phase:
+
+- **Cunning** — During your action phase, if a Hero of Strength 4+ is in this realm and you hold an Ally, you may play Cunning without using a Play a Card action, then play that Ally for free.
+- **Obsession** — During your action phase, if Peter Pan has not yet been revealed, you may play Obsession without using a Play a Card action, then reveal Fate cards until a Hero and play or discard that Hero (the card goes to the Fate discard and can return).
+
+Playing a Condition from hand without spending Play a Card is close to published Condition timing. The trigger rewrite is the adaptation.
 
 ### Extra Item actions
 Cannon, Hook’s Case, and Ingenious Device grant extra actions at their location. Those extras are **never covered** by Heroes (only the printed top row is covered). Each matching Item adds one extra action.
@@ -36,6 +54,12 @@ The captain starts at the Jolly Roger with 0 Power and a 4-card hand, then must 
 
 ### Deck recycling
 Empty villain or Fate decks reshuffle their discard piles. There is no turn limit. Resign is the explicit concede.
+
+### Splitting Headache and attachments
+Headache can discard an Item in the realm, including Items attached to a character (Cutlass, Fate attachments). Discarded Fate attachments return to the Fate discard.
+
+### Fate attachments while the hideout is locked
+A common table clarification: the +2 Fate Item (Pixie Dust) does not attach to Peter while he sits on the still-locked hideout. Taunt may still cling.
 
 ### Not modeled
 - Multi-villain boards, Activate actions, and other villains

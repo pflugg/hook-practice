@@ -78,7 +78,7 @@ function objectiveLines(state: GameState): ObjectiveLine[] {
   let peterStatus: string;
   if (!peterDone) {
     peterStatus =
-      "Peter is still hidden in Fate. A Fate action, or a hunt card such as Worthy Opponent, can find him. When he is first found he always lands at Hangman’s Tree, even while that place is locked.";
+      "Peter is still hidden in Fate. Hunt cards such as Worthy Opponent, or being Fated, can find him. At a table your Fate action hits another villain — here the computer always Fates you, and taking Fate yourself is a practice self-Fate. When he is first found he always lands at Hangman’s Tree, even while that place is locked.";
   } else if (peter) {
     peterStatus = `Peter is ashore at ${locName(peter.location)}. The rest of the chain is about walking him west and meeting him with enough Strength on the ship.`;
   } else {
@@ -169,7 +169,7 @@ function whereYouAre(state: GameState): string {
     : ` No Hero is covering the top row at ${loc}, so both printed rows are usable if you have not spent them yet.`;
 
   const crocNote = croc
-      ? ` Tick Tock is at ${locName(croc)}. Sharing that place with the captain — stepping there, or sliding the crocodile onto him — empties the whole hand.`
+      ? ` Tick Tock is at ${locName(croc)}. The hand empties only if the captain moves onto that place. Seating the crocodile on the captain, or sliding him there, does not snap.`
     : " Tick Tock is not ashore, so movement is safer than it will be later.";
 
   const fateNote = fateEmptyLine(state);
@@ -240,7 +240,7 @@ function thisMoment(state: GameState): string {
     case "fateChooseAttach":
     case "fateChooseItem":
     case "worthyLocation":
-      return "This is your Fate action — you are the one flipping the other deck. If Peter is in the pair, play him: he lands at Hangman’s Tree. Park Tick Tock off the lagoon and the tree if you can. Other Heroes should cover the fewest actions you still need. This beat exists so you can hunt Peter without waiting for the computer’s turn.";
+      return "This is practice self-Fate: you are flipping Hook’s own Fate deck. At a table the Fate action hits another villain; Hook finds Peter with hunt cards and by being Fated. If Peter is in the pair, play him: he lands at Hangman’s Tree. Park Tick Tock off the lagoon and the tree if you can. Other Heroes should cover the fewest actions you still need.";
     case "fateReport":
       if (p.resume === "nextTurn") {
         return "Fate has already acted. This modal stays up with the full paraphrased card text until you press Continue — it will not auto-dismiss. Read what landed: who is covering your next stop, whether Peter appeared, whether Tick Tock is now on a place you wanted to walk. Then acknowledge. The next required move will use that new map of the realm.";
@@ -253,11 +253,11 @@ function thisMoment(state: GameState): string {
       return "You peeked at two Fate cards without revealing them. Looking is not finding Peter — a peek will not force him onto the tree. You may discard both to the Fate discard (they can return when Fate reshuffles), or put them back in either order. If Peter is in the peek, return him on top so the next real Fate flip can find him. If the crocodile or a headache is there, discarding both is often the kinder table.";
     case "obsessionDecide":
     case "obsessionLocation":
-      return "Obsession hunted a Hero out of Fate. If it is Peter, play him — he still goes to Hangman’s Tree. If it is Tick Tock, sending him out of the realm saves your hand later. This is a practice-only trigger: you may fire it on your own turn while Peter is still hidden, because there is no opponent’s turn here.";
+      return "Obsession hunted a Hero out of Fate. If it is Peter, play him — he still goes to Hangman’s Tree. If it is Tick Tock, sending him out of the realm saves your hand later. Obsession is a printed Condition; at a table it waits for another player to defeat a strong Hero. This tool rewrites that trigger so you may fire it on your own turn while Peter is still hidden.";
     case "cunningAlly":
     case "cunningLocation":
     case "conditionOffer":
-      return "A Condition is ready. In this solo tool those cards do not wait for an opponent. Cunning lets a free Ally come ashore if a Strength-4 Hero is already out — drop that Ally on the ship. Obsession hunts a Hero while Peter is hidden. Playing the Condition is usually the lesson; skipping it is legal if the board is already loud.";
+      return "A printed Condition is ready, with a solo trigger. At a table Cunning watches for a strong Ally in another realm on another player’s turn; here it fires on your turn if a Strength-4 Hero is already out — drop that Ally on the ship. Obsession is also printed; here it hunts a Hero while Peter is hidden. Playing the Condition is usually the lesson; skipping it is legal if the board is already loud.";
     case "tinkerDiscard":
       return "A newly placed Hero may discard one Ally at that same place. Skipping keeps your crew. Allies on the Jolly Roger are the clash that finishes Peter, so do not feed them away unless the Ally was stranded and useless.";
     default:
@@ -343,7 +343,7 @@ function whatItSetsUp(state: GameState): string {
   }
 
   parts.push(
-    "The tree is open and Peter is still hidden, so the setup is a hunt. Fate actions, Worthy Opponent, Give Them a Scare, and Obsession exist to flip him onto Hangman’s Tree. You do not need to wait politely for the computer.",
+    "The tree is open and Peter is still hidden, so the setup is a hunt. At a table Hook finds him with hunt cards (Worthy Opponent, Give Them a Scare, Obsession) and by being Fated. Here the computer always Fates you after each turn; your own Fate action is a practice self-Fate, not the printed Fate-another-villain action.",
   );
   parts.push(
     `Meanwhile the ship should not sit empty — you have about ${jrStrength(state)} Strength there. An Ally played “too early” is an Ally you will not have to find later while Peter is already walking. When he appears, switch immediately to escort plus clash math.`,

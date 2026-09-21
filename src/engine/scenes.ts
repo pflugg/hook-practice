@@ -257,7 +257,7 @@ export function fateSpentScene(): GameState {
   return state;
 }
 
-/** Tick Tock already selected for Move a Hero, one step from the captain — click the ship to snap. */
+/** Tick Tock already selected for Move a Hero, one step from the captain — seating him on the ship does not snap. */
 export function tickTockOntoCaptainScene(): GameState {
   const state = createGame("normal", 1);
   emptyRealm(state);
