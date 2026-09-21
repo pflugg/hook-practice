@@ -3,7 +3,9 @@ import { adjacentIds, locName } from "./realm";
 import {
   allAllies,
   allHeroes,
+  allLocationItems,
   allyStrength,
+  attachableHeroes,
   availableActions,
   cardName,
   coveringHero,
@@ -130,29 +132,10 @@ function bestAllyHome(state: GameState): LocationId {
   return legal.includes(state.villainLocation) ? state.villainLocation : (legal[0] ?? "jollyRoger");
 }
 
-function crocCanSlideOnto(state: GameState, captainAt: LocationId): boolean {
-  const croc = tickTockAt(state);
-  if (!croc || croc === captainAt) return false;
-  return adjacentUnlocked(state, croc).includes(captainAt);
-}
-
-function heroSlideReady(state: GameState): boolean {
-  const kind = state.pending?.kind;
-  if (kind === "moveHeroSelect" || kind === "moveHeroDest" || kind === "starkeyHero" || kind === "starkeyDest") {
-    return true;
-  }
-  if (state.phase === "actions" && !state.pending) {
-    return availableActions(state).some((a) => a.kind === "moveHero" && a.available);
-  }
-  return false;
-}
-
 function warningFor(state: GameState, highlights: string[]): string | undefined {
   const notes: string[] = [];
   const croc = tickTockAt(state);
-  const slideNow = Boolean(croc && crocCanSlideOnto(state, state.villainLocation) && heroSlideReady(state));
   const pair = clashAndCrocLine(state);
-  const moveOrSlide = state.phase === "move" || heroSlideReady(state);
   if (
     state.phase === "actions" &&
     anyTauntInRealm(state) &&
@@ -163,13 +146,9 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
   }
   if (pair) {
     notes.push(pair);
-  } else if (slideNow) {
+  } else if (croc && state.phase === "move") {
     notes.push(
-      "A Hero move can slide Tick Tock onto the captain this turn. That empties the hand the same as stepping onto him — park the crocodile elsewhere.",
-    );
-  } else if (croc && moveOrSlide) {
-    notes.push(
-      `Tick Tock waits at ${locName(croc)} — sharing that place (stepping there, or sliding the crocodile onto the captain) empties your hand.`,
+      `Tick Tock waits at ${locName(croc)} — if the captain moves onto that place, the whole hand is discarded. Seating or sliding the crocodile onto the captain does not empty the hand.`,
     );
   }
   const covering = coveringHero(state, state.villainLocation);
@@ -185,23 +164,6 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
   }
   if (highlights.some((h) => croc && h === `loc:${croc}`)) {
     notes.unshift("That recommended step lands on Tick Tock. Only go if you accept an empty hand.");
-  }
-  if (state.phase === "move" && !state.pending) {
-    const destHi = highlights.find((h) => h.startsWith("loc:"));
-    const dest = destHi?.slice(4) as LocationId | undefined;
-    if (dest && crocCanSlideOnto(state, dest)) {
-      notes.unshift(
-        `Stopping at ${locName(dest)} puts Tick Tock one Hero-move from the captain. Sliding him onto you empties the hand.`,
-      );
-    }
-  }
-  const movingCroc =
-    (state.pending?.kind === "moveHeroDest" || state.pending?.kind === "starkeyDest") &&
-    findCard(state, state.pending.heroId)?.defId === "tickTock";
-  if (movingCroc && highlights.some((h) => h === `loc:${state.villainLocation}`)) {
-    notes.unshift(
-      "That recommended step slides Tick Tock onto the captain. Only go if you accept an empty hand.",
-    );
   }
   return notes[0];
 }
@@ -355,7 +317,7 @@ function plannedAfterMove(state: GameState, dest: LocationId): string {
     const junk = next.hand.find((c) => !keepOnDiscard(next, c));
     return junk ? `then take Discard and click ${cardName(junk)}` : "then take Discard";
   }
-  if (pick.kind === "fate") return "then take Fate to hunt Peter Pan";
+  if (pick.kind === "fate") return "then take Fate (practice self-Fate)";
   if (pick.kind === "moveItemAlly") {
     const piece = movableAlliesAndItems(next).find(
       (c) => def(c.defId).type === "ally" && findCardLocation(next, c.instanceId) !== "jollyRoger",
@@ -443,7 +405,7 @@ function moveWhy(state: GameState, dest: LocationId): string {
     return "The Map is still in the deck. A Discard action lets you dig for it so the tree can open.";
   }
   if (!state.peterPanRevealed && hasKind(state, dest, "fate")) {
-    return "Peter is still hidden. A Fate action can flip him onto Hangman’s Tree, even if that hideout is locked.";
+    return "Peter is still hidden. Hunt cards, or being Fated, can find him. In this practice tool your Fate action is self-Fate — at a table it would hit another villain.";
   }
   return "Every turn starts with a required move. This stop lines up the next useful action on the Map → Tree → Peter → ship chain.";
 }
@@ -580,7 +542,7 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
       return `Click Play a Card, then ${cardName(card)} in your hand, then ${placeVerb(playHome(state, card))}. An Ally on the Jolly Roger is Strength waiting for Peter.`;
     }
     if (card && (card.defId === "worthyOpponent" || card.defId === "giveThemAScare")) {
-      return `Click Play a Card, then ${cardName(card)} in your hand. These hunts can flip Peter onto Hangman’s Tree without waiting on a Fate action.`;
+      return `Click Play a Card, then ${cardName(card)} in your hand. Hunt cards are how Hook finds Peter at a table — plus being Fated. The computer always Fates you here after each turn.`;
     }
     if (card) {
       return playCta(state, card, "open");
@@ -601,7 +563,7 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
     return "Toss cards you do not need so the deck can yield the Never Land Map — the tree stays locked without it.";
   }
   if (slot.kind === "fate") {
-    return "A Fate action can reveal Peter onto Hangman’s Tree. Other cards from that reveal are swept aside.";
+    return "Practice self-Fate: this flips Hook’s own Fate deck. At a table your Fate action hits another villain; Hook finds Peter with hunt cards and by being Fated. If Peter is in the pair, play him — he lands at Hangman’s Tree.";
   }
   if (slot.kind === "moveItemAlly") {
     return "Slide crew toward the Jolly Roger so their Strength is waiting when Peter arrives.";
@@ -964,18 +926,22 @@ function advisePending(state: GameState): CoachAdvice {
       );
     }
     case "fateChooseAttach": {
-      const heroes = allHeroes(state).filter((h) => h.hero.defId !== "peterPan");
-      const pick = heroes[0] ?? allHeroes(state)[0];
+      const itemId = state.heldCard?.defId ?? (p.kind === "fateChooseAttach" ? findCard(state, p.cardId)?.defId : undefined) ?? "pixieDust";
+      const legal = attachableHeroes(state, itemId);
+      const offPeter = legal.filter((h) => h.defId !== "peterPan");
+      const pick = offPeter[0] ?? legal[0];
       if (!pick) return say("Choose a Hero", "The attachment needs a Hero in the realm.", [], state);
       return say(
-        `Attach it to ${cardName(pick.hero)}`,
-        "Keep extra Strength off Peter if you can. He is already a tall clash.",
-        [`card:${pick.hero.instanceId}`],
+        `Attach it to ${cardName(pick)}`,
+        itemId === "pixieDust" && !state.hangmansUnlocked
+          ? "Pixie Dust does not cling to Peter while Hangman’s Tree is still locked. Park the +2 on another Hero."
+          : "Keep extra Strength off Peter if you can. He is already a tall clash.",
+        [`card:${pick.instanceId}`],
         state,
       );
     }
     case "fateChooseItem": {
-      const items = LOCATION_IDS.flatMap((id) => state.locations[id].items.map((item) => ({ item, id })));
+      const items = allLocationItems(state);
       const junk = items.find((i) => i.item.defId !== "neverLandMap" && i.item.defId !== "ingeniousDevice");
       const pick = junk ?? items.find((i) => i.item.defId !== "neverLandMap") ?? items[0];
       if (!pick) {
@@ -1008,7 +974,7 @@ function advisePending(state: GameState): CoachAdvice {
         const other = p.cards.find((c) => c.instanceId !== peter.instanceId) ?? peter;
         return say(
           `Return the peek with ${cardName(peter)} on top`,
-          "The next Fate flip can reveal him onto Hangman’s Tree, even while that hideout is locked.",
+          "A later hunt or being Fated can reveal him onto Hangman’s Tree, even while that hideout is locked.",
           [`btn:scare-order:${peter.instanceId},${other.instanceId}`],
           state,
         );
@@ -1023,7 +989,7 @@ function advisePending(state: GameState): CoachAdvice {
       }
       return say(
         "Discard both peeked cards",
-        "A cleaner Fate deck makes Worthy Opponent and later Fate actions more likely to find Peter. Discarded cards can still return when Fate reshuffles.",
+        "A cleaner Fate deck makes Worthy Opponent and later hunts more likely to find Peter. Discarded cards can still return when Fate reshuffles.",
         ["btn:scare-discard"],
         state,
       );

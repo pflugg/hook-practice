@@ -61,8 +61,8 @@ Heroes cover the **top** actions at their location. Gold outlines mark legal cli
 
 **Difficulty**
 
-- **Easy** — Fate picks randomly among legal plays in the drawn pair (including skipping Peter when he is one of the two cards).
-- **Normal** (default) — Fate prefers Peter Pan, blocks useful actions, parks Tick Tock on rich locations, and spends Splitting Headache on your best Items.
+- **Easy** — Fate picks randomly among legal plays in the drawn pair. If Peter is one of the two revealed cards, he is played to Hangman’s Tree and the other card is discarded — same as Normal and a table Fate aimed at Hook.
+- **Normal** (default) — Fate prefers Peter Pan, blocks useful actions, parks Tick Tock on rich locations, and spends Splitting Headache on your best Items (including attached Cutlass / Fate Items).
 
 ## Coach mode
 
@@ -111,11 +111,11 @@ While a Play, Move a Hero, Move Ally/Item, Aye Aye, or Cutlass attach is open, g
 ## Practice tips
 
 - Discard often until the Map appears. Hangman’s Tree stays locked without it, so Peter cannot leave.
-- Worthy Opponent and Give Them a Scare let you hunt Fate without waiting on a Fate action.
+- Worthy Opponent and Give Them a Scare are hunt cards — at a table those (plus being Fated) are how Hook finds Peter. Your Fate action here is practice self-Fate, not the printed Fate-another-villain action.
 - Build Strength at the Jolly Roger *before* walking Peter across. Two Pirate Brutes, or Smee plus help, will finish an unbuffed Peter (Strength 8).
 - Mr. Starkey and Ingenious Device are the fast escort. Splitting Headache loves those Items.
 - Do not vanquish Peter anywhere except the Jolly Roger — that loses the duel.
-- Tick Tock discards your whole hand if you step onto his location.
+- Tick Tock discards your whole hand only if the captain **moves onto** his location. Seating or sliding the crocodile onto the captain does not snap.
 
 ## Project layout
 

@@ -20,7 +20,7 @@ Personal unofficial practice tool. This document **paraphrases** table mechanics
 
 The voyage it teaches — play the Map, open the locked hideout, find Peter (he always lands at the hideout, even while locked), walk him west along the four-stop realm, clash him only on the ship — matches Hook’s published objective. Realm layout, printed action rows, costs, copy counts (30 / 15), Power, hand refill to four, Hero coverage of the **top printed row**, equal-Strength Vanquish, Taunt-before-others, Lost Boys needing two Allies, Smee / John / Michael / Wendy math, Cutlass attach, Map-as-Item-payment, and Boarding Party adjacency are in good shape.
 
-What it is *not* is a substitute for sitting across from another villain. The computer always Fates you. Your own Fate action fishes **your** Fate deck. Cunning and Obsession fire on **your** turn with rewritten triggers. Tick Tock empties the hand when the crocodile is seated or slid onto the captain, not only when the captain walks onto the crocodile. Easy Fate may bury Peter from a revealed pair.
+What it is *not* is a substitute for sitting across from another villain. The computer always Fates you. Your own Fate action fishes **your** Fate deck (now labeled practice self-Fate). Cunning and Obsession fire on **your** turn with rewritten triggers. Tick Tock empties the hand only when the captain walks onto the crocodile. Easy Fate plays a revealed Peter.
 
 For someone who already knows the table game and wants reps on Map → tree → walk → ship clash, fidelity is high enough to be useful tonight. For a first-time Hook player who will sit down at a real table tomorrow, the Must list below is the curriculum gap.
 
@@ -77,12 +77,12 @@ Captain starts at the Jolly Roger, 0 Power, four cards, and must move (`createGa
 
 | | Easy | Normal |
 | --- | --- | --- |
-| Card from the pair | Random among “legal” cards | Heuristic; **always** plays Peter if present |
+| Card from the pair | Random among “legal” cards; **always** plays Peter if present | Heuristic; **always** plays Peter if present |
 | Hero seating | Random unlocked stop | Prefers covering rich actions; Tick Tock likes the lagoon / ship |
 | Attach | Random Hero | Prefers Peter, else strongest |
 | Headache | Random; skipped if the *location-item* shore is empty and the other card can play | Targets Device → Map → Cannon → Case |
 
-Easy **can skip Peter** when he is one of the two revealed cards (`tests/fateEasy.test.ts`). That is gentler practice and **illegal** at a table. See Must #4.
+Easy **plays Peter** when he is one of the two revealed cards (`tests/fateEasy.test.ts`). Fixed in the fidelity Must PR.
 
 ### Already listed as not modeled
 
@@ -92,49 +92,37 @@ Easy **can skip Peter** when he is one of the two revealed cards (`tests/fateEas
 
 ## Must gaps (mis-teach real table play)
 
-These will leak into a real game if the player only learns from the UI.
+**Fixed in this PR** (fidelity Must: Tick Tock, Easy Peter, teaching copy). The four items below are the original audit findings; each now notes the repair.
 
-### 1. Tick Tock fires when the crocodile arrives, not only when the captain walks
+### 1. Tick Tock fires when the crocodile arrives, not only when the captain walks — **fixed**
 
 **Table (and this tool’s own card line):** the hand empties if the captain **moves to** the crocodile’s place. Seating Tick Tock on the captain, or sliding the crocodile onto the captain, does **not** snap.
 
-**Engine:** `checkTickTock` / `snapTickTockHand` also snap when Tick Tock is moved onto the captain (Move a Hero, Starkey) and when Fate seats him on the captain’s place. The snap report teaches the wrong rule: “sharing this place with the captain empties the hand again.” The Strategy brief repeats it (`whereYouAre` in `src/engine/strategyBrief.ts`: “stepping there, or sliding the crocodile onto him”). `tests/tickTockMove.test.ts` encodes the extra triggers as desired behavior. `RULES_NOTES.md` does **not** mention this.
+**Now:** `checkTickTock` snaps only when `moved === "captain"`. Fate seating and Move a Hero / Starkey slides do not empty the hand. Snap note, Coach, Strategy brief, and `RULES_NOTES.md` match. `tests/tickTockMove.test.ts` encodes the table triggers.
 
-**Why it matters:** at a table, parking Tick Tock on Hook is a cover / Strength problem, not a free discard. A player trained here will refuse legal seats and “safe” escort slides that are actually fine.
+### 2. Taking Fate is taught as Hook’s way to find Peter — **fixed (copy)**
 
-### 2. Taking Fate is taught as Hook’s way to find Peter
+Coach, Strategy brief, help, and the player Fate overlay now say hunt cards + being Fated are how Hook finds Peter at a table. The player Fate action is labeled **practice self-Fate**.
 
-Coach, Strategy brief, and help treat a Fate action as a hunt: “A Fate action, or a hunt card… can find him” (`objectiveLines`, `whatItSetsUp`). That is true **in this program**. At a table, Hook’s Fate action Fates **someone else**. Finding Peter is the hunt cards plus opponents choosing (or being forced) to Fate you.
+### 3. Teaching copy says Cunning / Obsession are not printed two-player cards — **fixed**
 
-**Why it matters:** a player will spend a Fate action on their own deck in a multiplayer game, or expect that “I Fate” is how Hook advances the objective.
+Help and `RULES_NOTES.md` now say they **are** printed Conditions; only the **triggers** are rewritten for solo (strong Hero here / Peter not yet revealed, on your turn).
 
-### 3. Teaching copy says Cunning / Obsession are not printed two-player cards
+### 4. Easy Fate may bury a revealed Peter — **fixed**
 
-`helpView` in `src/ui/app.ts`: “Neither is a printed two-player Condition.” That is false. They **are** printed Conditions. The solo tool **rewrites the trigger** so they can fire without an opponent.
-
-`RULES_NOTES.md` correctly says they wait for an opponent’s turn, then describes the **practice** triggers as if those were the published ones. Printed Cunning watches for a **strong Ally in another realm**. Printed Obsession watches for **another player defeating a strong Hero**. The practice versions watch a strong Hero here, and “Peter not yet revealed.”
-
-**Why it matters:** the player will look at the wrong board, on the wrong turn, and think the cards were invented for this app.
-
-### 4. Easy Fate may bury a revealed Peter
-
-Published Peter: when he is revealed — including as one of the two cards from a Fate action aimed at Hook — he is played to the hideout and the other card is discarded. The player Fate path honors that (`playPeterIfPresent`). Normal computer Fate honors it. **Easy does not.**
-
-README presents this as Easy’s charm. It still teaches a false legal option: “I can take the other card and put Peter in the discard.”
+Easy and Normal both play a revealed Peter to Hangman’s Tree and discard the other card (`chooseFateCard`, `tests/fateEasy.test.ts`). README no longer presents burying Peter as Easy’s charm.
 
 ---
 
 ## Should gaps (rough edges / partial rules)
 
-### Splitting Headache only sees loose location Items
+### Splitting Headache only sees loose location Items — **fixed in this PR**
 
-`allLocationItems` / `chooseHeadacheItem` ignore the `attachments` list. A board whose only Item is a strapped Cutlass (or Pixie Dust / Taunt) is treated as “no Item ashore,” and Headache fizzles (`finishHeadacheWithoutItems`). At a table, an Item attached to a character is still an Item in the realm; Headache can strip Cutlass, and many tables also allow stripping Fate attachments.
+`allLocationItems` now includes `attachments`. Headache can strip Cutlass and Fate attachments; discarded Fate Items go to the Fate discard.
 
-Normal AI therefore both **under-threatens** (leaves Cutlass up) and **over-fizzles**.
+### Fate attachments on Peter while the hideout is still locked — **fixed in this PR (Pixie Dust)**
 
-### Fate attachments on Peter while the hideout is still locked
-
-A common table clarification: the +2 Fate Item does not attach to Peter while he sits on the still-locked hideout. The engine will attach Pixie Dust or Taunt to any Hero in the realm (`fateChooseAttach`, `chooseAttachTarget`), including locked-tree Peter. That can make the later clash look harder than a strict table would allow.
+Pixie Dust does not attach to Peter while Hangman’s Tree is still locked (`canAttachFateItem`). Taunt may still cling.
 
 ### Distant Boarding Party joining an adjacent clash
 
@@ -150,9 +138,9 @@ Obsession’s practice resolve lets you play or “banish” the found Hero (`pl
 
 Covered above as intentional. They stay on the Should list because Coach / Brief treat them as the rules of the evening, not as a sidebar. A “table mode” toggle later would help; not tonight.
 
-### Help / Brief under-label the Fate-on-self adaptation
+### Help / Brief under-label the Fate-on-self adaptation — **fixed in this PR**
 
-The Across-the-table strip correctly says it stands in for another player. The **player** Fate overlay (“Your Fate action”) does not say “this is self-Fate, not the printed Fate action.”
+The player Fate overlay is titled **Practice self-Fate** and says the printed Fate action hits another villain.
 
 ---
 

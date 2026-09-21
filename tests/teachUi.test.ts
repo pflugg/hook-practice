@@ -13,7 +13,7 @@ import {
   vanquishLocalScene,
 } from "../src/engine/scenes";
 import { liveMoveReason } from "../src/engine/moveReason";
-import { renderOverlay, renderPlay } from "../src/ui/app";
+import { helpView, renderOverlay, renderPlay } from "../src/ui/app";
 import { barePlayState, give, inst, putAlly, putHero, putItem } from "./helpers";
 
 describe("teaching UI for Must fixes", () => {
@@ -255,5 +255,23 @@ describe("teaching UI for Must fixes", () => {
     });
     expect(spent).toContain("That Fate is over");
     expect(spent).not.toContain("Taunt clings to Tinker Bell");
+  });
+
+  it("help and player Fate overlay teach table Fate and printed Conditions honestly", () => {
+    const help = helpView(true);
+    expect(help).toMatch(/practice self-Fate/i);
+    expect(help).toMatch(/hits another villain/i);
+    expect(help).toMatch(/are<\/b> printed two-player Conditions|are printed two-player Conditions/i);
+    expect(help).not.toMatch(/Neither is a printed/);
+    expect(help).toMatch(/rewrites those triggers/i);
+    expect(help).toMatch(/hand empties only if the captain moves onto him/i);
+
+    const state = barePlayState();
+    state.phase = "resolving";
+    state.pending = { kind: "fateChooseCard", cards: [inst("wendy"), inst("john")], actor: "player" };
+    const overlay = renderOverlay(state);
+    expect(overlay).toMatch(/Practice self-Fate/);
+    expect(overlay).not.toMatch(/<h2>Your Fate action<\/h2>/);
+    expect(overlay).toMatch(/hits another villain/i);
   });
 });

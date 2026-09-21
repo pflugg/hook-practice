@@ -103,9 +103,26 @@ export function allAllies(state: GameState): { ally: CardInstance; location: Loc
 }
 
 export function allLocationItems(state: GameState): { item: CardInstance; location: LocationId }[] {
-  return LOCATION_IDS.flatMap((id) =>
+  const loose = LOCATION_IDS.flatMap((id) =>
     state.locations[id].items.map((item) => ({ item, location: id })),
   );
+  const strapped = state.attachments.flatMap((a) => {
+    const location = findCardLocation(state, a.attachedTo);
+    return location ? [{ item: a.item, location }] : [];
+  });
+  return [...loose, ...strapped];
+}
+
+/** +2 Fate Items (Pixie Dust) do not attach to Peter while Hangman’s Tree is still locked. */
+export function canAttachFateItem(state: GameState, itemDefId: string, hero: CardInstance): boolean {
+  if (itemDefId === "pixieDust" && hero.defId === "peterPan" && !state.hangmansUnlocked) return false;
+  return true;
+}
+
+export function attachableHeroes(state: GameState, itemDefId: string): CardInstance[] {
+  return allHeroes(state)
+    .filter(({ hero }) => canAttachFateItem(state, itemDefId, hero))
+    .map(({ hero }) => hero);
 }
 
 export function mapInRealm(state: GameState): CardInstance | null {
@@ -545,11 +562,11 @@ export function promptText(state: GameState): string {
     case "scarePeek":
       return "Discard both peeked Fate cards to the Fate discard (they can return when Fate reshuffles), or put them back on top in an order.";
     case "fateChooseCard":
-      return "Play one Fate card and discard the other.";
+      return "Practice self-Fate: play one Fate card from Hook’s own deck and discard the other. At a table this action would Fate another villain.";
     case "fateChooseLocation":
       return "Choose an unlocked location for this Hero.";
     case "fateChooseAttach":
-      return "Attach this to a Hero in the realm.";
+      return "Attach this to a Hero in the realm. Pixie Dust cannot cling to Peter while Hangman’s Tree is still locked.";
     case "fateChooseItem":
       return allLocationItems(state).length === 0
         ? "No Item ashore — this Fate card is discarded. Splitting Headache finds no Item and is discarded."

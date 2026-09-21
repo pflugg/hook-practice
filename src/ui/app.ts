@@ -173,15 +173,28 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
   const cards = (empty: string, arr: CardInstance[]) =>
     arr.length
       ? `<div class="zone-cards">${arr
-          .map((c) =>
-            renderCard(state, c, {
+          .map((c) => {
+            const host = renderCard(state, c, {
               size: "mini",
               legal: hi.has(`card:${c.instanceId}`),
               selected: sel.has(c.instanceId),
               coached: coached.has(`card:${c.instanceId}`),
               inspectable: true,
-            }),
-          )
+            });
+            const extras = attachmentsOn(state, c.instanceId)
+              .filter((a) => hi.has(`card:${a.instanceId}`))
+              .map((a) =>
+                renderCard(state, a, {
+                  size: "mini",
+                  legal: true,
+                  selected: sel.has(a.instanceId),
+                  coached: coached.has(`card:${a.instanceId}`),
+                  inspectable: true,
+                }),
+              )
+              .join("");
+            return host + extras;
+          })
           .join("")}</div>`
       : `<p class="empty">${empty}</p>`;
 
@@ -271,7 +284,7 @@ function titleView(
   </main>`;
 }
 
-function helpView(fromPlay: boolean): string {
+export function helpView(fromPlay: boolean): string {
   return `<div class="overlay"><div class="modal wood">
     <h2>How to play</h2>
     <p>Each turn you <b>must move</b> to a different unlocked location, then may use each uncovered action there once. Heroes cover the top row. End the turn to refill to 4 cards; the computer then Fates you.</p>
@@ -280,9 +293,10 @@ function helpView(fromPlay: boolean): string {
     <p><b>Strategy brief:</b> a persistent right-rail pane that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
     <p><b>Move reasons:</b> a “Why this move” pane in that same right-hand stack. After each legal click it names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on. Below about 1100px the three panes tab under the board so type stays at the desktop floor.</p>
     <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it. The <b>Across the table</b> strip keeps the last revealed Fate play visible while that card is still on the table — never the face-down deck.</p>
-    <p><b>Solo Conditions:</b> Cunning and Obsession are practice-only. Cunning is ready only when a Strength 4+ Hero is already ashore — then you may slip an Ally in for free. Obsession hunts Fate for a Hero while Peter is hidden. Neither is a printed two-player Condition. A grey Condition is not ready yet.</p>
+    <p><b>Finding Peter:</b> At a table, Hook finds Peter with hunt cards (Worthy Opponent, Give Them a Scare, Obsession) and by being Fated. Your Fate action there hits another villain. This solo tool always Fates you after each turn, and your Fate action is a <b>practice self-Fate</b> — it flips Hook’s own Fate deck so you can practice the find without a second player.</p>
+    <p><b>Printed Conditions:</b> Cunning and Obsession <b>are</b> printed two-player Conditions. At a table they wait for another player’s turn (a strong Ally in another realm; another player defeating a strong Hero). This tool rewrites those triggers so they can fire on your turn: Cunning if a Strength 4+ Hero is already ashore and you hold an Ally; Obsession if Peter is still hidden. A grey Condition is not ready yet.</p>
     <p><b>Drag:</b> When a card can move or be played onto a place, grab it and slide onto a glowing location (or Ally, for the Cutlass). Drop outside to cancel the slide; clicking still works.</p>
-    <p><b>Practice tips:</b> Discard aggressively for the Map. Fish Fate with Worthy Opponent and Give Them a Scare. Station strength at the ship before walking Peter across. Beware Tick Tock and Splitting Headache.</p>
+    <p><b>Practice tips:</b> Discard aggressively for the Map. Hunt cards (Worthy Opponent, Give Them a Scare) are how Hook finds Peter at a table — plus being Fated. Station strength at the ship before walking Peter across. Beware Tick Tock (hand empties only if the captain moves onto him) and Splitting Headache.</p>
     <div class="actions-row"><button class="btn primary" data-close-help>${fromPlay ? "Return to the realm" : "Back"}</button></div>
   </div></div>`;
 }
@@ -359,8 +373,8 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
   }
   if (p?.kind === "fateChooseCard") {
     return `<div class="overlay"><div class="modal">
-      <h2>Your Fate action</h2>
-      <p>Play one card; the other is discarded. Read the full text before you choose.</p>
+      <h2>Practice self-Fate</h2>
+      <p>This is a solo adaptation: you are flipping Hook’s own Fate deck. At a table the Fate action hits another villain; Hook finds Peter with hunt cards and by being Fated. Play one card; the other is discarded. Read the full text before you choose.</p>
       <div class="modal-cards">${p.cards
         .map((c) => renderCard(state, c, { size: "reveal", legal: hi.has(`card:${c.instanceId}`), selected: sel.has(c.instanceId), coached: coached.has(`card:${c.instanceId}`) }))
         .join("")}</div>

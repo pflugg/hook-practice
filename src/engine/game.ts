@@ -12,6 +12,7 @@ import {
   allAllies,
   allLocationItems,
   allyStrength,
+  attachableHeroes,
   availableActions,
   canPlayCunning,
   canPlayObsession,
@@ -160,6 +161,11 @@ function discardVillainCard(state: GameState, card: CardInstance): void {
 
 function discardFateCard(state: GameState, card: CardInstance): void {
   state.fateDiscard.unshift(card);
+}
+
+function discardRealmItem(state: GameState, card: CardInstance): void {
+  if (def(card.defId).deck === "fate") discardFateCard(state, card);
+  else discardVillainCard(state, card);
 }
 
 function detachAll(state: GameState, hostId: string): void {
@@ -342,7 +348,7 @@ function openFateReport(
 }
 
 const TICK_TOCK_SNAP_NOTE =
-  "Tick Tock snaps — the whole hand is discarded. The crocodile stays in the realm; sharing this place with the captain empties the hand again.";
+  "Tick Tock snaps — the whole hand is discarded. The crocodile stays in the realm. The hand empties only when the captain moves onto this place.";
 
 function tickTockAt(state: GameState, dest: LocationId): CardInstance | undefined {
   return state.locations[dest].heroes.find((h) => h.defId === "tickTock");
@@ -374,12 +380,12 @@ function openTickTockSnapReport(state: GameState, opts?: { markAction?: boolean 
   });
 }
 
-/** Captain stepped onto Tick Tock, or Tick Tock was moved/seated onto the captain. */
+/** Hand empties only when the captain moves onto Tick Tock's place — not when the crocodile is seated or slid onto the captain. */
 function checkTickTock(state: GameState, dest: LocationId, moved?: CardInstance | "captain"): boolean {
+  if (moved !== "captain") return false;
   if (dest !== state.villainLocation) return false;
   const croc = tickTockAt(state, dest);
   if (!croc) return false;
-  if (moved && moved !== "captain" && moved.defId !== "tickTock") return false;
   snapTickTockHand(state);
   openTickTockSnapReport(state);
   return true;
@@ -506,12 +512,6 @@ function resolveComputerFateCard(
     state.rng = dest.rng;
     placeHero(state, card, dest.id);
     note = `Fate seats ${d.name} at ${locName(dest.id)}.`;
-    if (card.defId === "tickTock" && dest.id === state.villainLocation && snapTickTockHand(state)) {
-      const pair = clashAndCrocLine(state);
-      note += pair
-        ? ` Tick Tock snaps — the whole hand is discarded. ${pair}`
-        : " Tick Tock snaps — the whole hand is discarded.";
-    }
     if (card.defId === "tinkerBell") {
       const ally = chooseTinkerAlly(state, dest.id);
       if (ally) {
@@ -522,7 +522,7 @@ function resolveComputerFateCard(
       }
     }
   } else if (d.id === "pixieDust" || d.id === "taunt") {
-    const target = chooseAttachTarget(state, state.difficulty);
+    const target = chooseAttachTarget(state, state.difficulty, d.id);
     state.rng = target.rng;
     if (!target.hero) {
       discardFateCard(state, card);
@@ -538,7 +538,7 @@ function resolveComputerFateCard(
       return;
     }
     removeFromRealm(state, item.instanceId);
-    discardVillainCard(state, item);
+    discardRealmItem(state, item);
     discardFateCard(state, card);
     note = `Splitting Headache discards ${def(item.defId).name}.`;
   } else {
@@ -736,10 +736,6 @@ function playAfterCost(
 function playHeldHero(state: GameState, hero: CardInstance, locationId: LocationId, tinkerActor: "player" | "ai"): void {
   placeHero(state, hero, locationId);
   log(state, `${def(hero.defId).name} is played to ${locName(locationId)}.`, "fate");
-  if (hero.defId === "tickTock" && locationId === state.villainLocation && snapTickTockHand(state)) {
-    openTickTockSnapReport(state, { markAction: true });
-    return;
-  }
   if (hero.defId === "tinkerBell" && state.locations[locationId].allies.length) {
     state.pending = { kind: "tinkerDiscard", tinkerId: hero.instanceId, locationId, actor: tinkerActor };
     return;
@@ -1076,7 +1072,6 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
     updatePeterLoc(state);
     log(state, `${def(hero.defId).name} is moved to ${locName(locationId)}.`);
     consumeCurrentAction(state);
-    checkTickTock(state, locationId, hero);
     return state;
   }
   if (p.kind === "fateChooseLocation" || p.kind === "worthyLocation" || p.kind === "obsessionLocation") {
@@ -1282,7 +1277,8 @@ function handleCard(state: GameState, instanceId: string): GameState {
   }
 
   if (p.kind === "fateChooseAttach") {
-    const heroes = LOCATION_IDS.flatMap((id) => state.locations[id].heroes);
+    const heldPreview = state.heldCard ?? findCard(state, p.cardId);
+    const heroes = attachableHeroes(state, heldPreview?.defId ?? "pixieDust");
     if (!heroes.some((h) => h.instanceId === instanceId)) return state;
     const held = state.heldCard ?? findCard(state, p.cardId);
     if (!held) return state;
@@ -1297,7 +1293,7 @@ function handleCard(state: GameState, instanceId: string): GameState {
     const item = removeFromRealm(state, instanceId);
     const headache = state.heldCard;
     if (item) {
-      discardVillainCard(state, item);
+      discardRealmItem(state, item);
       log(state, `Splitting Headache discards ${def(item.defId).name}.`, "fate");
     }
     if (headache) discardFateCard(state, headache);
@@ -1363,7 +1359,7 @@ function playPlayerFateCard(state: GameState, card: CardInstance): GameState {
     return state;
   }
   if (d.id === "pixieDust" || d.id === "taunt") {
-    const heroes = LOCATION_IDS.flatMap((id) => state.locations[id].heroes);
+    const heroes = attachableHeroes(state, d.id);
     if (heroes.length === 0) {
       discardFateCard(state, card);
       log(state, `${d.name} has no Hero to attach to.`);
@@ -1497,9 +1493,11 @@ export function highlightSet(state: GameState): Set<string> {
     case "scarePeek":
       p.cards.forEach((c) => set.add(`card:${c.instanceId}`));
       break;
-    case "fateChooseAttach":
-      LOCATION_IDS.forEach((id) => state.locations[id].heroes.forEach((h) => set.add(`card:${h.instanceId}`)));
+    case "fateChooseAttach": {
+      const held = state.heldCard ?? findCard(state, p.cardId);
+      attachableHeroes(state, held?.defId ?? "pixieDust").forEach((h) => set.add(`card:${h.instanceId}`));
       break;
+    }
     case "fateChooseItem":
       allLocationItems(state).forEach((i) => set.add(`card:${i.item.instanceId}`));
       break;
