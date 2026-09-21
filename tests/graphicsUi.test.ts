@@ -162,4 +162,31 @@ describe("game graphics UI pass", () => {
     expect(treeChunk).toContain("disabled");
     expect(treeChunk).toMatch(/data-act="ht-play"[^>]*disabled|disabled[^>]*data-act="ht-play"/);
   });
+
+  it("keeps teaching font floors while compacting play chrome, not copy", () => {
+    const css = readFileSync(join(process.cwd(), "src/ui/styles.css"), "utf8");
+    const coachDo = css.slice(css.indexOf(".coach-do {"), css.indexOf(".coach-why {"));
+    const coachWhy = css.slice(css.indexOf(".coach-why {"), css.indexOf(".coach-warn {"));
+    const briefP = css.slice(css.indexOf(".brief-block p {"), css.indexOf(".brief-objectives {"));
+    const reasonP = css.slice(css.indexOf(".reason-block p {"), css.indexOf(".reason-foot {"));
+    expect(coachDo).toMatch(/font-size:\s*18px/);
+    expect(coachWhy).toMatch(/font-size:\s*14px/);
+    expect(briefP).toMatch(/font-size:\s*14\.5px/);
+    expect(css).toMatch(/\.brief-objectives p \{ font-size: 14\.5px; \}/);
+    expect(reasonP).toMatch(/font-size:\s*14px/);
+    expect(css).not.toMatch(/\.coach-do\s*\{[^}]*font-size:\s*(1[0-7]|[0-9])px/);
+    expect(css).not.toMatch(/\.coach-why\s*\{[^}]*font-size:\s*(1[0-3]|[0-9])px/);
+
+    const locationBlock = css.slice(css.indexOf(".location {"), css.indexOf(".location.jollyRoger"));
+    expect(locationBlock).toMatch(/min-height:\s*340px/);
+    expect(locationBlock).not.toMatch(/min-height:\s*[4-9]\d{2}px/);
+
+    const handRow = css.slice(css.indexOf(".hand-row {"), css.indexOf(".hand.is-picking"));
+    expect(handRow).toMatch(/min-height:\s*212px/);
+    expect(handRow).not.toMatch(/min-height:\s*2[5-9]\dpx/);
+
+    const handCard = css.slice(css.indexOf(".card.hand-card {"), css.indexOf(".card.hand-card::before"));
+    expect(handCard).toMatch(/min-height:\s*196px/);
+    expect(handCard).not.toMatch(/min-height:\s*2[4-9]\dpx/);
+  });
 });
