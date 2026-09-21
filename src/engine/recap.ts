@@ -8,6 +8,16 @@ export interface EndgameRecap {
   fate: string;
 }
 
+function placePhrase(name: string): string {
+  return name === "Jolly Roger" ? "the Jolly Roger" : name;
+}
+
+function sentence(line: string): string {
+  const trimmed = line.replace(/\s+/g, " ").trim();
+  if (!trimmed) return "";
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
 function stepsRecap(state: GameState): string {
   const voyage = state.voyage;
   const parts: string[] = [];
@@ -38,33 +48,47 @@ function clashRecap(state: GameState): string {
   if (!clash) {
     return "There was no finished clash. A win needs Peter vanquished on the Jolly Roger, with the captain standing there or a Boarding Party reaching that neighboring place, and Ally Strength at least equal to his.";
   }
+  const where = placePhrase(clash.place);
+  const captainWhere = placePhrase(clash.captainPlace);
   const math = `Ally Strength was ${clash.allyStrength} and ${clash.heroName} was ${clash.heroStrength}. Equal Strength is enough — you do not need to go over.`;
   const local =
     clash.reach === "same-place"
-      ? `The captain stood at ${clash.captainPlace} with ${clash.heroName}, so the fight was local.`
-      : `The captain stood at ${clash.captainPlace}, and a Boarding Party reached ${clash.place} next door. That neighboring reach is what made the clash legal.`;
+      ? `The captain stood at ${captainWhere} with ${clash.heroName}, so the fight was local.`
+      : `The captain stood at ${captainWhere}, and a Boarding Party reached ${where} next door. That neighboring reach is what made the clash legal.`;
   if (state.won) {
-    return `${clash.heroName} was vanquished at ${clash.place}. ${local} ${math} That clash was legal, and it wins because it happened on the ship.`;
+    return `${clash.heroName} was vanquished at ${where}. ${local} ${math} That clash was legal, and it wins because it happened on the ship.`;
   }
   if (clash.heroName === "Peter Pan" && !clash.onShip) {
-    return `The Strength was enough and the place rule was followed. ${local} ${math} It still loses, because Peter was at ${clash.place}, not the Jolly Roger. This practice duel only wins on the ship.`;
+    return `The Strength was enough and the place rule was followed. ${local} ${math} It still loses, because Peter was at ${where}, not the Jolly Roger. This practice duel only wins on the ship.`;
   }
-  return `${clash.heroName} fell at ${clash.place}. ${local} ${math}`;
+  return `${clash.heroName} fell at ${where}. ${local} ${math}`;
 }
 
 function fateRecap(state: GameState): string {
-  const moments = state.voyage.fateMoments;
-  const peter = state.voyage.peterHow.trim();
+  const moments = state.voyage.fateMoments.map(sentence).filter(Boolean);
+  const peter = sentence(state.voyage.peterHow);
   const tick = [...moments].reverse().find((line) => /tick tock/i.test(line));
   const latest = moments[moments.length - 1];
-  const bits: string[] = [];
-  if (peter) bits.push(peter.endsWith(".") ? peter : `${peter}.`);
-  if (tick && tick !== peter) bits.push(tick.endsWith(".") ? tick : `${tick}.`);
-  else if (!tick && latest && latest !== peter) bits.push(latest.endsWith(".") ? latest : `${latest}.`);
-  if (bits.length === 0) {
+  const chosen: string[] = [];
+  const push = (line: string) => {
+    if (!line) return;
+    const shorter = chosen.findIndex((have) => line.includes(have) && line.length > have.length);
+    if (shorter >= 0) {
+      chosen[shorter] = line;
+      return;
+    }
+    if (chosen.some((have) => have === line || have.includes(line))) return;
+    chosen.push(line);
+  };
+  const peterStem = peter.replace(/[.!?]$/, "");
+  const peterLine = latest && peterStem && latest.includes(peterStem) ? latest : peter;
+  push(peterLine);
+  if (tick) push(tick);
+  if (chosen.length === 0 && latest) push(latest);
+  if (chosen.length === 0) {
     return "Fate did not change this finish. No Fate card landed a blow you still had to answer.";
   }
-  return bits.join(" ");
+  return chosen.join(" ");
 }
 
 /** Kid- and parent-friendly end card. Paraphrased play facts only — no published card text. */

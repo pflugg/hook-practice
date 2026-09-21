@@ -171,9 +171,10 @@ describe("full objective win", () => {
     expect(recap.headline).toBe("The ship is yours");
     expect(recap.steps).toMatch(/Map/);
     expect(recap.steps).toMatch(/walked him west/);
-    expect(recap.clash).toMatch(/Jolly Roger/);
+    expect(recap.clash).toMatch(/at the Jolly Roger/);
     expect(recap.clash).toMatch(/8/);
     expect(recap.fate).toMatch(/Fate played Peter Pan/);
+    expect(recap.fate.match(/seated him at Hangman’s Tree/g)?.length).toBe(1);
 
     const html = renderPlay(won);
     expect(html).toContain("data-recap-steps");
