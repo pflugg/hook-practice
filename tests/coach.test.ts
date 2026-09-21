@@ -359,6 +359,99 @@ describe("coach suggestions", () => {
     expectLegalHighlights(attaching, strap.highlights);
   });
 
+  it("does not say Play a costly card when Power cannot cover it", () => {
+    const state = barePlayState();
+    state.villainLocation = "skullRock";
+    state.phase = "actions";
+    state.power = 0;
+    state.hangmansUnlocked = true;
+    state.peterPanRevealed = false;
+    give(state, "pirateBrute");
+
+    const advice = advise(state);
+    expect(advice.do).not.toMatch(/Play Pirate Brute/i);
+    expect(advice.do).not.toMatch(/Take Fate/i);
+    expect(advice.do).toMatch(/Gain/);
+    expect(advice.why).toMatch(/3 Power/);
+    expect(advice.why).toMatch(/Save Pirate Brute/);
+    expectLegalHighlights(state, advice.highlights);
+
+    state.usedActions = ["sr-gain"];
+    const dig = advise(state);
+    expect(dig.do).not.toMatch(/Play Pirate Brute/i);
+    expect(dig.do).toMatch(/Discard/);
+    expect(dig.do).toMatch(/click Pirate Brute/i);
+    expect(dig.do).toMatch(/Confirm/);
+    expectLegalHighlights(state, dig.highlights);
+  });
+
+  it("moves toward Power instead of naming an unaffordable Play", () => {
+    const state = barePlayState();
+    state.phase = "move";
+    state.villainLocation = "jollyRoger";
+    state.power = 0;
+    state.hangmansUnlocked = true;
+    state.peterPanRevealed = false;
+    give(state, "pirateBrute");
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Move to Mermaid Lagoon/);
+    expect(advice.do).toMatch(/Gain/);
+    expect(advice.do).not.toMatch(/Play Pirate Brute/i);
+    expect(advice.why).toMatch(/Save Pirate Brute for when you have 3 Power/);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
+  it("does not start a Cutlass strap when Power cannot pay and the Map cannot substitute", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    state.power = 0;
+    state.hangmansUnlocked = true;
+    give(state, "cutlass");
+    putAlly(state, "boardingParty", "jollyRoger");
+
+    const advice = advise(state);
+    expect(advice.do).not.toMatch(/Play Cutlass/i);
+    expect(advice.do).not.toMatch(/strap/i);
+    expect(advice.do).toMatch(/Gain|Discard/);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
+  it("still plays the card the captain can pay when a costlier card is also in hand", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    state.power = 1;
+    state.hangmansUnlocked = true;
+    give(state, "pirateBrute");
+    give(state, "swashbuckler");
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Play Swashbuckler/);
+    expect(advice.do).not.toMatch(/Play Pirate Brute/i);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
+  it("treats Fate as a hunt once Gain and Discard cannot fix an unaffordable hand", () => {
+    const state = barePlayState();
+    state.villainLocation = "hangmansTree";
+    state.phase = "actions";
+    state.power = 0;
+    state.hangmansUnlocked = true;
+    state.peterPanRevealed = false;
+    state.usedActions = ["ht-gain"];
+    give(state, "pirateBrute");
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Fate/);
+    expect(advice.do).not.toMatch(/Play Pirate Brute/i);
+    expect(advice.why).toMatch(/Peter is still hidden/);
+    expect(advice.why).toMatch(/does not pay for a card/);
+    expect(advice.why).not.toMatch(/Fate pays|pay for Pirate Brute/i);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
   it("recommends the ship clash when Peter is vanquishable at the Jolly Roger", () => {
     const state = barePlayState();
     state.hangmansUnlocked = true;

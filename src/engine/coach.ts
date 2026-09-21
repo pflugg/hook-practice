@@ -94,6 +94,45 @@ function wantEarlyPower(state: GameState): boolean {
   return !state.hangmansUnlocked && state.power < 4;
 }
 
+/** Power is short and the Map is not in the realm to cover an Item. */
+function cannotPay(state: GameState, card: CardInstance): boolean {
+  const d = def(card.defId);
+  if (d.type === "condition" || d.cost <= 0) return false;
+  if (d.cost <= state.power) return false;
+  if (d.type === "item" && mapInRealm(state)) return false;
+  return true;
+}
+
+function canPayNow(state: GameState, card: CardInstance): boolean {
+  const d = def(card.defId);
+  if (d.type === "condition") return false;
+  return !cannotPay(state, card);
+}
+
+/** Hand has pays, and none of them can be played with current Power (Map substitute included). */
+function handHasOnlyUnaffordablePays(state: GameState): boolean {
+  if (playableHandCards(state).length > 0) return false;
+  return state.hand.some((card) => cannotPay(state, card));
+}
+
+function cheapestUnaffordable(state: GameState): CardInstance | null {
+  const cards = state.hand.filter((card) => cannotPay(state, card));
+  cards.sort((a, b) => def(a.defId).cost - def(b.defId).cost);
+  return cards[0] ?? null;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function namesUnaffordablePlay(state: GameState, text: string): CardInstance | null {
+  for (const card of state.hand) {
+    if (!cannotPay(state, card)) continue;
+    if (new RegExp(`Play ${escapeRegExp(cardName(card))}\\b`, "i").test(text)) return card;
+  }
+  return null;
+}
+
 function diggingForMap(state: GameState): boolean {
   return !state.hangmansUnlocked && !mapInHand(state);
 }
@@ -188,9 +227,12 @@ function scoreMove(state: GameState, id: LocationId): number {
   const peter = peterCard(state);
   if (peter && state.hangmansUnlocked && peter.location !== "jollyRoger" && moveHero) score += 900;
   if (playableMap(state) && play) score += 700;
-  if (needPowerForMap(state) || wantEarlyPower(state)) score += gainAmt * 120;
+  const blocked = handHasOnlyUnaffordablePays(state);
+  if (blocked) score += gainAmt * 180;
+  else if (needPowerForMap(state) || wantEarlyPower(state)) score += gainAmt * 120;
   if (diggingForMap(state) && discard) score += state.power >= 4 ? 380 : 70;
-  if (!state.peterPanRevealed && fate) score += state.hangmansUnlocked ? 360 : 40;
+  if (blocked && discard && gainAmt === 0) score += 220;
+  if (!state.peterPanRevealed && fate && !blocked) score += state.hangmansUnlocked ? 360 : 40;
   if (jrStrength(state) < 8 && play && state.hand.some((c) => def(c.defId).type === "ally" && def(c.defId).cost <= state.power + gainAmt)) {
     score += id === "jollyRoger" ? 280 : 120;
   }
@@ -291,7 +333,7 @@ function plannedAfterMove(state: GameState, dest: LocationId): string {
   }
   if (pick.kind === "playCard") {
     const card = usefulPlay(next);
-    if (card) {
+    if (card && canPayNow(next, card)) {
       const d = def(card.defId);
       if (d.id === "cutlass") {
         const host = preferredAttachAlly(next);
@@ -302,7 +344,17 @@ function plannedAfterMove(state: GameState, dest: LocationId): string {
       if (d.type === "effect") return `then play ${cardName(card)}`;
       return `then play ${cardName(card)} to ${locName(playHome(next, card))}`;
     }
-    return "then take Play a Card";
+    const gains = liveSlots(next, dest)
+      .filter((a) => a.kind === "gainPower")
+      .sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1));
+    if (gains[0]) return `then take ${gains[0].label}`;
+    const junk = next.hand.find((c) => !keepOnDiscard(next, c));
+    if (hasKind(next, dest, "discard")) {
+      return junk
+        ? `then take Discard and click ${cardName(junk)} in your hand, then Confirm`
+        : "then take Discard";
+    }
+    return "then bank Power before you play";
   }
   if (pick.kind === "gainPower") return `then take ${pick.label}`;
   if (pick.kind === "vanquish") {
@@ -315,7 +367,9 @@ function plannedAfterMove(state: GameState, dest: LocationId): string {
   }
   if (pick.kind === "discard") {
     const junk = next.hand.find((c) => !keepOnDiscard(next, c));
-    return junk ? `then take Discard and click ${cardName(junk)}` : "then take Discard";
+    return junk
+      ? `then take Discard and click ${cardName(junk)} in your hand, then Confirm`
+      : "then take Discard";
   }
   if (pick.kind === "fate") return "then take Fate (practice self-Fate)";
   if (pick.kind === "moveItemAlly") {
@@ -404,6 +458,16 @@ function moveWhy(state: GameState, dest: LocationId): string {
   if (diggingForMap(state) && hasKind(state, dest, "discard")) {
     return "The Map is still in the deck. A Discard action lets you dig for it so the tree can open.";
   }
+  const pricey = cheapestUnaffordable(state);
+  if (pricey && handHasOnlyUnaffordablePays(state)) {
+    const cost = def(pricey.defId).cost;
+    if (hasKind(state, dest, "gainPower")) {
+      return `Save ${cardName(pricey)} for when you have ${cost} Power. This stop can bank Power before that card is a real Play.`;
+    }
+    if (hasKind(state, dest, "discard")) {
+      return `${cardName(pricey)} costs ${cost} and you have ${state.power}. Discard here digs for a card you can pay for.`;
+    }
+  }
   if (!state.peterPanRevealed && hasKind(state, dest, "fate")) {
     return "Peter is still hidden. Hunt cards, or being Fated, can find him. In this practice tool your Fate action is self-Fate — at a table it would hit another villain.";
   }
@@ -421,7 +485,7 @@ function adviseMove(state: GameState): CoachAdvice {
 }
 
 function usefulPlay(state: GameState): CardInstance | null {
-  const playable = playableHandCards(state);
+  const playable = playableHandCards(state).filter((card) => canPayNow(state, card));
   const map = playable.find((c) => c.defId === "neverLandMap");
   if (map) return map;
   if (!state.peterPanRevealed) {
@@ -477,15 +541,22 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
     if (play) return play;
   }
 
-  if (needPowerForMap(state) || (wantEarlyPower(state) && !playableMap(state) && !usefulPlay(state))) {
+  const blocked = handHasOnlyUnaffordablePays(state);
+
+  if (needPowerForMap(state) || blocked || (wantEarlyPower(state) && !playableMap(state) && !usefulPlay(state))) {
     const gains = acts.filter((a) => a.kind === "gainPower").sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1));
     if (gains[0] && state.power + (gains[0].amount ?? 1) <= 12) return gains[0];
   }
 
   const card = usefulPlay(state);
-  if (card && find("playCard")) return find("playCard")!;
+  if (card && canPayNow(state, card) && find("playCard")) return find("playCard")!;
 
-  if (!state.peterPanRevealed && find("fate")) return find("fate")!;
+  // Fate is a hunt for Peter, not a stand-in for a card the captain cannot pay.
+  if (!blocked && !state.peterPanRevealed && find("fate")) return find("fate")!;
+
+  if (blocked && find("discard") && state.hand.some((c) => !keepOnDiscard(state, c))) {
+    return find("discard")!;
+  }
 
   if (diggingForMap(state) && find("discard") && state.hand.some((c) => !keepOnDiscard(state, c))) {
     return find("discard")!;
@@ -500,7 +571,7 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
     return find("moveItemAlly")!;
   }
 
-  if (find("playCard") && playableHandCards(state).length > 0 && usefulPlay(state)) {
+  if (!blocked && card && canPayNow(state, card) && find("playCard")) {
     return find("playCard")!;
   }
 
@@ -509,7 +580,15 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
 
   if (diggingForMap(state) && find("discard")) return find("discard")!;
 
-  if (find("fate") && !state.peterPanRevealed) return find("fate")!;
+  if (blocked && find("discard") && state.hand.some((c) => !keepOnDiscard(state, c))) {
+    return find("discard")!;
+  }
+
+  if (find("fate") && !state.peterPanRevealed) {
+    const gainOpen = Boolean(find("gainPower"));
+    const discardDigs = Boolean(find("discard") && state.hand.some((c) => !keepOnDiscard(state, c)));
+    if (!(blocked && (gainOpen || discardDigs))) return find("fate")!;
+  }
 
   return "end";
 }
@@ -557,13 +636,27 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
     if (needPowerForMap(state)) {
       return `Bank Power now so the Never Land Map is affordable. Allies for the final clash will want a reserve too.${tokenLine}`;
     }
+    const pricey = cheapestUnaffordable(state);
+    if (pricey && handHasOnlyUnaffordablePays(state)) {
+      const cost = def(pricey.defId).cost;
+      return `Save ${cardName(pricey)} for when you have ${cost} Power. You have ${state.power} now, so that card is not a Play yet.${tokenLine}`;
+    }
     return `Bank Power as a reserve for the next Item or Ally you draw. That is why ${slot.label} still matters even when the Map is not in hand.${tokenLine}`;
   }
   if (slot.kind === "discard") {
+    const pricey = cheapestUnaffordable(state);
+    if (pricey && handHasOnlyUnaffordablePays(state)) {
+      const cost = def(pricey.defId).cost;
+      return `${cardName(pricey)} costs ${cost} and you have ${state.power}, so it is not a Play. Discard it to dig for a card you can pay.`;
+    }
     return "Toss cards you do not need so the deck can yield the Never Land Map — the tree stays locked without it.";
   }
   if (slot.kind === "fate") {
-    return "Practice self-Fate: this flips Hook’s own Fate deck. At a table your Fate action hits another villain; Hook finds Peter with hunt cards and by being Fated. If Peter is in the pair, play him — he lands at Hangman’s Tree.";
+    const hunt =
+      cheapestUnaffordable(state) && !state.peterPanRevealed
+        ? " Peter is still hidden, so this Fate action is the hunt. It does not pay for a card."
+        : "";
+    return `Practice self-Fate: this flips Hook’s own Fate deck. At a table your Fate action hits another villain; Hook finds Peter with hunt cards and by being Fated. If Peter is in the pair, play him — he lands at Hangman’s Tree.${hunt}`;
   }
   if (slot.kind === "moveItemAlly") {
     return "Slide crew toward the Jolly Roger so their Strength is waiting when Peter arrives.";
@@ -1128,6 +1221,57 @@ function adviseUnchecked(state: GameState): CoachAdvice {
   return say("Watch the prompt", "The next legal click will light up as soon as the realm is ready.", [], state);
 }
 
+function rescueUnaffordable(state: GameState): CoachAdvice {
+  const pricey = cheapestUnaffordable(state);
+  const cost = pricey ? def(pricey.defId).cost : 0;
+  const save = pricey
+    ? `Save ${cardName(pricey)} for when you have ${cost} Power.`
+    : "Save that card until you can pay its cost.";
+  const pendingKind = state.pending?.kind;
+  if (
+    pendingKind === "playChooseCard" ||
+    pendingKind === "playChooseLocation" ||
+    pendingKind === "playChooseAllyAttach" ||
+    pendingKind === "playChoosePayment"
+  ) {
+    return say("Cancel — not enough Power (click Cancel)", `${save} You have ${state.power}.`, ["btn:cancel"], state);
+  }
+  if (state.phase === "actions" && !state.pending) {
+    const acts = liveActions(state);
+    const gain = [...acts.filter((a) => a.kind === "gainPower")].sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1))[0];
+    if (gain) return say(fullActionDo(state, gain), actionWhy(state, gain), [`act:${gain.key}`], state);
+    const discard = acts.find((a) => a.kind === "discard");
+    if (discard) return say(fullActionDo(state, discard), actionWhy(state, discard), [`act:${discard.key}`], state);
+  }
+  if (state.phase === "move" && !state.pending) {
+    const dest = pickMove(state);
+    const next: GameState = { ...state, villainLocation: dest, usedActions: [], pending: null, phase: "actions" };
+    const gains = liveSlots(next, dest)
+      .filter((a) => a.kind === "gainPower")
+      .sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1));
+    const junk = state.hand.find((c) => !keepOnDiscard(state, c));
+    const follow = gains[0]
+      ? `then take ${gains[0].label}`
+      : hasKind(next, dest, "discard")
+        ? junk
+          ? `then take Discard and click ${cardName(junk)} in your hand, then Confirm`
+          : "then take Discard"
+        : "then bank Power before you play";
+    return say(
+      `Move to ${locName(dest)} (click Move here on ${locName(dest)}), ${follow}.`,
+      save,
+      [`loc:${dest}`],
+      state,
+    );
+  }
+  return say("End the turn (click End turn). Draw back to four, then Fate will answer.", save, ["btn:end"], state);
+}
+
+function guardAffordability(state: GameState, advice: CoachAdvice): CoachAdvice {
+  if (!namesUnaffordablePlay(state, advice.do)) return advice;
+  return rescueUnaffordable(state);
+}
+
 export function advise(state: GameState): CoachAdvice {
-  return clampToLegal(state, adviseUnchecked(state));
+  return guardAffordability(state, clampToLegal(state, adviseUnchecked(state)));
 }

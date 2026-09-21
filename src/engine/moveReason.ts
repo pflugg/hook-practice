@@ -127,10 +127,25 @@ function explainCurrentMoment(state: GameState): MoveReason {
     const card = findCard(state, p.cardId);
     const name = card ? cardName(card) : "this card";
     const cost = card ? def(card.defId).cost : 0;
+    const map = mapInRealm(state);
+    if (state.power >= cost) {
+      return pack(
+        `You still owe Power for ${name}.`,
+        `${name} costs ${cost} and you have ${state.power}. Click Pay with Power to finish the play${map ? ". Keep the Never Land Map in the realm if the tree is already open" : ""}.`,
+        "After you pay, the card lands and you return to the action stretch at this stop.",
+      );
+    }
+    if (map && card && def(card.defId).type === "item") {
+      return pack(
+        `Power cannot cover ${name}.`,
+        `${name} costs ${cost} and you have ${state.power}. The Never Land Map is already in the realm, so you may discard the Map to pay for this Item. Fate does not pay a card cost.`,
+        "Click Discard the Map, or Cancel and Gain Power if you want to keep the Map.",
+      );
+    }
     return pack(
-      `You still owe Power for ${name}.`,
-      `${name} costs ${cost} and you have ${state.power}. Click Pay with Power to finish the play${mapInRealm(state) ? ", or Discard the Map if the tree is already open and you are short" : ""}.`,
-      "After you pay, the card lands and you return to the action stretch at this stop.",
+      `You cannot pay for ${name} yet.`,
+      `${name} costs ${cost} and you have ${state.power}. Save it for when you have ${cost} Power. Fate does not pay a card cost.`,
+      "Click Cancel, then Gain Power or Discard to dig.",
     );
   }
   if (p?.kind === "moveHeroSelect" || p?.kind === "starkeyHero") {
@@ -684,12 +699,21 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
     const name = card ? cardName(card) : "that card";
     if (p.kind === "playChooseLocation" && after.pending?.kind === "playChoosePayment") {
       const cost = card ? def(card.defId).cost : 0;
+      const short = after.power < cost;
+      const map = mapInRealm(after);
+      const item = card ? def(card.defId).type === "item" : false;
       return pack(
         `You chose ${locName(locationId)} for ${name}.`,
-        `${name} still needs its Power cost (${cost}). Pay it to finish the play — that is the printed price, not a silent spend.`,
-        mapInRealm(after)
-          ? "You may pay with Power or discard the Never Land Map if it is already unlocking the tree."
-          : `You have ${after.power} Power. Pay ${cost} to put ${name} on the table.`,
+        short
+          ? `${name} still needs its Power cost (${cost}). You have ${after.power}, so Power cannot cover it yet.`
+          : `${name} still needs its Power cost (${cost}). Pay it to finish the play — that is the printed price, not a silent spend.`,
+        short && map && item
+          ? "Discard the Never Land Map to cover this Item, or Cancel and Gain Power if you want to keep the Map. Fate does not pay a card cost."
+          : short
+            ? `Cancel and Gain Power. Save ${name} for when you have ${cost} Power.`
+            : map
+              ? "You may pay with Power or discard the Never Land Map if it is already unlocking the tree."
+              : `You have ${after.power} Power. Pay ${cost} to put ${name} on the table.`,
       );
     }
     const extra = card ? playCardWhy(card.defId, after) : { why: chainLine(after), next: crocWatch(after) };
@@ -787,7 +811,7 @@ function explainAction(before: GameState, after: GameState, actionKey: string): 
     case "fate":
       return pack(
         `You took the Fate action at ${here}.`,
-        "This is practice self-Fate: you are flipping Hook’s own Fate deck. At a table that action hits another villain; Hook finds Peter with hunt cards and by being Fated. If Peter is in the pair, play him: he lands at Hangman’s Tree.",
+        "This is practice self-Fate: you are flipping Hook’s own Fate deck. It does not pay a card cost. At a table that action hits another villain; Hook finds Peter with hunt cards and by being Fated. If Peter is in the pair, play him: he lands at Hangman’s Tree.",
         "Park Tick Tock off the lagoon and the tree if you can. Read the full text of whatever you seat before you Continue.",
       );
     case "vanquish":

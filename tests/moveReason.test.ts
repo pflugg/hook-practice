@@ -238,6 +238,20 @@ describe("idle vs coach/brief roles", () => {
     }
   });
 
+  it("does not tell you to pay with Power when an Ally is still too expensive", () => {
+    const state = barePlayState();
+    state.phase = "resolving";
+    state.power = 0;
+    const brute = give(state, "pirateBrute");
+    state.pending = { kind: "playChoosePayment", cardId: brute.instanceId, locationId: "jollyRoger" };
+
+    const reason = liveMoveReason(state, null);
+    expect(reason.chose).toMatch(/cannot pay/i);
+    expect(reason.why).toMatch(/Save it for when you have 3 Power/);
+    expect(reason.why).toMatch(/Fate does not pay/);
+    expect(`${reason.why} ${reason.next}`).not.toMatch(/Click Pay with Power/);
+  });
+
   it("names Peter on the tree as a helpful Fate find", () => {
     const state = barePlayState();
     state.villainLocation = "skullRock";
