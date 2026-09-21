@@ -485,6 +485,36 @@ describe("coach suggestions", () => {
     expectLegalHighlights(state, advice.highlights);
   });
 
+  it("names Tick Tock’s walk-on in the move why, and still avoids that square", () => {
+    const state = barePlayState();
+    state.phase = "move";
+    state.villainLocation = "jollyRoger";
+    state.power = 0;
+    putHero(state, "tickTock", "skullRock");
+
+    const advice = advise(state);
+    expect(advice.highlights).not.toContain("loc:skullRock");
+    expect(advice.why).toMatch(/walk-on/i);
+    expect(advice.why).toMatch(/moves onto/i);
+    expect(advice.why).toMatch(/Seating or sliding/i);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
+  it("names Boarding Party neighboring reach when the Hero is one step away", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "resolving";
+    state.pending = { kind: "vanquishHero" };
+    const john = putHero(state, "john", "skullRock");
+    putAlly(state, "boardingParty", "jollyRoger");
+
+    const advice = advise(state);
+    expect(advice.highlights).toContain(`card:${john.instanceId}`);
+    expect(advice.why).toMatch(/neighboring reach/i);
+    expect(advice.why).toMatch(/one unlocked step/i);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
   it("recommends the ship clash when Peter is vanquishable at the Jolly Roger", () => {
     const state = barePlayState();
     state.hangmansUnlocked = true;

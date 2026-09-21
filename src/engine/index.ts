@@ -10,6 +10,7 @@ export type {
   LocationId,
   Pending,
   Phase,
+  VoyageMemory,
 } from "./types";
 export { LOCATION_IDS } from "./types";
 export { CARDS, def } from "./cards";
@@ -46,5 +47,6 @@ export {
   isNoItemFateDiscard,
 } from "./game";
 export { advise, type CoachAdvice } from "./coach";
+export { endgameRecap, type EndgameRecap } from "./recap";
 export { strategyBrief, type ObjectiveLine, type StrategyBrief } from "./strategyBrief";
 export { explainSelection, IDLE_MOVE_REASON, liveMoveReason, type MoveReason } from "./moveReason";

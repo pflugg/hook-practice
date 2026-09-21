@@ -272,6 +272,15 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
   return notes[0];
 }
 
+const BOARDING_REACH_WHY =
+  "Boarding Party’s neighboring reach is the exception: that crew may join a clash at the captain’s place or one unlocked step away. Other Allies cannot be spent on a Hero the captain is not standing beside.";
+
+function withReach(why: string, state: GameState, heroLoc: LocationId | null | undefined): string {
+  if (!heroLoc || heroLoc === state.villainLocation) return why;
+  if (why.includes("neighboring reach")) return why;
+  return `${why} ${BOARDING_REACH_WHY}`;
+}
+
 function say(next: string, why: string, highlights: string[], state: GameState): CoachAdvice {
   const warning = warningFor(state, highlights);
   return warning ? { do: next, why, highlights, warning } : { do: next, why, highlights };
@@ -639,7 +648,11 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
 
 function actionWhy(state: GameState, slot: ActionSlot): string {
   if (slot.kind === "vanquish" && peterReadyToFinish(state)) {
-    return "Peter is on the Jolly Roger and your Allies can meet his Strength. The clash there completes the objective.";
+    return withReach(
+      "Peter is on the Jolly Roger and your Allies can meet his Strength. The clash there completes the objective.",
+      state,
+      peterCard(state)?.location,
+    );
   }
   if (slot.kind === "vanquish" && anyTauntInRealm(state) && vanquishableHeroes(state).length === 0) {
     return vanquishBlockedReason(state);
@@ -703,7 +716,12 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
     return "Slide crew toward the Jolly Roger so their Strength is waiting when Peter arrives.";
   }
   if (slot.kind === "vanquish") {
-    return "Clear a blocking Hero if the clash is safe. Leave Peter alone unless he is already on the ship.";
+    const off = vanquishableHeroes(state).find((hero) => hero.location !== state.villainLocation);
+    return withReach(
+      "Clear a blocking Hero if the clash is safe. Leave Peter alone unless he is already on the ship.",
+      state,
+      off?.location,
+    );
   }
   return "Spend the useful action here, then we will look at the next link in the chain.";
 }
@@ -832,7 +850,7 @@ function advisePending(state: GameState): CoachAdvice {
       if (peter && peter.location === "jollyRoger") {
         return say(
           "Vanquish Peter Pan at the Jolly Roger (click Peter Pan, then tap Allies until Strength meets him, then Confirm).",
-          "This is the last link. The clash only wins if it happens on the ship.",
+          withReach("This is the last link. The clash only wins if it happens on the ship.", state, peter.location),
           [`card:${peter.hero.instanceId}`],
           state,
         );
@@ -850,9 +868,13 @@ function advisePending(state: GameState): CoachAdvice {
       }
       return say(
         `Vanquish ${cardName(pick.hero)} at ${locName(pick.location)} (click ${cardName(pick.hero)}, then tap Allies, then Confirm).`,
-        pick.hero.defId === "tickTock"
-          ? "The crocodile empties your hand if you step onto his space. Clear him if the Strength is there."
-          : "Clear the blocker so your next actions — Play, Gain, or Move a Hero — are uncovered.",
+        withReach(
+          pick.hero.defId === "tickTock"
+            ? "The crocodile empties your hand if you step onto his space. Clear him if the Strength is there."
+            : "Clear the blocker so your next actions — Play, Gain, or Move a Hero — are uncovered.",
+          state,
+          pick.location,
+        ),
         [`card:${pick.hero.instanceId}`],
         state,
       );
@@ -865,12 +887,19 @@ function advisePending(state: GameState): CoachAdvice {
         const ally = pool.find((a) => a.ally.instanceId === id)?.ally;
         return n + (ally ? allyStrength(state, ally) : 0);
       }, 0);
+      const heroLoc = hero ? findCardLocation(state, hero.instanceId) : null;
       if (selectedStr >= need && p.selected.length > 0) {
-        return say(
-          "Confirm the clash (click Confirm)",
+        const usedNeighbor = p.selected.some((id) => {
+          const ally = pool.find((row) => row.ally.instanceId === id);
+          return ally?.ally.defId === "boardingParty" && heroLoc && ally.location !== heroLoc;
+        });
+        const confirmWhy =
           hero?.defId === "peterPan"
             ? "The Strength is there. Click Confirm and the objective chain is complete."
-            : "That is enough Strength. Click Confirm so you can return to the rest of the turn.",
+            : "That is enough Strength. Click Confirm so you can return to the rest of the turn.";
+        return say(
+          "Confirm the clash (click Confirm)",
+          usedNeighbor ? `${confirmWhy} ${BOARDING_REACH_WHY}` : withReach(confirmWhy, state, heroLoc),
           ["btn:confirm"],
           state,
         );
@@ -881,9 +910,13 @@ function advisePending(state: GameState): CoachAdvice {
       if (!nextAlly) {
         return say("Cancel the clash", "You do not have the Strength. Back out and gather more crew.", ["btn:cancel"], state);
       }
+      const neighborCrew =
+        nextAlly.ally.defId === "boardingParty" && heroLoc && nextAlly.location !== heroLoc
+          ? ` ${BOARDING_REACH_WHY}`
+          : "";
       return say(
         `Add ${cardName(nextAlly.ally)} to the clash (click that Ally). You need ${need} Strength.`,
-        `Click ${cardName(nextAlly.ally)} now. Keep tapping Allies at this place until the total meets the Hero, then Confirm.`,
+        `Click ${cardName(nextAlly.ally)} now. Keep tapping Allies at this place until the total meets the Hero, then Confirm.${neighborCrew}`,
         [`card:${nextAlly.ally.instanceId}`],
         state,
       );
@@ -1310,6 +1343,20 @@ function guardAffordability(state: GameState, advice: CoachAdvice): CoachAdvice 
   return rescueUnaffordable(state);
 }
 
+function withWalkOnWhy(state: GameState, advice: CoachAdvice): CoachAdvice {
+  if (state.phase !== "move" || state.pending) return advice;
+  if (/walk-on/i.test(advice.why)) return advice;
+  const croc = tickTockAt(state);
+  if (!croc || !legalMoveLocations(state).includes(croc)) return advice;
+  const destKey = advice.highlights.find((key) => key.startsWith("loc:"));
+  const dest = destKey?.slice(4) as LocationId | undefined;
+  const clause =
+    dest === croc
+      ? `Tick Tock’s walk-on is this step: moving the captain onto ${locName(croc)} discards every card in hand. The hand empties only when the captain moves onto that place — seating or sliding the crocodile onto the captain does not.`
+      : `Tick Tock’s walk-on: skip ${locName(croc)}. The hand empties only if the captain moves onto that place. Seating or sliding the crocodile onto the captain does not.`;
+  return { ...advice, why: `${advice.why} ${clause}` };
+}
+
 export function advise(state: GameState): CoachAdvice {
-  return guardAffordability(state, clampToLegal(state, adviseUnchecked(state)));
+  return withWalkOnWhy(state, guardAffordability(state, clampToLegal(state, adviseUnchecked(state))));
 }
