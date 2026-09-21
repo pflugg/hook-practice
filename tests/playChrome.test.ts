@@ -68,7 +68,7 @@ describe("play chrome rescue", () => {
     expect(css).toMatch(/\.coach-why\s*\{[^}]*font-size:\s*14px/);
     expect(css).toMatch(/\.brief-block p\s*\{[^}]*font-size:\s*14\.5px/);
     expect(css).toMatch(/\.reason-block p\s*\{[^}]*font-size:\s*14px/);
-    expect(css).toMatch(/\.location\s*\{[^}]*min-height:\s*340px/);
+    expect(css).toMatch(/\.location\s*\{[^}]*min-height:\s*300px/);
     expect(css).toMatch(/\.hand-row\s*\{[^}]*min-height:\s*212px/);
   });
 

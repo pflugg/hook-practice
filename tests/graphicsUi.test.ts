@@ -91,7 +91,7 @@ describe("game graphics UI pass", () => {
     expect(map).toBeTruthy();
     expect(map?.getAttribute("viewBox")).toBe("0 0 1600 56");
     expect(css).toContain(".topbar-map");
-    expect(css).toMatch(/\.topbar-map[\s\S]*?opacity:\s*0\.12/);
+    expect(css).toMatch(/\.topbar-map[\s\S]*?opacity:\s*0\.16/);
     expect(css).not.toContain(".topbar::before");
     expect(css).not.toContain("linear-gradient(180deg, rgba(8, 10, 12, 0.88), rgba(8, 10, 12, 0.72))");
     expect(map?.outerHTML).not.toMatch(/Never Land|Peter|Disney|Hangman|Mermaid|Skull|Jolly/);
@@ -178,7 +178,7 @@ describe("game graphics UI pass", () => {
     expect(css).not.toMatch(/\.coach-why\s*\{[^}]*font-size:\s*(1[0-3]|[0-9])px/);
 
     const locationBlock = css.slice(css.indexOf(".location {"), css.indexOf(".location.jollyRoger"));
-    expect(locationBlock).toMatch(/min-height:\s*340px/);
+    expect(locationBlock).toMatch(/min-height:\s*300px/);
     expect(locationBlock).not.toMatch(/min-height:\s*[4-9]\d{2}px/);
 
     const handRow = css.slice(css.indexOf(".hand-row {"), css.indexOf(".hand.is-picking"));

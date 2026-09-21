@@ -341,7 +341,7 @@ h1.wordmark {
   height: 40px;
   min-width: 0;
   pointer-events: none;
-  opacity: 0.12;
+  opacity: 0.16;
   mix-blend-mode: screen;
   z-index: 0;
 }
@@ -679,7 +679,7 @@ h1.wordmark {
 
 .location {
   position: relative;
-  min-height: 340px;
+  min-height: 300px;
   padding: 8px 8px 8px;
   border: 1px solid rgba(232, 195, 106, 0.24);
   overflow: hidden;
@@ -994,9 +994,9 @@ h1.wordmark {
 }
 
 .zone {
-  min-height: 52px;
-  margin: 4px 0;
-  padding: 5px;
+  min-height: 40px;
+  margin: 3px 0;
+  padding: 4px;
   border: 1px dashed rgba(215, 199, 162, 0.24);
   background: rgba(8, 8, 10, 0.28);
 }
@@ -1068,7 +1068,7 @@ h1.wordmark {
   border: 1px solid rgba(138, 106, 24, 0.2);
   pointer-events: none;
 }
-.card.mini { width: 104px; min-height: 128px; padding-bottom: 22px; }
+.card.mini { width: 92px; min-height: 100px; padding-bottom: 16px; }
 .card.hand-card {
   width: 156px;
   min-width: 156px;
@@ -1173,7 +1173,7 @@ h1.wordmark {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.card.mini .text { -webkit-line-clamp: 3; font-size: 11px; }
+.card.mini .text { -webkit-line-clamp: 2; font-size: 11px; }
 .card.hand-card .text {
   display: block;
   -webkit-line-clamp: none;
@@ -1379,7 +1379,7 @@ h1.wordmark {
   50% { transform: translateY(-5px); }
 }
 @media (max-width: 1400px) {
-  .location { padding: 8px 6px 6px; min-height: 320px; }
+  .location { padding: 8px 6px 6px; min-height: 280px; }
   .board { gap: 6px; }
 }
 
