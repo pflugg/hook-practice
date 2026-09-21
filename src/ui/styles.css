@@ -1340,6 +1340,39 @@ h1.wordmark {
 .win h2 { color: var(--gold); }
 .lose h2 { color: #f0b3b7; }
 .celebrate { animation: celebrate 0.9s ease; }
+.modal.endgame {
+  width: min(760px, 100%);
+  max-height: min(92vh, 920px);
+  overflow: auto;
+}
+.modal.endgame .eyebrow {
+  margin: 0 0 6px;
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.modal.win .recap-lead { color: #fff4d4; font-size: 18px; }
+.recap-block {
+  border: 1px solid rgba(232, 195, 106, 0.28);
+  background: rgba(8, 8, 10, 0.35);
+  padding: 10px 14px;
+  margin: 0 0 12px;
+}
+.recap-block h3 {
+  margin: 0 0 4px;
+  font-family: var(--display);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.recap-block p {
+  margin: 0 !important;
+  font-size: 16px !important;
+  line-height: 1.45;
+}
 
 @keyframes twinkle {
   0%, 100% { opacity: 0.78; }

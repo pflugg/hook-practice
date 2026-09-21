@@ -36,8 +36,35 @@ import {
   vanquishableHeroes,
 } from "./queries";
 import { locName } from "./realm";
-import { LOCATION_IDS, type CardInstance, type GameState, type Input, type LocationId, type Pending } from "./types";
+import {
+  LOCATION_IDS,
+  type CardInstance,
+  type GameState,
+  type Input,
+  type LocationId,
+  type Pending,
+  type VoyageMemory,
+} from "./types";
 import { shuffle } from "./rng";
+
+export function emptyVoyage(): VoyageMemory {
+  return {
+    mapOpened: false,
+    peterSeated: false,
+    peterHow: "",
+    walkedWest: false,
+    fateMoments: [],
+    lastClash: null,
+  };
+}
+
+function rememberFate(state: GameState, text: string): void {
+  const line = text.replace(/\s+/g, " ").trim();
+  if (!line) return;
+  if (state.voyage.fateMoments[state.voyage.fateMoments.length - 1] === line) return;
+  state.voyage.fateMoments.push(line);
+  if (state.voyage.fateMoments.length > 5) state.voyage.fateMoments.shift();
+}
 
 function emptyLocations(): GameState["locations"] {
   return {
@@ -81,6 +108,7 @@ export function titleState(): GameState {
     log: [],
     lastComputerFateNote: "",
     lastFateShow: null,
+    voyage: emptyVoyage(),
     bannerNote: "",
   };
 }
@@ -334,6 +362,7 @@ function openFateReport(
     markAction: opts.markAction,
   };
   state.phase = opts.resume === "nextTurn" ? "fateAdversary" : "resolving";
+  rememberFate(state, opts.note);
   if (opts.resume === "nextTurn") {
     state.lastComputerFateNote = opts.note;
     state.lastFateShow = {
@@ -409,9 +438,11 @@ function beginAction(state: GameState, key: string, pending: Pending): void {
   state.pending = pending;
 }
 
-function revealPeter(state: GameState, peter: CardInstance, extras: CardInstance[]): void {
+function revealPeter(state: GameState, peter: CardInstance, extras: CardInstance[], how: string): void {
   placeHero(state, peter, "hangmansTree");
   extras.forEach((c) => discardFateCard(state, c));
+  state.voyage.peterSeated = true;
+  state.voyage.peterHow = how;
   log(state, "Peter Pan is revealed and lands at Hangman's Tree.", "fate");
 }
 
@@ -439,6 +470,20 @@ function finishVanquish(state: GameState, heroId: string, allyIds: string[]): vo
   const hero = findCard(state, heroId);
   if (!loc || !hero) return;
   const strength = heroStrength(state, hero);
+  const allyTotal = allyIds.reduce((sum, id) => {
+    const ally = findCard(state, id);
+    return sum + (ally ? allyStrength(state, ally) : 0);
+  }, 0);
+  state.voyage.lastClash = {
+    heroName: def(hero.defId).name,
+    place: locName(loc),
+    locationId: loc,
+    captainPlace: locName(state.villainLocation),
+    allyStrength: allyTotal,
+    heroStrength: strength,
+    reach: loc === state.villainLocation ? "same-place" : "neighbor",
+    onShip: loc === "jollyRoger",
+  };
   for (const id of allyIds) {
     const ally = removeFromRealm(state, id);
     if (ally) {
@@ -483,12 +528,13 @@ function startComputerFate(state: GameState): void {
   const discarded = drawn.filter((c) => c.instanceId !== play.instanceId);
   const choiceReason = explainFateChoice(state, drawn, play, state.difficulty);
   if (play.defId === "peterPan") {
-    revealPeter(state, play, discarded);
+    const peterNote = "Fate plays Peter Pan. He is forced to Hangman's Tree.";
+    revealPeter(state, play, discarded, peterNote);
     openFateReport(state, {
       drawn,
       played: play,
       discarded,
-      note: "Fate plays Peter Pan. He is forced to Hangman's Tree.",
+      note: peterNote,
       choiceReason,
       resume: "nextTurn",
     });
@@ -570,10 +616,11 @@ function refillHand(state: GameState): void {
 function playPeterIfPresent(state: GameState, cards: CardInstance[]): boolean {
   const peter = cards.find((c) => c.defId === "peterPan");
   if (!peter) return false;
-  revealPeter(
+    revealPeter(
     state,
     peter,
     cards.filter((c) => c.instanceId !== peter.instanceId),
+    "Peter Pan is revealed and lands at Hangman's Tree.",
   );
   return true;
 }
@@ -613,6 +660,7 @@ function afterPaymentPlay(
     if (!locationId) return;
     placeItem(state, card, locationId);
     state.hangmansUnlocked = true;
+    state.voyage.mapOpened = true;
     log(state, "The Never Land Map is spread open. Hangman's Tree is unlocked.", "good");
     consumeCurrentAction(state);
     return;
@@ -684,12 +732,13 @@ function resolveEffect(state: GameState, card: CardInstance): void {
       return;
     }
     if (hero.defId === "peterPan") {
-      revealPeter(state, hero, []);
+      const peterNote = "Worthy Opponent finds Peter Pan. He is forced to Hangman's Tree.";
+      revealPeter(state, hero, [], peterNote);
       openFateReport(state, {
         drawn: [hero],
         played: hero,
         discarded: [],
-        note: "Worthy Opponent finds Peter Pan. He is forced to Hangman's Tree.",
+        note: peterNote,
         resume: "actions",
         markAction: true,
       });
@@ -923,12 +972,13 @@ export function applyInput(prev: GameState, input: Input): GameState {
       return state;
     }
     if (hero.defId === "peterPan") {
-      revealPeter(state, hero, []);
+      const peterNote = "Obsession finds Peter Pan. He is forced to Hangman's Tree.";
+      revealPeter(state, hero, [], peterNote);
       openFateReport(state, {
         drawn: [hero],
         played: hero,
         discarded: [],
-        note: "Obsession finds Peter Pan. He is forced to Hangman's Tree.",
+        note: peterNote,
         resume: "actions",
         markAction: true,
       });
@@ -1070,6 +1120,9 @@ function handleLocation(state: GameState, locationId: LocationId): GameState {
     if (!hero) return state;
     placeHero(state, hero, locationId);
     updatePeterLoc(state);
+    if (hero.defId === "peterPan" && LOCATION_IDS.indexOf(locationId) < LOCATION_IDS.indexOf(from)) {
+      state.voyage.walkedWest = true;
+    }
     log(state, `${def(hero.defId).name} is moved to ${locName(locationId)}.`);
     consumeCurrentAction(state);
     return state;

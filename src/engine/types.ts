@@ -151,6 +151,7 @@ export interface GameState {
   log: LogEntry[];
   lastComputerFateNote: string;
   lastFateShow: FateShow | null;
+  voyage: VoyageMemory;
   /** Visible prompt banner for a refused or empty action (e.g. Vanquish with no legal Hero). */
   bannerNote: string;
   actionKey?: string;
@@ -164,6 +165,30 @@ export interface FateShow {
   note: string;
   abilityText: string;
   choiceReason?: string;
+}
+
+/** Facts the end-of-voyage recap can explain without replaying the whole log. */
+export interface ClashFact {
+  heroName: string;
+  place: string;
+  locationId: LocationId;
+  captainPlace: string;
+  allyStrength: number;
+  heroStrength: number;
+  /** Captain stood with the Hero, or a Boarding Party reached a neighboring unlocked place. */
+  reach: "same-place" | "neighbor";
+  onShip: boolean;
+}
+
+export interface VoyageMemory {
+  mapOpened: boolean;
+  peterSeated: boolean;
+  /** How Peter first arrived, already paraphrased. */
+  peterHow: string;
+  walkedWest: boolean;
+  /** Short Fate lines, oldest first. */
+  fateMoments: string[];
+  lastClash: ClashFact | null;
 }
 
 export type Input =

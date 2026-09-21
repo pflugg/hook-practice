@@ -384,6 +384,49 @@ export function hourEqualVanquishScene(): GameState {
   return state;
 }
 
+/**
+ * Late voyage for `?scene=nearwin`.
+ * The Map has opened the tree, Fate seated Peter there, and he has already walked west to Skull Rock.
+ * One Move a Hero (the Device) puts him on the Jolly Roger; the captain then clashes him there.
+ */
+export function nearWinScene(): GameState {
+  const state = createGame("easy", 7);
+  emptyRealm(state);
+  state.turn = 8;
+  state.power = 2;
+  state.difficulty = "easy";
+  state.hangmansUnlocked = true;
+  state.villainLocation = "skullRock";
+  state.phase = "actions";
+  const peter = inst(state, "peterPan");
+  const device = inst(state, "ingeniousDevice");
+  const map = inst(state, "neverLandMap");
+  state.locations.skullRock.heroes.push(peter);
+  state.locations.skullRock.items.push(device);
+  state.locations.jollyRoger.items.push(map);
+  state.locations.jollyRoger.allies.push(inst(state, "pirateBrute"), inst(state, "pirateBrute"));
+  state.peterPanRevealed = true;
+  state.peterPanLocation = "skullRock";
+  state.voyage = {
+    mapOpened: true,
+    peterSeated: true,
+    peterHow: "Fate played Peter Pan and seated him at Hangman’s Tree.",
+    walkedWest: true,
+    fateMoments: ["Fate played Peter Pan and seated him at Hangman’s Tree. The other revealed card was discarded."],
+    lastClash: null,
+  };
+  const lines: { text: string; tone: GameState["log"][number]["tone"] }[] = [
+    { text: "The Never Land Map is spread open. Hangman's Tree is unlocked.", tone: "good" },
+    { text: "Fate played Peter Pan and seated him at Hangman’s Tree.", tone: "fate" },
+    { text: "Peter Pan is moved to Mermaid Lagoon.", tone: "info" },
+    { text: "Peter Pan is moved to Skull Rock.", tone: "info" },
+  ];
+  for (const line of lines) {
+    state.log.unshift({ id: state.logSeq++, text: line.text, tone: line.tone });
+  }
+  return state;
+}
+
 /** Hour-playtest Play-a-Card so Why can name live Peter Strength. */
 export function hourPlaytestWhyScene(): GameState {
   const state = hourPlaytestTauntScene();

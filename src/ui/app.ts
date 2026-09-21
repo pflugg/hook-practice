@@ -16,6 +16,7 @@ import {
   REALM,
   selectedSet,
   strategyBrief,
+  endgameRecap,
   explainSelection,
   IDLE_MOVE_REASON,
   liveMoveReason,
@@ -45,6 +46,7 @@ import {
   easyFizzleScene,
   fateSpentScene,
   lagoonCoverScene,
+  nearWinScene,
   obsessionDecideScene,
   payNoMapScene,
   peterSoftConfirmScene,
@@ -308,9 +310,23 @@ function coachClass(coached: Set<string>, key: string): string {
 function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached: Set<string>): string {
   const p = state.pending;
   if (state.phase === "over") {
-    return `<div class="overlay"><div class="modal wood ${state.won ? "win celebrate" : "lose"}">
-      <h2>${state.won ? "The ship is yours" : "The tide turns"}</h2>
-      <p>${esc(state.won ? "Peter Pan is vanquished at the Jolly Roger. The objective chain is complete." : state.loseReason)}</p>
+    const recap = endgameRecap(state);
+    return `<div class="overlay"><div class="modal wood endgame ${state.won ? "win celebrate" : "lose"}" data-recap>
+      <p class="eyebrow">${state.won ? "Captain Hook wins" : "Voyage recap"}</p>
+      <h2>${esc(recap.headline)}</h2>
+      <p class="recap-lead">${esc(recap.lead)}</p>
+      <section class="recap-block" data-recap-steps>
+        <h3>The objective</h3>
+        <p>${esc(recap.steps)}</p>
+      </section>
+      <section class="recap-block" data-recap-clash>
+        <h3>${state.won ? "Why the clash was legal" : "Why that clash did not win"}</h3>
+        <p>${esc(recap.clash)}</p>
+      </section>
+      <section class="recap-block" data-recap-fate>
+        <h3>What Fate did</h3>
+        <p>${esc(recap.fate)}</p>
+      </section>
       <div class="actions-row">
         <button class="btn primary${coachClass(coached, "btn:again")}" data-again>Play again</button>
         <button class="btn ghost" data-home>Return to title</button>
@@ -852,6 +868,7 @@ function bootState(): GameState {
       if (scene === "hourmove") return hourPlaytestMoveScene();
       if (scene === "hourwhy") return hourPlaytestWhyScene();
       if (scene === "hourequal") return hourEqualVanquishScene();
+      if (scene === "nearwin") return nearWinScene();
     }
   } catch {
     /* ignore */
