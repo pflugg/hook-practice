@@ -51,7 +51,7 @@ describe("play chrome rescue", () => {
     const css = readFileSync(join(process.cwd(), "src/ui/styles.css"), "utf8");
     expect(css).toMatch(/\.fate-rail\s*\{[^}]*align-items:\s*center/);
     expect(css).not.toMatch(/\.fate-rail\s*\{[^}]*min-height:\s*[3-9]\d{2}/);
-    expect(css).toMatch(/\.fate-rail \.card\.mini \{[^}]*min-height:\s*88px/);
+    expect(css).toMatch(/\.fate-rail \.card\.mini \{[^}]*min-height:\s*92px/);
     expect(css).toMatch(/\.fate-fine \{ display: none; \}/);
     expect(css).not.toMatch(/\.fate-rail \.card\.mini \{[^}]*min-height:\s*1[0-9]{2}px/);
   });
@@ -68,8 +68,12 @@ describe("play chrome rescue", () => {
     expect(css).toMatch(/\.coach-why\s*\{[^}]*font-size:\s*14px/);
     expect(css).toMatch(/\.brief-block p\s*\{[^}]*font-size:\s*14\.5px/);
     expect(css).toMatch(/\.reason-block p\s*\{[^}]*font-size:\s*14px/);
-    expect(css).toMatch(/\.location\s*\{[^}]*min-height:\s*300px/);
-    expect(css).toMatch(/\.hand-row\s*\{[^}]*min-height:\s*212px/);
+    expect(css).toMatch(/\.location\s*\{[^}]*min-height:\s*380px/);
+    expect(css).toMatch(/\.hand-row\s*\{[^}]*min-height:\s*226px/);
+    expect(css).toMatch(/\.fate-rail\.is-spent \.fate-rail-copy p\s*\{[^}]*white-space:\s*nowrap/);
+    expect(css).toMatch(/\.prompt\s*\{[^}]*padding:\s*8px/);
+    expect(css).toMatch(/\.prompt\s*\{[^}]*min-height:\s*44px/);
+    expect(css).toMatch(/\.power\.is-loud\s*\{[^}]*min-height:\s*46px/);
   });
 
   it("paints an inline chart in the logo-to-Power gap at a whisper opacity", () => {

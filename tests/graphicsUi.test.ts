@@ -178,15 +178,20 @@ describe("game graphics UI pass", () => {
     expect(css).not.toMatch(/\.coach-why\s*\{[^}]*font-size:\s*(1[0-3]|[0-9])px/);
 
     const locationBlock = css.slice(css.indexOf(".location {"), css.indexOf(".location.jollyRoger"));
-    expect(locationBlock).toMatch(/min-height:\s*300px/);
+    expect(locationBlock).toMatch(/min-height:\s*380px/);
     expect(locationBlock).not.toMatch(/min-height:\s*[4-9]\d{2}px/);
 
     const handRow = css.slice(css.indexOf(".hand-row {"), css.indexOf(".hand.is-picking"));
-    expect(handRow).toMatch(/min-height:\s*212px/);
+    expect(handRow).toMatch(/min-height:\s*226px/);
     expect(handRow).not.toMatch(/min-height:\s*2[5-9]\dpx/);
 
     const handCard = css.slice(css.indexOf(".card.hand-card {"), css.indexOf(".card.hand-card::before"));
-    expect(handCard).toMatch(/min-height:\s*196px/);
+    expect(handCard).toMatch(/min-height:\s*210px/);
     expect(handCard).not.toMatch(/min-height:\s*2[4-9]\dpx/);
+    expect(css).toMatch(/\.card\.hand-card \.text \{[\s\S]*?font-size:\s*12px/);
+
+    const powerLoud = css.slice(css.indexOf(".power.is-loud {"), css.indexOf(".power span {"));
+    expect(powerLoud).toMatch(/min-height:\s*46px/);
+    expect(css).toMatch(/\.power b \{[^}]*font-size:\s*28px/);
   });
 });
