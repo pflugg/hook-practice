@@ -379,10 +379,43 @@ describe("coach suggestions", () => {
     state.usedActions = ["sr-gain"];
     const dig = advise(state);
     expect(dig.do).not.toMatch(/Play Pirate Brute/i);
-    expect(dig.do).toMatch(/Discard/);
+    expect(dig.do).toMatch(/Discard at Skull Rock/);
     expect(dig.do).toMatch(/click Pirate Brute/i);
     expect(dig.do).toMatch(/Confirm/);
+    expect(dig.why).toMatch(/0 Power/);
+    expect(dig.why).toMatch(/Pirate Brute costs 3/);
+    expect(dig.why).toMatch(/Discard Pirate Brute/);
+    expect(dig.do).not.toMatch(/something/i);
+    expect(dig.why).not.toMatch(/something/i);
     expectLegalHighlights(state, dig.highlights);
+  });
+
+  it("names a concrete Discard when a low-Power hand holds a costly Ally", () => {
+    const state = barePlayState();
+    state.villainLocation = "skullRock";
+    state.phase = "actions";
+    state.power = 1;
+    state.hangmansUnlocked = false;
+    state.peterPanRevealed = false;
+    state.usedActions = ["sr-gain"];
+    give(state, "boardingParty");
+    give(state, "obsession");
+
+    const advice = advise(state);
+    expect(advice.do).not.toMatch(/Play Boarding Party/i);
+    expect(advice.do).not.toMatch(/Take Fate/i);
+    expect(advice.do).toMatch(/Discard at Skull Rock/);
+    expect(advice.do).toMatch(/click Obsession/);
+    expect(advice.do).toMatch(/Confirm/);
+    expect(advice.do).not.toMatch(/click Boarding Party/i);
+    expect(advice.do).not.toMatch(/something/i);
+    expect(advice.why).toMatch(/1 Power/);
+    expect(advice.why).toMatch(/Boarding Party costs 2/);
+    expect(advice.why).toMatch(/Discard Obsession/);
+    expect(advice.why).toMatch(/Map|crew/i);
+    expect(advice.why).not.toMatch(/something/i);
+    expect(advice.highlights).toContain("act:sr-discard");
+    expectLegalHighlights(state, advice.highlights);
   });
 
   it("moves toward Power instead of naming an unaffordable Play", () => {

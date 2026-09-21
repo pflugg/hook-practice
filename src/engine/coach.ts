@@ -7,6 +7,7 @@ import {
   allyStrength,
   attachableHeroes,
   availableActions,
+  canPlayCunning,
   cardName,
   coveringHero,
   findCard,
@@ -137,18 +138,82 @@ function diggingForMap(state: GameState): boolean {
   return !state.hangmansUnlocked && !mapInHand(state);
 }
 
-function keepOnDiscard(state: GameState, card: CardInstance): boolean {
-  if (card.defId === "neverLandMap") return true;
-  if (!state.hangmansUnlocked && card.defId === "neverLandMap") return true;
-  if (!state.peterPanRevealed && (card.defId === "worthyOpponent" || card.defId === "giveThemAScare" || card.defId === "obsession")) {
-    return true;
-  }
-  if (state.peterPanRevealed && state.peterPanLocation !== "jollyRoger") {
-    if (card.defId === "ingeniousDevice" || card.defId === "mrStarkey" || card.defId === "ayeAyeSir") return true;
-  }
-  const d = def(card.defId);
-  if (d.type === "ally" && jrStrength(state) < 8) return state.power >= d.cost;
+const DISCARD_KEEP = 1_000;
+
+function isDeadCondition(state: GameState, card: CardInstance): boolean {
+  if (card.defId === "obsession") return state.peterPanRevealed;
+  if (card.defId === "cunning") return !canPlayCunning(state);
   return false;
+}
+
+/** Lower rank is tossed first. Keepers sit at DISCARD_KEEP and above. */
+function discardRank(state: GameState, card: CardInstance): number {
+  const d = def(card.defId);
+  if (card.defId === "neverLandMap") return 10_000;
+  if (card.defId === "cunning" && canPlayCunning(state)) return 8_000;
+  if (d.type === "ally" && canPlayCunning(state)) return 4_500 + d.strength;
+  if (
+    card.defId === "obsession" &&
+    !state.peterPanRevealed &&
+    !handHasOnlyUnaffordablePays(state) &&
+    !diggingForMap(state)
+  ) {
+    return 7_000;
+  }
+  if (isDeadCondition(state, card)) return 0;
+  if (d.type === "condition") return 20;
+  if (!state.peterPanRevealed && (card.defId === "worthyOpponent" || card.defId === "giveThemAScare")) {
+    return canPayNow(state, card) ? 6_000 : 320;
+  }
+  if (
+    state.peterPanRevealed &&
+    state.peterPanLocation !== "jollyRoger" &&
+    (card.defId === "ingeniousDevice" || card.defId === "mrStarkey" || card.defId === "ayeAyeSir")
+  ) {
+    return canPayNow(state, card) ? 5_500 : 280;
+  }
+  if (d.type === "ally" && jrStrength(state) < 8 && canPayNow(state, card)) return 5_000 + d.strength;
+  if (d.type === "ally" && cannotPay(state, card)) return 100 + d.strength;
+  if (cannotPay(state, card)) return 80 + d.cost;
+  return 400 + d.cost;
+}
+
+function discardPicks(state: GameState, skip: string[] = []): CardInstance[] {
+  const ranked = state.hand
+    .filter((card) => !skip.includes(card.instanceId))
+    .sort((a, b) => discardRank(state, a) - discardRank(state, b) || cardName(a).localeCompare(cardName(b)));
+  const pick = ranked.find((card) => discardRank(state, card) < DISCARD_KEEP);
+  return pick ? [pick] : [];
+}
+
+function wantsNamedDiscard(state: GameState): boolean {
+  if (discardPicks(state).length === 0) return false;
+  if (handHasOnlyUnaffordablePays(state) || diggingForMap(state)) return true;
+  if (state.hand.some((card) => isDeadCondition(state, card))) return true;
+  return jrStrength(state) < 8 && state.hand.some((card) => def(card.defId).type === "ally" && cannotPay(state, card));
+}
+
+function discardDo(state: GameState, where: string): string {
+  const pick = discardPicks(state)[0];
+  const name = pick ? cardName(pick) : "";
+  return name
+    ? `Take Discard at ${where} (click that action), then click ${name} in your hand, then Confirm.`
+    : `Take Discard at ${where} (click that action), then Confirm.`;
+}
+
+function discardWhy(state: GameState, picks: CardInstance[]): string {
+  const name = picks.map((card) => cardName(card)).join(" and ");
+  const pricey = cheapestUnaffordable(state);
+  const powerLine = pricey
+    ? `You have ${state.power} Power; ${cardName(pricey)} costs ${def(pricey.defId).cost}.`
+    : `You have ${state.power} Power.`;
+  const deadLine = picks.some((card) => isDeadCondition(state, card)) ? ` ${name} no longer serves this objective.` : "";
+  const goal = !state.hangmansUnlocked
+    ? "cheaper crew and the Map"
+    : jrStrength(state) < 8
+      ? "cheaper crew"
+      : "the next card that serves the chain";
+  return `${powerLine}${deadLine} Discard ${name} to dig toward ${goal}.`;
 }
 
 function parkHeroLocation(state: GameState, hero: CardInstance): LocationId {
@@ -348,11 +413,8 @@ function plannedAfterMove(state: GameState, dest: LocationId): string {
       .filter((a) => a.kind === "gainPower")
       .sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1));
     if (gains[0]) return `then take ${gains[0].label}`;
-    const junk = next.hand.find((c) => !keepOnDiscard(next, c));
-    if (hasKind(next, dest, "discard")) {
-      return junk
-        ? `then take Discard and click ${cardName(junk)} in your hand, then Confirm`
-        : "then take Discard";
+    if (hasKind(next, dest, "discard") && discardPicks(next)[0]) {
+      return `then ${discardDo(next, locName(dest)).replace(/\.$/, "")}`;
     }
     return "then bank Power before you play";
   }
@@ -366,10 +428,7 @@ function plannedAfterMove(state: GameState, dest: LocationId): string {
       : "then take Vanquish";
   }
   if (pick.kind === "discard") {
-    const junk = next.hand.find((c) => !keepOnDiscard(next, c));
-    return junk
-      ? `then take Discard and click ${cardName(junk)} in your hand, then Confirm`
-      : "then take Discard";
+    return `then ${discardDo(next, locName(dest)).replace(/\.$/, "")}`;
   }
   if (pick.kind === "fate") return "then take Fate (practice self-Fate)";
   if (pick.kind === "moveItemAlly") {
@@ -409,12 +468,8 @@ function fullActionDo(state: GameState, slot: ActionSlot): string {
         ? `Take Vanquish at ${here} (click that action), then click ${cardName(hero.hero)} at ${locName(hero.location)}, tap Allies until Strength meets the Hero, then Confirm.`
         : `Take Vanquish at ${here} (click that action).`;
     }
-    case "discard": {
-      const junk = state.hand.find((c) => !keepOnDiscard(state, c));
-      return junk
-        ? `Take Discard at ${here} (click that action), then click ${cardName(junk)} in your hand, then Confirm.`
-        : `Take Discard at ${here} (click that action), then Confirm — discarding none still spends the action.`;
-    }
+    case "discard":
+      return discardDo(state, here);
     case "fate":
       return `Take Fate at ${here} (click that action). Play Peter Pan if he appears — he lands at Hangman’s Tree.`;
     case "moveItemAlly": {
@@ -455,18 +510,17 @@ function moveWhy(state: GameState, dest: LocationId): string {
   if (wantEarlyPower(state) && dest === "mermaidLagoon") {
     return "Gain 3 here is the richest Power bank. Keep a reserve so the next Item or Ally you draw is playable.";
   }
+  const pricey = cheapestUnaffordable(state);
+  if (pricey && handHasOnlyUnaffordablePays(state) && hasKind(state, dest, "gainPower")) {
+    const cost = def(pricey.defId).cost;
+    return `Save ${cardName(pricey)} for when you have ${cost} Power. This stop can bank Power before that card is a real Play.`;
+  }
+  const toss = discardPicks(state);
+  if (toss[0] && hasKind(state, dest, "discard") && wantsNamedDiscard(state)) {
+    return `${discardWhy(state, toss)} After you land, click Discard at ${locName(dest)}, then click ${cardName(toss[0])} in your hand.`;
+  }
   if (diggingForMap(state) && hasKind(state, dest, "discard")) {
     return "The Map is still in the deck. A Discard action lets you dig for it so the tree can open.";
-  }
-  const pricey = cheapestUnaffordable(state);
-  if (pricey && handHasOnlyUnaffordablePays(state)) {
-    const cost = def(pricey.defId).cost;
-    if (hasKind(state, dest, "gainPower")) {
-      return `Save ${cardName(pricey)} for when you have ${cost} Power. This stop can bank Power before that card is a real Play.`;
-    }
-    if (hasKind(state, dest, "discard")) {
-      return `${cardName(pricey)} costs ${cost} and you have ${state.power}. Discard here digs for a card you can pay for.`;
-    }
   }
   if (!state.peterPanRevealed && hasKind(state, dest, "fate")) {
     return "Peter is still hidden. Hunt cards, or being Fated, can find him. In this practice tool your Fate action is self-Fate — at a table it would hit another villain.";
@@ -551,16 +605,10 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
   const card = usefulPlay(state);
   if (card && canPayNow(state, card) && find("playCard")) return find("playCard")!;
 
+  if (find("discard") && wantsNamedDiscard(state)) return find("discard")!;
+
   // Fate is a hunt for Peter, not a stand-in for a card the captain cannot pay.
   if (!blocked && !state.peterPanRevealed && find("fate")) return find("fate")!;
-
-  if (blocked && find("discard") && state.hand.some((c) => !keepOnDiscard(state, c))) {
-    return find("discard")!;
-  }
-
-  if (diggingForMap(state) && find("discard") && state.hand.some((c) => !keepOnDiscard(state, c))) {
-    return find("discard")!;
-  }
 
   const tick = tickTockAt(state);
   if (tick && find("vanquish") && vanquishableHeroes(state).some((h) => h.hero.defId === "tickTock")) {
@@ -578,15 +626,11 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
   const leftoverGain = acts.filter((a) => a.kind === "gainPower").sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1))[0];
   if (leftoverGain && state.power < 8) return leftoverGain;
 
-  if (diggingForMap(state) && find("discard")) return find("discard")!;
-
-  if (blocked && find("discard") && state.hand.some((c) => !keepOnDiscard(state, c))) {
-    return find("discard")!;
-  }
+  if (find("discard") && wantsNamedDiscard(state)) return find("discard")!;
 
   if (find("fate") && !state.peterPanRevealed) {
     const gainOpen = Boolean(find("gainPower"));
-    const discardDigs = Boolean(find("discard") && state.hand.some((c) => !keepOnDiscard(state, c)));
+    const discardDigs = Boolean(find("discard") && wantsNamedDiscard(state));
     if (!(blocked && (gainOpen || discardDigs))) return find("fate")!;
   }
 
@@ -644,12 +688,9 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
     return `Bank Power as a reserve for the next Item or Ally you draw. That is why ${slot.label} still matters even when the Map is not in hand.${tokenLine}`;
   }
   if (slot.kind === "discard") {
-    const pricey = cheapestUnaffordable(state);
-    if (pricey && handHasOnlyUnaffordablePays(state)) {
-      const cost = def(pricey.defId).cost;
-      return `${cardName(pricey)} costs ${cost} and you have ${state.power}, so it is not a Play. Discard it to dig for a card you can pay.`;
-    }
-    return "Toss cards you do not need so the deck can yield the Never Land Map — the tree stays locked without it.";
+    const picks = discardPicks(state);
+    if (picks.length) return discardWhy(state, picks);
+    return "The Map is still in the deck. Discard here digs for it so the tree can open.";
   }
   if (slot.kind === "fate") {
     const hunt =
@@ -767,11 +808,11 @@ function advisePending(state: GameState): CoachAdvice {
       );
     }
     case "discardSelect": {
-      const junk = state.hand.filter((c) => !keepOnDiscard(state, c) && !p.selected.includes(c.instanceId));
+      const junk = discardPicks(state, p.selected);
       if (junk[0]) {
         return say(
-          `Discard ${cardName(junk[0])} (click that card in your hand, then Confirm).`,
-          "Let go of the spare card so the deck can offer the Map or the next escort piece.",
+          `Discard ${cardName(junk[0])} at ${locName(state.villainLocation)} (click that card in your hand, then Confirm).`,
+          discardWhy(state, junk),
           [`card:${junk[0].instanceId}`],
           state,
         );
@@ -1249,13 +1290,10 @@ function rescueUnaffordable(state: GameState): CoachAdvice {
     const gains = liveSlots(next, dest)
       .filter((a) => a.kind === "gainPower")
       .sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1));
-    const junk = state.hand.find((c) => !keepOnDiscard(state, c));
     const follow = gains[0]
       ? `then take ${gains[0].label}`
-      : hasKind(next, dest, "discard")
-        ? junk
-          ? `then take Discard and click ${cardName(junk)} in your hand, then Confirm`
-          : "then take Discard"
+      : hasKind(next, dest, "discard") && discardPicks(next)[0]
+        ? `then ${discardDo(next, locName(dest)).replace(/\.$/, "")}`
         : "then bank Power before you play";
     return say(
       `Move to ${locName(dest)} (click Move here on ${locName(dest)}), ${follow}.`,
