@@ -244,6 +244,7 @@ function titleView(
   coachEnabled: boolean,
   briefEnabled: boolean,
   reasonsEnabled: boolean,
+  sceneWarning: string | null = null,
 ): string {
   return `<div class="sky" aria-hidden="true">
     <div class="stars"></div>
@@ -283,6 +284,7 @@ function titleView(
         <button class="btn" data-start>Set Sail</button>
         <button class="btn ghost" data-help>How to play</button>
       </div>
+      ${sceneWarning ? `<p class="fine" data-scene-warning>${esc(sceneWarning)}</p>` : ""}
       <p class="fine">Unofficial personal practice tool. Not affiliated with, endorsed by, or associated with Disney or Ravensburger.</p>
     </section>
   </main>`;
@@ -695,6 +697,7 @@ function playView(
   reasonsEnabled: boolean,
   reason: MoveReason | null,
   teachTab: TeachTab = "brief",
+  sceneId: string | null = null,
 ): string {
   const hi = highlightSet(state);
   const sel = selectedSet(state);
@@ -760,6 +763,7 @@ function playView(
           <div class="chip chip-stat chip-piles" title="Hand, deck, and discard">Hand ${state.hand.length} · Deck ${state.villainDeck.length} · Discard ${state.villainDiscard.length}</div>
         </div>
         <div class="hud-toggles">
+          ${sceneId ? `<div class="chip" data-scene-chip>Scene: ${esc(sceneId)}</div>` : ""}
           <div class="chip">${state.difficulty === "easy" ? "Easy Fate" : "Normal Fate"}</div>
           <button type="button" class="chip ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
           <button type="button" class="chip ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
@@ -850,33 +854,71 @@ function writeFlag(key: string, on: boolean): void {
   }
 }
 
-function bootState(): GameState {
+const SCENE_LOADERS: Record<string, () => GameState> = {
+  cutlass: cutlassAttachScene,
+  ticktock: tickTockReportScene,
+  crocmove: tickTockOntoCaptainScene,
+  peterloss: peterSoftConfirmScene,
+  drag: dragHeroScene,
+  clash: vanquishClashScene,
+  obsession: obsessionDecideScene,
+  vanquish: vanquishLocalScene,
+  pay: payNoMapScene,
+  fatepick: easyFizzleScene,
+  fatespent: fateSpentScene,
+  lagoon: lagoonCoverScene,
+  hourtaunt: hourPlaytestTauntScene,
+  hourmove: hourPlaytestMoveScene,
+  hourwhy: hourPlaytestWhyScene,
+  hourequal: hourEqualVanquishScene,
+  nearwin: nearWinScene,
+  bounceloop: bounceLoopScene,
+  tauntdig: tauntDigScene,
+};
+
+let activeSceneId: string | null = null;
+let warnedSceneId: string | null = null;
+
+function readSceneParam(): string | null {
   try {
-    if (import.meta.env.DEV) {
-      const scene = new URLSearchParams(window.location.search).get("scene");
-      if (scene === "cutlass") return cutlassAttachScene();
-      if (scene === "ticktock") return tickTockReportScene();
-      if (scene === "crocmove") return tickTockOntoCaptainScene();
-      if (scene === "peterloss") return peterSoftConfirmScene();
-      if (scene === "drag") return dragHeroScene();
-      if (scene === "clash") return vanquishClashScene();
-      if (scene === "obsession") return obsessionDecideScene();
-      if (scene === "vanquish") return vanquishLocalScene();
-      if (scene === "pay") return payNoMapScene();
-      if (scene === "fatepick") return easyFizzleScene();
-      if (scene === "fatespent") return fateSpentScene();
-      if (scene === "lagoon") return lagoonCoverScene();
-      if (scene === "hourtaunt") return hourPlaytestTauntScene();
-      if (scene === "hourmove") return hourPlaytestMoveScene();
-      if (scene === "hourwhy") return hourPlaytestWhyScene();
-      if (scene === "hourequal") return hourEqualVanquishScene();
-      if (scene === "nearwin") return nearWinScene();
-      if (scene === "bounceloop") return bounceLoopScene();
-      if (scene === "tauntdig") return tauntDigScene();
-    }
+    const scene = new URLSearchParams(window.location.search).get("scene");
+    const id = scene?.trim() ?? "";
+    return id.length ? id : null;
   } catch {
-    /* ignore */
+    return null;
   }
+}
+
+function unknownSceneWarning(): string | null {
+  if (!import.meta.env.DEV) return null;
+  const id = readSceneParam();
+  if (!id || SCENE_LOADERS[id]) return null;
+  return `Unknown scene “${id}”. No fixture matches this link. Set Sail starts a fresh voyage.`;
+}
+
+function noteUnknownScene(): void {
+  if (!import.meta.env.DEV) return;
+  const id = readSceneParam();
+  if (!id || SCENE_LOADERS[id] || warnedSceneId === id) return;
+  warnedSceneId = id;
+  console.warn(`Unknown scene "${id}". No fixture matches ?scene=${id}.`);
+}
+
+/** Known `?scene=` fixtures. Sets the play-screen chip when one loads. */
+function stagedScene(): GameState | null {
+  const id = readSceneParam();
+  if (!id) return null;
+  const load = SCENE_LOADERS[id];
+  if (!load) return null;
+  activeSceneId = id;
+  return load();
+}
+
+function bootState(): GameState {
+  noteUnknownScene();
+  const staged = stagedScene();
+  if (staged) return staged;
+  activeSceneId = null;
   return titleState();
 }
 
@@ -1003,15 +1045,16 @@ export function mount(root: HTMLElement): void {
     const inspect = inspectId ? inspectOverlay(state, inspectId) : "";
     const reason = reasonsEnabled ? lastReason : null;
     const tab = activeTeachTab();
-    if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled);
+    const sceneWarning = unknownSceneWarning();
+    if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled, sceneWarning);
     else if (state.screen === "help") {
       root.innerHTML =
         (state.phase === "title"
-          ? titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled)
-          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab)) +
+          ? titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled, sceneWarning)
+          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId)) +
         helpView(state.phase !== "title") +
         inspect;
-    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab) + inspect;
+    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId) + inspect;
     bindCardDrag();
     restoreScroll();
     requestAnimationFrame(restoreScroll);
@@ -1071,10 +1114,21 @@ export function mount(root: HTMLElement): void {
       writeFlag("nld-coach", true);
       writeFlag("nld-brief", true);
       writeFlag("nld-reasons", true);
+      activeSceneId = null;
       return dispatch({ type: "start", difficulty });
     }
     const start = t.closest<HTMLElement>("[data-start]");
-    if (start) return dispatch({ type: "start", difficulty });
+    if (start) {
+      const staged = stagedScene();
+      if (staged) {
+        state = staged;
+        lastReason = IDLE_MOVE_REASON;
+        render();
+        return;
+      }
+      activeSceneId = null;
+      return dispatch({ type: "start", difficulty });
+    }
     const diff = t.closest<HTMLElement>("[data-diff]");
     if (diff) {
       difficulty = diff.dataset.diff as Difficulty;
@@ -1086,7 +1140,18 @@ export function mount(root: HTMLElement): void {
     if (t.closest("[data-resign]")) return dispatch({ type: "resign" });
     if (t.closest("[data-home]") || t.closest("[data-again]")) {
       difficulty = t.closest("[data-again]") ? state.difficulty : difficulty;
-      if (t.closest("[data-again]")) return dispatch({ type: "start", difficulty: state.difficulty });
+      if (t.closest("[data-again]")) {
+        const staged = stagedScene();
+        if (staged) {
+          state = staged;
+          lastReason = IDLE_MOVE_REASON;
+          render();
+          return;
+        }
+        activeSceneId = null;
+        return dispatch({ type: "start", difficulty: state.difficulty });
+      }
+      activeSceneId = null;
       return dispatch({ type: "newGame" });
     }
     if (t.closest("[data-end]")) return dispatch({ type: "endTurn" });

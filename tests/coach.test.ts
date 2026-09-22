@@ -386,7 +386,7 @@ describe("coach suggestions", () => {
     state.usedActions = ["sr-gain"];
     const dig = advise(state);
     expect(dig.do).not.toMatch(/Play Pirate Brute/i);
-    expect(dig.do).toMatch(/Discard at Skull Rock/);
+    expect(dig.do).toMatch(/Discard Pirate Brute at Skull Rock/);
     expect(dig.do).toMatch(/click Pirate Brute/i);
     expect(dig.do).toMatch(/Confirm/);
     expect(dig.why).toMatch(/0 Power/);
@@ -411,7 +411,7 @@ describe("coach suggestions", () => {
     const advice = advise(state);
     expect(advice.do).not.toMatch(/Play Boarding Party/i);
     expect(advice.do).not.toMatch(/Take Fate/i);
-    expect(advice.do).toMatch(/Discard at Skull Rock/);
+    expect(advice.do).toMatch(/Discard Obsession at Skull Rock/);
     expect(advice.do).toMatch(/click Obsession/);
     expect(advice.do).toMatch(/Confirm/);
     expect(advice.do).not.toMatch(/click Boarding Party/i);
@@ -455,6 +455,84 @@ describe("coach suggestions", () => {
     expect(advice.do).not.toMatch(/Play Cutlass/i);
     expect(advice.do).not.toMatch(/strap/i);
     expect(advice.do).toMatch(/Gain|Discard/);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
+  it("does not CTA Cutlass when the Map could pay but Power is still short", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    state.power = 0;
+    state.hangmansUnlocked = true;
+    give(state, "cutlass");
+    putAlly(state, "boardingParty", "jollyRoger");
+    putItem(state, "neverLandMap", "skullRock");
+
+    const advice = advise(state);
+    expect(advice.do).not.toMatch(/Play Cutlass/i);
+    expect(advice.do).not.toMatch(/strap/i);
+    expect(advice.do).toMatch(/Gain/);
+    expect(advice.why).toMatch(/Cutlass/);
+    expect(advice.why).toMatch(/0 Power/);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
+  it("plays an Ally instead of Cutlass when no Ally is ashore", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    state.power = 1;
+    state.hangmansUnlocked = true;
+    give(state, "cutlass");
+    give(state, "swashbuckler");
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Play Swashbuckler/);
+    expect(advice.do).not.toMatch(/Play Cutlass/i);
+    expect(advice.do).not.toMatch(/strap/i);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
+  it("names a Cutlass dig when Power cannot pay and no Ally is ashore", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    state.power = 0;
+    state.hangmansUnlocked = true;
+    state.usedActions = ["jr-gain"];
+    give(state, "cutlass");
+
+    const advice = advise(state);
+    expect(advice.do).not.toMatch(/Play Cutlass/i);
+    expect(advice.do).not.toMatch(/strap/i);
+    expect(advice.do).toMatch(/Discard Cutlass at (the )?Jolly Roger/);
+    expect(advice.do).toMatch(/click Cutlass/);
+    expect(advice.do).toMatch(/0 Power|Ally already ashore/);
+    expect(advice.why).toMatch(/Cutlass/);
+    expect(advice.why).toMatch(/0 Power/);
+    expect(advice.why).toMatch(/Ally already ashore/);
+    expect(advice.do).not.toMatch(/Take Discard at .+ \(click that action\), then Confirm/);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
+  it("names the card and the reason whenever the headline says Discard", () => {
+    const state = barePlayState();
+    state.villainLocation = "skullRock";
+    state.phase = "actions";
+    state.power = 0;
+    state.hangmansUnlocked = true;
+    state.usedActions = ["sr-gain"];
+    give(state, "cunning");
+    give(state, "obsession");
+    give(state, "pirateBrute");
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/\bDiscard\b/);
+    const named = ["Cunning", "Obsession", "Pirate Brute"].filter((name) => advice.do.includes(name));
+    expect(named.length).toBeGreaterThan(0);
+    expect(advice.why).toMatch(new RegExp(named[0]!));
+    expect(advice.do).not.toMatch(/^Discard\.?$/);
+    expect(advice.do).not.toMatch(/Take Discard at .+ \(click that action\), then Confirm\./);
     expectLegalHighlights(state, advice.highlights);
   });
 
@@ -650,7 +728,7 @@ describe("coach bounce loop", () => {
     expect(state.hand.filter((card) => card.defId === "obsession")).toHaveLength(2);
 
     const advice = advise(state);
-    expect(advice.do).toMatch(/Discard at Skull Rock/);
+    expect(advice.do).toMatch(/Discard Obsession at Skull Rock/);
     expect(advice.do).toMatch(/click Obsession/);
     expect(advice.do).toMatch(/Confirm/);
     expect(advice.do).not.toMatch(/End the turn/i);
