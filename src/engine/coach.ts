@@ -110,6 +110,26 @@ function canPayNow(state: GameState, card: CardInstance): boolean {
   return !cannotPay(state, card);
 }
 
+/** Villain Items that strap onto an Ally. Cutlass is the only one. */
+function isAllyAttachItem(card: CardInstance): boolean {
+  return card.defId === "cutlass";
+}
+
+/** Power cannot cover the printed cost, or no legal Ally is ashore to receive it. */
+function attachBlocked(state: GameState, card: CardInstance): boolean {
+  if (!isAllyAttachItem(card)) return false;
+  if (state.power < def(card.defId).cost) return true;
+  return preferredAttachAlly(state) === null;
+}
+
+function blockedAttachInHand(state: GameState): CardInstance | null {
+  return state.hand.find((card) => attachBlocked(state, card)) ?? null;
+}
+
+function coachPlayable(state: GameState): CardInstance[] {
+  return playableHandCards(state).filter((card) => canPayNow(state, card) && !attachBlocked(state, card));
+}
+
 /** Hand has pays, and none of them can be played with current Power (Map substitute included). */
 function handHasOnlyUnaffordablePays(state: GameState): boolean {
   if (playableHandCards(state).length > 0) return false;
@@ -191,19 +211,30 @@ function wantsNamedDiscard(state: GameState): boolean {
   if (discardPicks(state).length === 0) return false;
   if (handHasOnlyUnaffordablePays(state) || diggingForMap(state)) return true;
   if (state.hand.some((card) => isDeadCondition(state, card))) return true;
+  if (blockedAttachInHand(state)) return true;
   return jrStrength(state) < 8 && state.hand.some((card) => def(card.defId).type === "ally" && cannotPay(state, card));
 }
 
-function discardDo(state: GameState, where: string): string {
+/** Headline always names the card and the reason. Null when nothing in hand should be tossed. */
+function discardDo(state: GameState, where: string): string | null {
   const pick = discardPicks(state)[0];
-  const name = pick ? cardName(pick) : "";
-  return name
-    ? `Take Discard at ${where} (click that action), then click ${name} in your hand, then Confirm.`
-    : `Take Discard at ${where} (click that action), then Confirm.`;
+  if (!pick) return null;
+  const name = cardName(pick);
+  const reason = discardWhy(state, [pick]).replace(/\.$/, "");
+  return `Discard ${name} at ${where} — ${reason}. Click Discard, then click ${name} in your hand, then Confirm.`;
 }
 
 function discardWhy(state: GameState, picks: CardInstance[]): string {
   const name = picks.map((card) => cardName(card)).join(" and ");
+  const blockedAttach = picks.find((card) => attachBlocked(state, card));
+  if (blockedAttach && picks.length === 1) {
+    const d = def(blockedAttach.defId);
+    const bits: string[] = [];
+    if (state.power < d.cost) bits.push(`You have ${state.power} Power; ${cardName(blockedAttach)} costs ${d.cost}.`);
+    if (!preferredAttachAlly(state)) bits.push(`${cardName(blockedAttach)} needs an Ally already ashore.`);
+    const because = bits.length ? `${bits.join(" ")} ` : "";
+    return `${because}Discard ${cardName(blockedAttach)} to dig toward an Ally you can play.`;
+  }
   const spentObsession = picks.some((card) => card.defId === "obsession" && state.peterPanRevealed);
   if (spentObsession) {
     const peter = peterCard(state);
@@ -524,12 +555,17 @@ function playCta(state: GameState, card: CardInstance, phase: "open" | "pick" | 
   const name = cardName(card);
   const d = def(card.defId);
   if (d.id === "cutlass") {
-    const host = preferredAttachAlly(state);
-    if (!host) {
-      const need = cutlassStrapLine(state);
-      if (phase === "open") return `Play ${name} (click Play a Card, then click ${name} in your hand). ${need}`;
-      return need;
+    if (attachBlocked(state, card)) {
+      const hostMissing = preferredAttachAlly(state) === null;
+      const short = state.power < d.cost;
+      if (short && hostMissing) {
+        return `Gain Power or play an Ally before ${name}. You have ${state.power} Power and ${name} costs ${d.cost}, and no Ally is ashore.`;
+      }
+      if (short) return `Gain Power before ${name}. You have ${state.power} Power; ${name} costs ${d.cost}.`;
+      return cutlassStrapLine(state);
     }
+    const host = preferredAttachAlly(state);
+    if (!host) return cutlassStrapLine(state);
     const ally = cardName(host.ally);
     const place = host.location === "jollyRoger" ? "the Jolly Roger" : locName(host.location);
     const how = `click ${ally} in the ally picker / drag Cutlass onto ${ally}`;
@@ -574,24 +610,23 @@ function plannedAfterMove(state: GameState, dest: LocationId): string {
   }
   if (pick.kind === "playCard") {
     const card = usefulPlay(next);
-    if (card && canPayNow(next, card)) {
+    if (card && canPayNow(next, card) && !attachBlocked(next, card)) {
       const d = def(card.defId);
       if (d.id === "cutlass") {
         const host = preferredAttachAlly(next);
-        return host
-          ? `then ${cutlassStrapLine(next)}`
-          : `then play ${cardName(card)}`;
+        if (host) return `then ${cutlassStrapLine(next)}`;
+      } else if (d.type === "effect") {
+        return `then play ${cardName(card)}`;
+      } else {
+        return `then play ${cardName(card)} to ${locName(playHome(next, card))}`;
       }
-      if (d.type === "effect") return `then play ${cardName(card)}`;
-      return `then play ${cardName(card)} to ${locName(playHome(next, card))}`;
     }
     const gains = liveSlots(next, dest)
       .filter((a) => a.kind === "gainPower")
       .sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1));
     if (gains[0]) return `then take ${gains[0].label}`;
-    if (hasKind(next, dest, "discard") && discardPicks(next)[0]) {
-      return `then ${discardDo(next, locName(dest)).replace(/\.$/, "")}`;
-    }
+    const namedDiscard = hasKind(next, dest, "discard") ? discardDo(next, locName(dest)) : null;
+    if (namedDiscard) return `then ${namedDiscard.replace(/\.$/, "")}`;
     return "then bank Power before you play";
   }
   if (pick.kind === "gainPower") return `then take ${pick.label}`;
@@ -602,7 +637,8 @@ function plannedAfterMove(state: GameState, dest: LocationId): string {
       : "then take Vanquish";
   }
   if (pick.kind === "discard") {
-    return `then ${discardDo(next, locName(dest)).replace(/\.$/, "")}`;
+    const named = discardDo(next, locName(dest));
+    return named ? `then ${named.replace(/\.$/, "")}` : "then bank Power before you play";
   }
   if (pick.kind === "fate") return "then take Fate (practice self-Fate)";
   if (pick.kind === "moveItemAlly") {
@@ -618,7 +654,7 @@ function fullActionDo(state: GameState, slot: ActionSlot): string {
   const here = locName(state.villainLocation);
   switch (slot.kind) {
     case "playCard": {
-      const card = usefulPlay(state) ?? playableHandCards(state)[0];
+      const card = usefulPlay(state);
       if (card) return playCta(state, card, "open");
       return `Take Play a Card at ${here} (click that action), then click a glowing card in your hand.`;
     }
@@ -640,8 +676,11 @@ function fullActionDo(state: GameState, slot: ActionSlot): string {
         ? `Take Vanquish at ${here} (click that action), then click ${cardName(hero.hero)} at ${locName(hero.location)}, tap Allies until Strength meets the Hero, then Confirm.`
         : `Take Vanquish at ${here} (click that action).`;
     }
-    case "discard":
-      return discardDo(state, here);
+    case "discard": {
+      const named = discardDo(state, here);
+      if (named) return named;
+      return `Take Gain or Play at ${here} before discarding. Nothing in hand is a named dig.`;
+    }
     case "fate":
       return `Take Fate at ${here} (click that action). Play Peter Pan if he appears — he lands at Hangman’s Tree.`;
     case "moveItemAlly": {
@@ -712,7 +751,7 @@ function adviseMove(state: GameState): CoachAdvice {
 }
 
 function usefulPlay(state: GameState): CardInstance | null {
-  const playable = playableHandCards(state).filter((card) => canPayNow(state, card));
+  const playable = coachPlayable(state);
   const map = playable.find((c) => c.defId === "neverLandMap");
   if (map) return map;
   if (!state.peterPanRevealed) {
@@ -774,7 +813,13 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
   }
 
   const card = usefulPlay(state);
-  if (card && canPayNow(state, card) && find("playCard")) return find("playCard")!;
+  if (card && canPayNow(state, card) && !attachBlocked(state, card) && find("playCard")) return find("playCard")!;
+
+  const waitingAttach = blockedAttachInHand(state);
+  if (waitingAttach && state.power < def(waitingAttach.defId).cost) {
+    const gains = acts.filter((a) => a.kind === "gainPower").sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1));
+    if (gains[0] && state.power + (gains[0].amount ?? 1) <= 12) return gains[0];
+  }
 
   if (find("discard") && wantsNamedDiscard(state)) return find("discard")!;
 
@@ -790,7 +835,7 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
     return find("moveItemAlly")!;
   }
 
-  if (!blocked && card && canPayNow(state, card) && find("playCard")) {
+  if (!blocked && card && canPayNow(state, card) && !attachBlocked(state, card) && find("playCard")) {
     return find("playCard")!;
   }
 
@@ -864,8 +909,15 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
         ? ` Power tokens you can still take here: ${tokens.map((t) => t.label).join(", ")}.`
         : ` This token is ${slot.label}.`;
     let base: string;
+    const waitingAttach = blockedAttachInHand(state);
     if (needPowerForMap(state)) {
       base = `Bank Power now so the Never Land Map is affordable. Allies for the final clash will want a reserve too.${tokenLine}`;
+    } else if (waitingAttach && state.power < def(waitingAttach.defId).cost) {
+      const cost = def(waitingAttach.defId).cost;
+      const ashore = preferredAttachAlly(state)
+        ? ""
+        : ` ${cardName(waitingAttach)} also needs an Ally already ashore.`;
+      base = `You have ${state.power} Power; ${cardName(waitingAttach)} costs ${cost}. Gain before that attach is a real Play.${ashore}${tokenLine}`;
     } else {
       const pricey = cheapestUnaffordable(state);
       if (pricey && handHasOnlyUnaffordablePays(state)) {
@@ -944,9 +996,13 @@ function advisePending(state: GameState): CoachAdvice {
 
   switch (p.kind) {
     case "playChooseCard": {
-      const card = usefulPlay(state) ?? playableHandCards(state)[0];
+      const card = usefulPlay(state);
       if (!card) {
-        return say("Cancel the play (click Cancel)", "Nothing in hand is worth the action right now.", ["btn:cancel"], state);
+        const waiting = blockedAttachInHand(state);
+        const why = waiting
+          ? discardWhy(state, [waiting])
+          : "Nothing in hand is worth the action right now.";
+        return say("Cancel the play (click Cancel)", why, ["btn:cancel"], state);
       }
       const why =
         card.defId === "neverLandMap"
@@ -968,8 +1024,15 @@ function advisePending(state: GameState): CoachAdvice {
       );
     }
     case "playChooseAllyAttach": {
+      const held = findCard(state, p.cardId);
+      if (held && attachBlocked(state, held)) {
+        const why = state.power < def(held.defId).cost
+          ? `You have ${state.power} Power; ${cardName(held)} costs ${def(held.defId).cost}. Cancel, then Gain Power or play an Ally.`
+          : `${cardName(held)} needs an Ally already ashore. Cancel and play a crew member first.`;
+        return say(`Cancel — ${cardName(held)} is not a play yet (click Cancel)`, why, ["btn:cancel"], state);
+      }
       const pick = preferredAttachAlly(state);
-      if (!pick) return say("Cancel", "There is no Ally to arm. Cancel and play a crew member first.", ["btn:cancel"], state);
+      if (!pick) return say("Cancel — no Ally ashore (click Cancel)", "There is no Ally to arm. Cancel and play a crew member first.", ["btn:cancel"], state);
       const ally = cardName(pick.ally);
       const place = pick.location === "jollyRoger" ? "the Jolly Roger" : locName(pick.location);
       return say(
@@ -1012,18 +1075,32 @@ function advisePending(state: GameState): CoachAdvice {
     case "discardSelect": {
       const junk = discardPicks(state, p.selected);
       if (junk[0]) {
+        const name = cardName(junk[0]);
+        const reason = discardWhy(state, junk).replace(/\.$/, "");
         return say(
-          `Discard ${cardName(junk[0])} at ${locName(state.villainLocation)} (click that card in your hand, then Confirm).`,
+          `Discard ${name} at ${locName(state.villainLocation)} — ${reason}. Click ${name} in your hand, then Confirm.`,
           discardWhy(state, junk),
           [`card:${junk[0].instanceId}`],
           state,
         );
       }
+      if (p.selected.length) {
+        const chosen = p.selected
+          .map((id) => findCard(state, id))
+          .filter((card): card is CardInstance => Boolean(card));
+        if (chosen.length) {
+          const name = chosen.map((card) => cardName(card)).join(" and ");
+          return say(
+            `Confirm discarding ${name} (click Confirm).`,
+            `Discard ${name} to dig toward the next card that serves the chain.`,
+            ["btn:confirm"],
+            state,
+          );
+        }
+      }
       return say(
-        "Confirm the discard (click Confirm)",
-        p.selected.length
-          ? "Those cards can go. Click Confirm and keep hunting the Map."
-          : "Nothing extra to toss. Click Confirm to spend the action and stay on tempo.",
+        "Confirm to spend this action (click Confirm)",
+        "Nothing extra to toss. Click Confirm to spend the action and stay on tempo.",
         ["btn:confirm"],
         state,
       );
@@ -1304,8 +1381,8 @@ function advisePending(state: GameState): CoachAdvice {
         );
       }
       return say(
-        `Discard ${cardName(pick.item)}`,
-        "Protect the Map and the Device if they are still helping the escort.",
+        `Discard ${cardName(pick.item)} — it is the Item Splitting Headache can take.`,
+        `Discard ${cardName(pick.item)}. Protect the Map and the Device if they are still helping the escort.`,
         [`card:${pick.item.instanceId}`],
         state,
       );
@@ -1330,17 +1407,18 @@ function advisePending(state: GameState): CoachAdvice {
           state,
         );
       }
+      const peeked = p.cards.map((card) => cardName(card)).join(" and ");
       if (croc || p.cards.some((c) => c.defId === "splittingHeadache")) {
         return say(
-          "Discard both peeked cards",
-          "Send the crocodile or the headache to the Fate discard so they do not land on your Map or your path. They can still return when Fate reshuffles.",
+          `Discard both peeked cards — ${peeked}`,
+          `Discard ${peeked}. Send the crocodile or the headache to the Fate discard so they do not land on your Map or your path. They can still return when Fate reshuffles.`,
           ["btn:scare-discard"],
           state,
         );
       }
       return say(
-        "Discard both peeked cards",
-        "A cleaner Fate deck makes Worthy Opponent and later hunts more likely to find Peter. Discarded cards can still return when Fate reshuffles.",
+        `Discard both peeked cards — ${peeked}`,
+        `Discard ${peeked}. A cleaner Fate deck makes Worthy Opponent and later hunts more likely to find Peter. Discarded cards can still return when Fate reshuffles.`,
         ["btn:scare-discard"],
         state,
       );
@@ -1499,7 +1577,10 @@ function rescueUnaffordable(state: GameState): CoachAdvice {
     const gain = [...acts.filter((a) => a.kind === "gainPower")].sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1))[0];
     if (gain) return say(fullActionDo(state, gain), actionWhy(state, gain), [`act:${gain.key}`], state);
     const discard = acts.find((a) => a.kind === "discard");
-    if (discard) return say(fullActionDo(state, discard), actionWhy(state, discard), [`act:${discard.key}`], state);
+    const namedDiscard = discard ? discardDo(state, locName(state.villainLocation)) : null;
+    if (discard && namedDiscard) {
+      return say(namedDiscard, discardWhy(state, discardPicks(state)), [`act:${discard.key}`], state);
+    }
   }
   if (state.phase === "move" && !state.pending) {
     const choice = chooseMove(state);
@@ -1508,10 +1589,11 @@ function rescueUnaffordable(state: GameState): CoachAdvice {
     const gains = liveSlots(next, dest)
       .filter((a) => a.kind === "gainPower")
       .sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1));
+    const namedDiscard = hasKind(next, dest, "discard") ? discardDo(next, locName(dest)) : null;
     const follow = gains[0]
       ? `then take ${gains[0].label}`
-      : hasKind(next, dest, "discard") && discardPicks(next)[0]
-        ? `then ${discardDo(next, locName(dest)).replace(/\.$/, "")}`
+      : namedDiscard
+        ? `then ${namedDiscard.replace(/\.$/, "")}`
         : "then bank Power before you play";
     return say(
       `Move to ${locName(dest)} (click Move here on ${locName(dest)}), ${follow}.`,
@@ -1526,6 +1608,147 @@ function rescueUnaffordable(state: GameState): CoachAdvice {
 function guardAffordability(state: GameState, advice: CoachAdvice): CoachAdvice {
   if (!namesUnaffordablePlay(state, advice.do)) return advice;
   return rescueUnaffordable(state);
+}
+
+function attachCtaBlocked(state: GameState, text: string): CardInstance | null {
+  const cards = [...state.hand];
+  if (state.pending && "cardId" in state.pending) {
+    const held = findCard(state, state.pending.cardId);
+    if (held && !cards.some((card) => card.instanceId === held.instanceId)) cards.push(held);
+  }
+  for (const card of cards) {
+    if (!attachBlocked(state, card)) continue;
+    const name = escapeRegExp(cardName(card));
+    if (new RegExp(`\\bplay ${name}\\b`, "i").test(text)) return card;
+    if (new RegExp(`\\bstrap the ${name}\\b`, "i").test(text)) return card;
+  }
+  return null;
+}
+
+function rescueBlockedAttach(state: GameState, card: CardInstance): CoachAdvice {
+  const name = cardName(card);
+  const cost = def(card.defId).cost;
+  const bits: string[] = [];
+  if (state.power < cost) bits.push(`You have ${state.power} Power; ${name} costs ${cost}.`);
+  if (!preferredAttachAlly(state)) bits.push(`${name} needs an Ally already ashore.`);
+  const why = `${bits.join(" ")} Gain Power, play an Ally, or discard ${name} to dig.`.trim();
+  const pendingKind = state.pending?.kind;
+  if (
+    pendingKind === "playChooseCard" ||
+    pendingKind === "playChooseLocation" ||
+    pendingKind === "playChooseAllyAttach" ||
+    pendingKind === "playChoosePayment"
+  ) {
+    return say(`Cancel — ${name} is not a play yet (click Cancel)`, why, ["btn:cancel"], state);
+  }
+  if (state.phase === "actions" && !state.pending) {
+    const acts = liveActions(state);
+    const playCard = acts.find((a) => a.kind === "playCard");
+    const ally = usefulPlay(state);
+    if (ally && playCard && def(ally.defId).type === "ally") {
+      return say(playCta(state, ally, "open"), actionWhy(state, playCard), [`act:${playCard.key}`], state);
+    }
+    const gains = [...acts.filter((a) => a.kind === "gainPower")].sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1));
+    if (state.power < cost && gains[0]) return say(fullActionDo(state, gains[0]), why, [`act:${gains[0].key}`], state);
+    const discard = acts.find((a) => a.kind === "discard");
+    const named = discard ? discardDo(state, locName(state.villainLocation)) : null;
+    if (discard && named) return say(named, discardWhy(state, discardPicks(state)), [`act:${discard.key}`], state);
+    if (gains[0]) return say(fullActionDo(state, gains[0]), why, [`act:${gains[0].key}`], state);
+  }
+  if (state.phase === "move" && !state.pending) {
+    const choice = chooseMove(state);
+    const dest = choice.dest;
+    const next: GameState = { ...state, villainLocation: dest, usedActions: [], pending: null, phase: "actions" };
+    const gains = liveSlots(next, dest)
+      .filter((a) => a.kind === "gainPower")
+      .sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1));
+    const named = hasKind(next, dest, "discard") ? discardDo(next, locName(dest)) : null;
+    const ally = usefulPlay(next);
+    const follow =
+      ally && def(ally.defId).type === "ally"
+        ? `then play ${cardName(ally)}`
+        : state.power < cost && gains[0]
+          ? `then take ${gains[0].label}`
+          : named
+            ? `then ${named.replace(/\.$/, "")}`
+            : gains[0]
+              ? `then take ${gains[0].label}`
+              : "then bank Power before you play";
+    return say(
+      `Move to ${locName(dest)} (click Move here on ${locName(dest)}), ${follow}.`,
+      withBounceWhy(state, choice, why),
+      [`loc:${dest}`],
+      state,
+    );
+  }
+  return say("End the turn (click End turn). Draw back to four, then Fate will answer.", why, ["btn:end"], state);
+}
+
+function guardBlockedAttach(state: GameState, advice: CoachAdvice): CoachAdvice {
+  const blocked = attachCtaBlocked(state, advice.do);
+  if (!blocked) return advice;
+  return rescueBlockedAttach(state, blocked);
+}
+
+function discardNames(state: GameState): string[] {
+  const names = [
+    ...state.hand.map((card) => cardName(card)),
+    ...allLocationItems(state).map(({ item }) => cardName(item)),
+  ];
+  if (state.pending?.kind === "scarePeek") names.push(...state.pending.cards.map((card) => cardName(card)));
+  if (state.pending?.kind === "discardSelect") {
+    for (const id of state.pending.selected) {
+      const card = findCard(state, id);
+      if (card) names.push(cardName(card));
+    }
+  }
+  return names;
+}
+
+/** A Discard headline that never names the card being tossed. */
+function bareDiscardHeadline(state: GameState, text: string): boolean {
+  if (!/\bDiscard\b/.test(text)) return false;
+  if (/no uncovered Discard/i.test(text)) return false;
+  if (/Discard the Map/i.test(text)) return false;
+  return !discardNames(state).some((name) => name.length > 0 && text.includes(name));
+}
+
+function guardNamedDiscard(state: GameState, advice: CoachAdvice): CoachAdvice {
+  if (!bareDiscardHeadline(state, advice.do)) {
+    const named = discardNames(state).find((name) => advice.do.includes(name) && /\bDiscard\b/.test(advice.do));
+    if (named && !advice.why.includes(named) && !/Discard the Map/i.test(advice.do)) {
+      return { ...advice, why: `${advice.why} Discard ${named}.` };
+    }
+    return advice;
+  }
+  const picks = discardPicks(state);
+  if (picks[0]) {
+    const named = discardDo(state, locName(state.villainLocation));
+    if (named) {
+      const move = advice.do.match(/^(Move to .+?\), )\s*/);
+      return {
+        ...advice,
+        do: move ? `${move[1]}${named}` : named,
+        why: advice.why.includes(cardName(picks[0])) ? advice.why : discardWhy(state, picks),
+      };
+    }
+  }
+  if (state.pending?.kind === "scarePeek" && state.pending.cards[0]) {
+    const peeked = state.pending.cards.map((card) => cardName(card)).join(" and ");
+    return {
+      ...advice,
+      do: `Discard both peeked cards — ${peeked}`,
+      why: advice.why.includes(state.pending.cards[0] ? cardName(state.pending.cards[0]) : peeked)
+        ? advice.why
+        : `Discard ${peeked}. ${advice.why}`,
+    };
+  }
+  const stripped = advice.do.replace(/\bDiscard\b[^.]*\.?/g, "").replace(/\s+/g, " ").trim();
+  return {
+    ...advice,
+    do: stripped.length > 12 ? stripped : "End the turn (click End turn). Draw back to four, then Fate will answer.",
+    why: advice.why,
+  };
 }
 
 function withWalkOnWhy(state: GameState, advice: CoachAdvice): CoachAdvice {
@@ -1543,5 +1766,6 @@ function withWalkOnWhy(state: GameState, advice: CoachAdvice): CoachAdvice {
 }
 
 export function advise(state: GameState): CoachAdvice {
-  return withWalkOnWhy(state, guardAffordability(state, clampToLegal(state, adviseUnchecked(state))));
+  const advice = withWalkOnWhy(state, guardAffordability(state, clampToLegal(state, adviseUnchecked(state))));
+  return guardNamedDiscard(state, guardBlockedAttach(state, advice));
 }
