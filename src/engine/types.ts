@@ -130,6 +130,8 @@ export interface GameState {
   power: number;
   handSize: number;
   villainLocation: LocationId;
+  /** Location the captain left on the previous move. Null before the first move. */
+  departedFrom: LocationId | null;
   hangmansUnlocked: boolean;
   peterPanRevealed: boolean;
   peterPanLocation: LocationId | null;

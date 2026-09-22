@@ -1,7 +1,14 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, expect, it } from "vitest";
 import { advise } from "../src/engine/coach";
 import { applyInput, createGame, highlightSet } from "../src/engine/game";
 import { availableActions } from "../src/engine/queries";
+import { explainSelection } from "../src/engine/moveReason";
+import { bounceLoopScene, tauntDigScene } from "../src/engine/scenes";
+import type { LocationId } from "../src/engine/types";
+import { renderPlay } from "../src/ui/app";
 import { barePlayState, give, putAlly, putHero, putItem } from "./helpers";
 
 function expectLegalHighlights(state: ReturnType<typeof barePlayState>, highlights: string[]) {
@@ -528,5 +535,168 @@ describe("coach suggestions", () => {
     expect(advice.do).toMatch(/Vanquish/);
     expect(advice.highlights).toContain("act:jr-vanquish");
     expectLegalHighlights(state, advice.highlights);
+  });
+});
+
+describe("coach bounce loop", () => {
+  it("gains or explains, and does not pace Jolly Roger then Skull Rock", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = false;
+    state.power = 10;
+    state.hand = [];
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    state.departedFrom = "skullRock";
+    putHero(state, "peterPan", "hangmansTree");
+
+    const here = advise(state);
+    const took =
+      /Gain|Discard|Play|Vanquish/i.test(here.do) && !/End the turn/i.test(here.do);
+    const endedClean = /End the turn/i.test(here.do) && /No Discard, Gain, or Play/i.test(here.why);
+    expect(took || endedClean).toBe(true);
+    expect(here.do).toMatch(/Gain/);
+
+    const moving = structuredClone(state);
+    moving.phase = "move";
+    const moves: string[] = [];
+    let acted = false;
+    let current = moving;
+    for (let step = 0; step < 8; step++) {
+      if (current.pending) break;
+      const advice = advise(current);
+      if (current.phase === "move") {
+        const loc = advice.highlights.find((h) => h.startsWith("loc:"))?.slice(4);
+        expect(loc, advice.do).toBeTruthy();
+        moves.push(loc!);
+        current = applyInput(current, { type: "selectLocation", locationId: loc as LocationId });
+        continue;
+      }
+      if (current.phase === "actions") {
+        const act = advice.highlights.find((h) => h.startsWith("act:"))?.slice(4);
+        if (act) {
+          acted = true;
+          current = applyInput(current, { type: "selectAction", actionKey: act });
+          continue;
+        }
+        expect(advice.do).toMatch(/End the turn/i);
+        expect(advice.why).toMatch(/No Discard, Gain, or Play/);
+        current = applyInput(current, { type: "endTurn" });
+        continue;
+      }
+      break;
+    }
+
+    expect(acted).toBe(true);
+    expect(moves[0]).toBe("mermaidLagoon");
+    expect(moves[0]).not.toBe("skullRock");
+    expect(moves[1]).not.toBe("jollyRoger");
+    expect(moves.slice(0, 2)).not.toEqual(["skullRock", "jollyRoger"]);
+    expect(moves.slice(0, 2)).not.toEqual(["jollyRoger", "skullRock"]);
+  });
+
+  it("explains a forced return when the other step is Tick Tock", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = false;
+    state.peterPanRevealed = true;
+    state.phase = "move";
+    state.villainLocation = "jollyRoger";
+    state.departedFrom = "skullRock";
+    state.power = 10;
+    state.hand = [];
+    putHero(state, "tickTock", "mermaidLagoon");
+
+    const advice = advise(state);
+    expect(advice.highlights).toContain("loc:skullRock");
+    expect(advice.highlights).not.toContain("loc:mermaidLagoon");
+    expect(advice.why).toMatch(/Mermaid Lagoon has Tick Tock — stay one turn to Gain, don’t bounce/);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
+  it("still returns to Peter when Move a Hero is the reason to go back", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.phase = "move";
+    state.villainLocation = "jollyRoger";
+    state.departedFrom = "hangmansTree";
+    putHero(state, "peterPan", "hangmansTree");
+
+    const advice = advise(state);
+    expect(advice.highlights).toContain("loc:hangmansTree");
+    expect(advice.do).toMatch(/Move a Hero/);
+    expectLegalHighlights(state, advice.highlights);
+  });
+
+  it("bounceloop scene banks Power and names the crocodile instead of ending", () => {
+    const state = bounceLoopScene();
+    expect(state.departedFrom).toBe("skullRock");
+    expect(state.locations.skullRock.heroes.some((h) => h.defId === "tickTock")).toBe(true);
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Gain/);
+    expect(advice.do).not.toMatch(/End the turn/i);
+    expect(advice.why).toMatch(/Skull Rock has Tick Tock — stay one turn to Gain, don’t bounce/);
+    expectLegalHighlights(state, advice.highlights);
+
+    const html = renderPlay(state, { coachEnabled: true, briefEnabled: false, reasonsEnabled: false });
+    expect(html).toContain("Skull Rock has Tick Tock — stay one turn to Gain, don’t bounce");
+    expect(html).toMatch(/Gain 1/);
+    expect(html).not.toMatch(/End the turn \(click End turn\)/);
+  });
+
+  it("discards spent Obsession at covered Skull Rock instead of ending or returning to the ship", () => {
+    const state = tauntDigScene();
+    expect(state.locations.skullRock.heroes[0]?.defId).toBe("tinkerBell");
+    expect(state.locations.jollyRoger.allies).toHaveLength(0);
+    expect(state.hand.filter((card) => card.defId === "obsession")).toHaveLength(2);
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Discard at Skull Rock/);
+    expect(advice.do).toMatch(/click Obsession/);
+    expect(advice.do).toMatch(/Confirm/);
+    expect(advice.do).not.toMatch(/End the turn/i);
+    expect(advice.do).not.toMatch(/Move to (the )?Jolly Roger/);
+    expect(advice.do).not.toMatch(/click Cunning/);
+    expect(advice.why).toMatch(/Obsession is spent/);
+    expect(advice.why).toMatch(/Taunt/);
+    expect(advice.why).toMatch(/dig for Allies/i);
+    expect(advice.why).toMatch(/crew the ship/i);
+    expect(advice.highlights).toContain("act:sr-discard");
+    expectLegalHighlights(state, advice.highlights);
+
+    const choosing = applyInput(state, { type: "selectAction", actionKey: "sr-discard" });
+    const named = advise(choosing);
+    expect(named.do).toMatch(/Obsession/);
+    expect(named.highlights.some((key) => key.startsWith("card:"))).toBe(true);
+    expectLegalHighlights(choosing, named.highlights);
+
+    const obsession = state.hand.find((card) => card.defId === "obsession");
+    expect(obsession).toBeTruthy();
+    const marked = applyInput(choosing, { type: "selectCard", instanceId: obsession!.instanceId });
+    const markedWhy = explainSelection(choosing, { type: "selectCard", instanceId: obsession!.instanceId }, marked);
+    expect(markedWhy?.why).toMatch(/dig for Allies/);
+    expect(markedWhy?.why).not.toMatch(/dig for the Map/);
+
+    const moving = structuredClone(state);
+    moving.phase = "move";
+    const move = advise(moving);
+    expect(move.highlights).not.toContain("loc:jollyRoger");
+    expect(move.highlights).not.toContain("loc:mermaidLagoon");
+    expect(move.why).toMatch(/Don’t walk back to the ship|cannot start/);
+    expectLegalHighlights(moving, move.highlights);
+
+    const html = renderPlay(state, { coachEnabled: true, briefEnabled: false, reasonsEnabled: true });
+    expect(html).toContain("click Obsession");
+    expect(html).toContain("dig for Allies");
+    expect(html).not.toContain("End the turn (click End turn)");
+
+    const before = structuredClone(state);
+    before.phase = "move";
+    before.villainLocation = "jollyRoger";
+    const after = applyInput(before, { type: "selectLocation", locationId: "skullRock" });
+    const reason = explainSelection(before, { type: "selectLocation", locationId: "skullRock" }, after);
+    expect(reason?.why).toMatch(/crew about 0/);
+    expect(reason?.why).toMatch(/dig or gain for Allies first/);
+    expect(reason?.why).not.toMatch(/Vanquish him there to finish/);
+    expect(state.log[0]?.text).toMatch(/Skull Rock/);
   });
 });

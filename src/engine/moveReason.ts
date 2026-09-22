@@ -3,6 +3,8 @@ import { locName } from "./realm";
 import {
   allAllies,
   allHeroes,
+  allyStrength,
+  anyTauntInRealm,
   availableActions,
   cardName,
   coveringHero,
@@ -14,6 +16,7 @@ import {
   preferredAttachAlly,
   cutlassStrapLine,
   promptText,
+  vanquishableHeroes,
 } from "./queries";
 import { LOCATION_IDS, type CardInstance, type GameState, type Input, type LocationId } from "./types";
 
@@ -183,7 +186,9 @@ function explainCurrentMoment(state: GameState): MoveReason {
   if (p?.kind === "discardSelect") {
     return pack(
       `You opened Discard at ${locName(state.villainLocation)}.`,
-      `${promptText(state)} Click cards in hand to mark them, then click Confirm. Discarding none still spends the action. Keep the Map and hunt cards while Peter is hidden.`,
+      `${promptText(state)} Click cards in hand to mark them, then click Confirm. Discarding none still spends the action. ${
+        state.peterPanRevealed ? "Keep Allies you can still play onto the ship." : "Keep the Map and hunt cards while Peter is hidden."
+      }`,
       `${chainLine(state)}`,
     );
   }
@@ -249,6 +254,17 @@ function crocWatch(state: GameState): string {
     : " Tick Tock is not ashore yet, so movement is safer than it will be later.";
 }
 
+function shipCrew(state: GameState): number {
+  return state.locations.jollyRoger.allies.reduce((sum, ally) => sum + allyStrength(state, ally), 0);
+}
+
+function discardDigWhy(state: GameState): string {
+  if (state.peterPanRevealed && shipCrew(state) < 8) {
+    return "Discarding is a dig for Allies so the ship has a crew before the clash. The action will spend even if you confirm with nothing selected.";
+  }
+  return "Discarding is a dig for the Map and for cards that still serve the chain. The action will spend even if you confirm with nothing selected.";
+}
+
 function chainLine(state: GameState): string {
   if (!state.hangmansUnlocked) {
     return "Hangman’s Tree is still locked, so the immediate job is Power and the Never Land Map. Until that hideout opens, Peter cannot walk toward the ship even if Fate drops him there.";
@@ -258,6 +274,18 @@ function chainLine(state: GameState): string {
   }
   if (state.peterPanLocation !== "jollyRoger") {
     return `Peter is ashore at ${state.peterPanLocation ? locName(state.peterPanLocation) : "the realm"}. The remaining job is walking him to the Jolly Roger and meeting him with enough Strength there.`;
+  }
+  const peter = allHeroes(state).find((h) => h.hero.defId === "peterPan");
+  const atShip = { ...state, villainLocation: "jollyRoger" as const };
+  const ready = peter
+    ? vanquishableHeroes(atShip).some((h) => h.hero.defId === "peterPan" && h.location === "jollyRoger")
+    : false;
+  if (peter && !ready) {
+    const crew = shipCrew(state);
+    const taunt = anyTauntInRealm(state)
+      ? " Taunt means Peter must be vanquished first, and the ship still needs Allies before that clash can start."
+      : " The ship still needs Allies before that clash can start.";
+    return `Peter is on the Jolly Roger (Strength ${heroStrength(state, peter.hero)}, crew about ${crew}).${taunt} Clashing him anywhere else loses the duel. Walking back to an empty ship does not crew it — dig or gain for Allies first.`;
   }
   return "Peter is on the Jolly Roger. Vanquish him there to finish the chain; clashing him anywhere else loses this practice duel.";
 }
@@ -898,8 +926,10 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
     const nowOn = selected.includes(instanceId);
     return pack(
       nowOn ? `You marked ${name} to discard.` : `You unmarked ${name}.`,
-      "Discarding is a dig for the Map and for cards that still serve the chain. The action will spend even if you confirm with nothing selected.",
-      "Keep the Map and affordable ship Allies. Confirm when the pile looks right.",
+      discardDigWhy(before),
+      before.peterPanRevealed
+        ? "Keep Allies you can still play onto the ship. Confirm when the pile looks right."
+        : "Keep the Map and affordable ship Allies. Confirm when the pile looks right.",
     );
   }
   if (p.kind === "vanquishHero") {

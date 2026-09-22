@@ -41,6 +41,7 @@ import {
   vanquishClashMath,
 } from "../engine/queries";
 import {
+  bounceLoopScene,
   cutlassAttachScene,
   dragHeroScene,
   easyFizzleScene,
@@ -48,6 +49,7 @@ import {
   lagoonCoverScene,
   nearWinScene,
   obsessionDecideScene,
+  tauntDigScene,
   payNoMapScene,
   peterSoftConfirmScene,
   tickTockOntoCaptainScene,
@@ -869,6 +871,8 @@ function bootState(): GameState {
       if (scene === "hourwhy") return hourPlaytestWhyScene();
       if (scene === "hourequal") return hourEqualVanquishScene();
       if (scene === "nearwin") return nearWinScene();
+      if (scene === "bounceloop") return bounceLoopScene();
+      if (scene === "tauntdig") return tauntDigScene();
     }
   } catch {
     /* ignore */
