@@ -160,6 +160,7 @@ function discardRank(state: GameState, card: CardInstance): number {
   ) {
     return 7_000;
   }
+  if (isDeadCondition(state, card) && card.defId === "cunning") return 45;
   if (isDeadCondition(state, card)) return 0;
   if (d.type === "condition") return 20;
   if (!state.peterPanRevealed && (card.defId === "worthyOpponent" || card.defId === "giveThemAScare")) {
@@ -203,6 +204,17 @@ function discardDo(state: GameState, where: string): string {
 
 function discardWhy(state: GameState, picks: CardInstance[]): string {
   const name = picks.map((card) => cardName(card)).join(" and ");
+  const spentObsession = picks.some((card) => card.defId === "obsession" && state.peterPanRevealed);
+  if (spentObsession) {
+    const peter = peterCard(state);
+    const where = peter?.location === "jollyRoger" ? "Peter is already on the Jolly Roger." : "Peter is already in the realm.";
+    const taunt = anyTauntInRealm(state) ? " Taunt means he must be vanquished first." : "";
+    const dig =
+      jrStrength(state) < 8
+        ? " Discard Obsession to dig for Allies and crew the ship before that clash."
+        : " Discard Obsession to dig toward the next card that serves the chain.";
+    return `Obsession is spent. ${where}${taunt}${dig}`;
+  }
   const pricey = cheapestUnaffordable(state);
   const powerLine = pricey
     ? `You have ${state.power} Power; ${cardName(pricey)} costs ${def(pricey.defId).cost}.`
@@ -305,7 +317,9 @@ function scoreMove(state: GameState, id: LocationId): number {
   if (blocked) score += gainAmt * 180;
   else if (needPowerForMap(state) || wantEarlyPower(state)) score += gainAmt * 120;
   // An empty hand cannot dig. Scoring the Discard symbol anyway made Jolly Roger and Skull Rock look equally useful and the captain paced between them.
-  if (diggingForMap(state) && discard && discardPicks(state).length > 0) score += state.power >= 4 ? 380 : 70;
+  if (discard && discardPicks(state).length > 0 && (diggingForMap(state) || wantsNamedDiscard(state))) {
+    score += state.power >= 4 ? 380 : 70;
+  }
   if (blocked && discard && gainAmt === 0) score += 220;
   if (!state.peterPanRevealed && fate && !blocked) score += state.hangmansUnlocked ? 360 : 40;
   if (jrStrength(state) < 8 && play && state.hand.some((c) => def(c.defId).type === "ally" && def(c.defId).cost <= state.power + gainAmt)) {
@@ -381,12 +395,36 @@ function playDestinationReason(state: GameState, dest: LocationId): boolean {
   return !others.some((id) => hasKind(state, id, "playCard"));
 }
 
+/** The only safe Discard stop, and the hand has a named card to dig. */
+function digReturnReason(state: GameState, dest: LocationId): boolean {
+  if (!hasKind(state, dest, "discard") || !wantsNamedDiscard(state)) return false;
+  const others = legalMoveLocations(state).filter((id) => id !== dest && tickTockAt(state) !== id);
+  return !others.some((id) => hasKind(state, id, "discard"));
+}
+
+function stopServes(state: GameState, id: LocationId): boolean {
+  if (hasKind(state, id, "gainPower") && state.power < 12) return true;
+  if (hasKind(state, id, "discard") && wantsNamedDiscard(state)) return true;
+  if (hasKind(state, id, "playCard") && usefulPlay(state)) return true;
+  if (peterWalkReason(state, id)) return true;
+  const there = relocated(state, id);
+  return Boolean(hasKind(state, id, "vanquish") && preferredVanquishTarget(there));
+}
+
+/** Peter is on the ship, but standing there still cannot start the clash. */
+function shipTrap(state: GameState, id: LocationId): boolean {
+  if (id !== "jollyRoger" || stopServes(state, id)) return false;
+  const peter = peterCard(state);
+  return Boolean(peter && peter.location === "jollyRoger" && !peterReadyToFinish(state));
+}
+
 function concreteReturnReason(state: GameState, dest: LocationId): boolean {
   if (peterReadyToFinish(state) && dest === "jollyRoger" && hasKind(state, dest, "vanquish")) return true;
   if (peterWalkReason(state, dest)) return true;
   if (newVanquishAt(state, dest)) return true;
   if (uncoverReason(state, dest)) return true;
   if (playDestinationReason(state, dest)) return true;
+  if (digReturnReason(state, dest)) return true;
   return false;
 }
 
@@ -394,6 +432,7 @@ interface MoveChoice {
   dest: LocationId;
   forcedBounce: boolean;
   skipped?: LocationId;
+  avoidedShip?: boolean;
 }
 
 /**
@@ -408,10 +447,13 @@ function chooseMove(state: GameState): MoveChoice {
   const best = ranked[0] ?? legal[0] ?? "skullRock";
   const nonCroc = (id: LocationId) => tickTockAt(state) !== id;
   const allowed = ranked.filter((id) => nonCroc(id) && (!departed || id !== departed || concreteReturnReason(state, id)));
-  if (allowed[0]) {
-    const dest = allowed[0];
+  const withoutShipTrap = allowed.filter((id) => !shipTrap(state, id));
+  const pool = withoutShipTrap.length > 0 ? withoutShipTrap : allowed;
+  if (pool[0]) {
+    const dest = pool[0];
     const skipped = departed && dest !== departed && ranked[0] === departed ? departed : undefined;
-    return { dest, forcedBounce: false, skipped };
+    const avoidedShip = dest !== "jollyRoger" && legal.includes("jollyRoger") && shipTrap(state, "jollyRoger");
+    return { dest, forcedBounce: false, skipped, avoidedShip };
   }
   if (departed && nonCroc(departed)) {
     return { dest: departed, forcedBounce: true };
@@ -436,11 +478,15 @@ function forcedBounceLead(state: GameState, dest: LocationId): string {
 }
 
 function withBounceWhy(state: GameState, choice: MoveChoice, why: string): string {
-  if (choice.forcedBounce) return `${forcedBounceLead(state, choice.dest)} ${why}`;
-  if (choice.skipped) {
-    return `${why} You just left ${locName(choice.skipped)}. No new clash, uncover, or play is waiting there, so this turn does not bounce back.`;
+  let text = why;
+  if (choice.forcedBounce) text = `${forcedBounceLead(state, choice.dest)} ${text}`;
+  if (choice.avoidedShip) {
+    text = `${text} Peter is on the Jolly Roger, but Vanquish cannot start — Taunt or an empty crew blocks the clash. Don’t walk back to the ship just to end the turn. Dig for Allies first.`;
   }
-  return why;
+  if (choice.skipped) {
+    text = `${text} You just left ${locName(choice.skipped)}. No new clash, uncover, or play is waiting there, so this turn does not bounce back.`;
+  }
+  return text;
 }
 
 function placeVerb(id: LocationId): string {
@@ -515,6 +561,9 @@ function plannedAfterMove(state: GameState, dest: LocationId): string {
   const next: GameState = { ...state, villainLocation: dest, usedActions: [], pending: null, phase: "actions" };
   const pick = pickAction(next);
   if (!pick || pick === "end") {
+    if (shipTrap(state, "jollyRoger")) {
+      return "then end the turn only if no uncovered Discard, Gain, or Play remains — do not walk back to the ship for a clash you cannot start";
+    }
     return "then End the turn if no uncovered action still serves the chain";
   }
   if (pick.kind === "moveHero") {
@@ -702,8 +751,6 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
 
   const peter = peterCard(state);
   if (peter && peter.location === "jollyRoger" && anyTauntInRealm(state) && !peterReadyToFinish(state)) {
-    const mh = find("moveHero");
-    if (mh && mh.available && movableHeroes(state).length > 0) return mh;
     const escort = usefulPlay(state);
     if (escort && (escort.defId === "ingeniousDevice" || escort.defId === "ayeAyeSir" || escort.defId === "mrStarkey") && find("playCard")) {
       return find("playCard")!;
@@ -858,16 +905,9 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
 }
 
 function endTurnWhy(state: GameState): string {
-  const departed = state.departedFrom;
-  const back = departed && departed !== state.villainLocation ? locName(departed) : null;
   const croc = tickTockAt(state);
-  if (back && croc) {
-    return `No Gain, Discard, Play, or Vanquish is left uncovered here. ${locName(croc)} has Tick Tock — don’t bounce back to ${back} just to pace the board. Ending refills the hand.`;
-  }
-  if (back) {
-    return `No Gain, Discard, Play, or Vanquish is left uncovered here. Don’t bounce straight back to ${back} unless a new clash, an uncover, a play, or Tick Tock requires that stop. Ending refills the hand.`;
-  }
-  return "You have spent the useful actions at this stop. Ending is the refill — stay ready to move again next turn.";
+  const crocLine = croc ? ` ${locName(croc)} has Tick Tock, so do not step on that square next.` : "";
+  return `No Discard, Gain, or Play is left uncovered here. Ending refills the hand.${crocLine} The next move should be a stop where one of those actions is usable, not a walk back to a clash you cannot start.`;
 }
 
 function adviseActions(state: GameState): CoachAdvice {

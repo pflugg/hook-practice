@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import { advise } from "../src/engine/coach";
 import { applyInput, createGame, highlightSet } from "../src/engine/game";
 import { availableActions } from "../src/engine/queries";
-import { bounceLoopScene } from "../src/engine/scenes";
+import { explainSelection } from "../src/engine/moveReason";
+import { bounceLoopScene, tauntDigScene } from "../src/engine/scenes";
 import type { LocationId } from "../src/engine/types";
 import { renderPlay } from "../src/ui/app";
 import { barePlayState, give, putAlly, putHero, putItem } from "./helpers";
@@ -551,7 +552,7 @@ describe("coach bounce loop", () => {
     const here = advise(state);
     const took =
       /Gain|Discard|Play|Vanquish/i.test(here.do) && !/End the turn/i.test(here.do);
-    const endedClean = /End the turn/i.test(here.do) && /bounce/i.test(here.why);
+    const endedClean = /End the turn/i.test(here.do) && /No Discard, Gain, or Play/i.test(here.why);
     expect(took || endedClean).toBe(true);
     expect(here.do).toMatch(/Gain/);
 
@@ -578,7 +579,7 @@ describe("coach bounce loop", () => {
           continue;
         }
         expect(advice.do).toMatch(/End the turn/i);
-        expect(advice.why).toMatch(/bounce/);
+        expect(advice.why).toMatch(/No Discard, Gain, or Play/);
         current = applyInput(current, { type: "endTurn" });
         continue;
       }
@@ -640,5 +641,62 @@ describe("coach bounce loop", () => {
     expect(html).toContain("Skull Rock has Tick Tock — stay one turn to Gain, don’t bounce");
     expect(html).toMatch(/Gain 1/);
     expect(html).not.toMatch(/End the turn \(click End turn\)/);
+  });
+
+  it("discards spent Obsession at covered Skull Rock instead of ending or returning to the ship", () => {
+    const state = tauntDigScene();
+    expect(state.locations.skullRock.heroes[0]?.defId).toBe("tinkerBell");
+    expect(state.locations.jollyRoger.allies).toHaveLength(0);
+    expect(state.hand.filter((card) => card.defId === "obsession")).toHaveLength(2);
+
+    const advice = advise(state);
+    expect(advice.do).toMatch(/Discard at Skull Rock/);
+    expect(advice.do).toMatch(/click Obsession/);
+    expect(advice.do).toMatch(/Confirm/);
+    expect(advice.do).not.toMatch(/End the turn/i);
+    expect(advice.do).not.toMatch(/Move to (the )?Jolly Roger/);
+    expect(advice.do).not.toMatch(/click Cunning/);
+    expect(advice.why).toMatch(/Obsession is spent/);
+    expect(advice.why).toMatch(/Taunt/);
+    expect(advice.why).toMatch(/dig for Allies/i);
+    expect(advice.why).toMatch(/crew the ship/i);
+    expect(advice.highlights).toContain("act:sr-discard");
+    expectLegalHighlights(state, advice.highlights);
+
+    const choosing = applyInput(state, { type: "selectAction", actionKey: "sr-discard" });
+    const named = advise(choosing);
+    expect(named.do).toMatch(/Obsession/);
+    expect(named.highlights.some((key) => key.startsWith("card:"))).toBe(true);
+    expectLegalHighlights(choosing, named.highlights);
+
+    const obsession = state.hand.find((card) => card.defId === "obsession");
+    expect(obsession).toBeTruthy();
+    const marked = applyInput(choosing, { type: "selectCard", instanceId: obsession!.instanceId });
+    const markedWhy = explainSelection(choosing, { type: "selectCard", instanceId: obsession!.instanceId }, marked);
+    expect(markedWhy?.why).toMatch(/dig for Allies/);
+    expect(markedWhy?.why).not.toMatch(/dig for the Map/);
+
+    const moving = structuredClone(state);
+    moving.phase = "move";
+    const move = advise(moving);
+    expect(move.highlights).not.toContain("loc:jollyRoger");
+    expect(move.highlights).not.toContain("loc:mermaidLagoon");
+    expect(move.why).toMatch(/Don’t walk back to the ship|cannot start/);
+    expectLegalHighlights(moving, move.highlights);
+
+    const html = renderPlay(state, { coachEnabled: true, briefEnabled: false, reasonsEnabled: true });
+    expect(html).toContain("click Obsession");
+    expect(html).toContain("dig for Allies");
+    expect(html).not.toContain("End the turn (click End turn)");
+
+    const before = structuredClone(state);
+    before.phase = "move";
+    before.villainLocation = "jollyRoger";
+    const after = applyInput(before, { type: "selectLocation", locationId: "skullRock" });
+    const reason = explainSelection(before, { type: "selectLocation", locationId: "skullRock" }, after);
+    expect(reason?.why).toMatch(/crew about 0/);
+    expect(reason?.why).toMatch(/dig or gain for Allies first/);
+    expect(reason?.why).not.toMatch(/Vanquish him there to finish/);
+    expect(state.log[0]?.text).toMatch(/Skull Rock/);
   });
 });

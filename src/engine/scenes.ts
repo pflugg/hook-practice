@@ -455,6 +455,45 @@ export function bounceLoopScene(): GameState {
   return state;
 }
 
+/**
+ * Turn-38 board for `?scene=tauntdig`.
+ * Captain at Skull Rock, Tinker Bell covering the top row, Peter taunted on an empty ship,
+ * and a spent Obsession in hand. Coach should dig, not end, and not walk back to the ship.
+ */
+export function tauntDigScene(): GameState {
+  const state = createGame("normal", 38);
+  emptyRealm(state);
+  state.turn = 38;
+  state.power = 7;
+  state.hangmansUnlocked = true;
+  state.villainLocation = "skullRock";
+  state.departedFrom = "jollyRoger";
+  state.phase = "actions";
+  const peter = inst(state, "peterPan");
+  const john = inst(state, "john");
+  const tinker = inst(state, "tinkerBell");
+  const taunt = inst(state, "taunt");
+  state.locations.jollyRoger.heroes.push(peter, john);
+  state.locations.skullRock.heroes.push(tinker);
+  state.locations.mermaidLagoon.heroes.push(inst(state, "lostBoys"), inst(state, "wendy"), inst(state, "tickTock"));
+  state.locations.hangmansTree.heroes.push(inst(state, "lostBoys"), inst(state, "michael"));
+  state.attachments.push({ item: taunt, attachedTo: peter.instanceId });
+  state.peterPanRevealed = true;
+  state.peterPanLocation = "jollyRoger";
+  state.hand.push(inst(state, "ayeAyeSir"), inst(state, "cunning"), inst(state, "obsession"), inst(state, "obsession"));
+  state.log.unshift({
+    id: state.logSeq++,
+    text: "The captain arrives at Jolly Roger.",
+    tone: "info",
+  });
+  state.log.unshift({
+    id: state.logSeq++,
+    text: "The captain arrives at Skull Rock — Tinker Bell covers the top actions.",
+    tone: "info",
+  });
+  return state;
+}
+
 /** Hour-playtest Play-a-Card so Why can name live Peter Strength. */
 export function hourPlaytestWhyScene(): GameState {
   const state = hourPlaytestTauntScene();

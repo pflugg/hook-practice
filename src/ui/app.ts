@@ -49,6 +49,7 @@ import {
   lagoonCoverScene,
   nearWinScene,
   obsessionDecideScene,
+  tauntDigScene,
   payNoMapScene,
   peterSoftConfirmScene,
   tickTockOntoCaptainScene,
@@ -871,6 +872,7 @@ function bootState(): GameState {
       if (scene === "hourequal") return hourEqualVanquishScene();
       if (scene === "nearwin") return nearWinScene();
       if (scene === "bounceloop") return bounceLoopScene();
+      if (scene === "tauntdig") return tauntDigScene();
     }
   } catch {
     /* ignore */
