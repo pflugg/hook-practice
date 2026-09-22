@@ -427,6 +427,34 @@ export function nearWinScene(): GameState {
   return state;
 }
 
+/**
+ * Mid-voyage for `?scene=bounceloop`.
+ * The captain just left Skull Rock, the hand is empty, and Power is already high.
+ * Tick Tock sits on Skull Rock. Coach used to end the turn and pace back; it should Gain here instead.
+ */
+export function bounceLoopScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.turn = 4;
+  state.power = 9;
+  state.hangmansUnlocked = false;
+  state.peterPanRevealed = true;
+  state.peterPanLocation = "hangmansTree";
+  state.villainLocation = "jollyRoger";
+  state.departedFrom = "skullRock";
+  state.phase = "actions";
+  const peter = inst(state, "peterPan");
+  const tick = inst(state, "tickTock");
+  state.locations.hangmansTree.heroes.push(peter);
+  state.locations.skullRock.heroes.push(tick);
+  state.log.unshift({
+    id: state.logSeq++,
+    text: "The captain left Skull Rock. Tick Tock still waits there.",
+    tone: "info",
+  });
+  return state;
+}
+
 /** Hour-playtest Play-a-Card so Why can name live Peter Strength. */
 export function hourPlaytestWhyScene(): GameState {
   const state = hourPlaytestTauntScene();

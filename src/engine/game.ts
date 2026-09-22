@@ -87,6 +87,7 @@ export function titleState(): GameState {
     power: 0,
     handSize: 4,
     villainLocation: "jollyRoger",
+    departedFrom: null,
     hangmansUnlocked: false,
     peterPanRevealed: false,
     peterPanLocation: null,
@@ -1056,6 +1057,7 @@ export function applyInput(prev: GameState, input: Input): GameState {
 function handleLocation(state: GameState, locationId: LocationId): GameState {
   if (state.phase === "move" && !state.pending) {
     if (!legalMoveLocations(state).includes(locationId)) return state;
+    state.departedFrom = state.villainLocation;
     state.villainLocation = locationId;
     state.usedActions = [];
     const snapped = checkTickTock(state, locationId, "captain");

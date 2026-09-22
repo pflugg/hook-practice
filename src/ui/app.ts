@@ -41,6 +41,7 @@ import {
   vanquishClashMath,
 } from "../engine/queries";
 import {
+  bounceLoopScene,
   cutlassAttachScene,
   dragHeroScene,
   easyFizzleScene,
@@ -869,6 +870,7 @@ function bootState(): GameState {
       if (scene === "hourwhy") return hourPlaytestWhyScene();
       if (scene === "hourequal") return hourEqualVanquishScene();
       if (scene === "nearwin") return nearWinScene();
+      if (scene === "bounceloop") return bounceLoopScene();
     }
   } catch {
     /* ignore */
