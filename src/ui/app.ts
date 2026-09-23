@@ -723,7 +723,18 @@ function playView(
     canCancelPlay ||
     (state.phase === "resolving" &&
       state.pending &&
-      !["scarePeek", "fateChooseCard", "fateReport"].includes(state.pending.kind))
+      ![
+        "scarePeek",
+        "fateChooseCard",
+        "fateChooseLocation",
+        "fateChooseAttach",
+        "fateReport",
+        "worthyLocation",
+        "obsessionDecide",
+        "obsessionLocation",
+        "ayeAyeAlly",
+        "ayeAyeDest",
+      ].includes(state.pending.kind))
   ) {
     if (!promptButtons.some((b) => b.includes("data-cancel"))) {
       promptButtons.push(`<button class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel>Cancel</button>`);

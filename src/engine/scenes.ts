@@ -377,7 +377,8 @@ export function hourEqualVanquishScene(): GameState {
   state.locations.jollyRoger.allies.push(swash);
   state.locations.hangmansTree.heroes.push(peter);
   state.locations.skullRock.heroes.push(tick);
-  state.attachments.push({ item: dust, attachedTo: peter.instanceId });
+  // Dust is spent, not strapped to Peter: the tree is still locked, and Pixie Dust does not attach there.
+  state.fateDiscard.push(dust);
   state.peterPanRevealed = true;
   state.peterPanLocation = "hangmansTree";
   state.hand.push(inst(state, "worthyOpponent"), inst(state, "hooksCase"));
