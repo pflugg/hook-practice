@@ -871,6 +871,22 @@ export function applyInput(prev: GameState, input: Input): GameState {
 
   if (input.type === "cancel") {
     if (state.pending?.kind === "fateReport") return state;
+    // These steps already pulled a card out of a deck. Cancel used to drop `pending`
+    // and leave the card only on `heldCard`, so the next Fate overwrite deleted it.
+    if (
+      state.pending?.kind === "fateChooseLocation" ||
+      state.pending?.kind === "fateChooseAttach" ||
+      state.pending?.kind === "worthyLocation" ||
+      state.pending?.kind === "obsessionDecide" ||
+      state.pending?.kind === "obsessionLocation" ||
+      state.pending?.kind === "ayeAyeAlly"
+    ) {
+      return state;
+    }
+    if (state.pending?.kind === "ayeAyeDest") {
+      state.pending = { kind: "ayeAyeAlly" };
+      return state;
+    }
     if (state.pending?.kind === "starkeyHero" || state.pending?.kind === "tinkerDiscard") {
       consumeCurrentAction(state);
       return state;

@@ -8,6 +8,7 @@ import {
   attachableHeroes,
   availableActions,
   canPlayCunning,
+  canPlayObsession,
   cardName,
   coveringHero,
   findCard,
@@ -147,6 +148,8 @@ function escapeRegExp(text: string): string {
 }
 
 function namesUnaffordablePlay(state: GameState, text: string): CardInstance | null {
+  // Cunning's Ally drop is free. "Play Brute for free" is not an unpaid Power play.
+  if (state.pending?.kind === "cunningAlly" || state.pending?.kind === "cunningLocation") return null;
   for (const card of state.hand) {
     if (!cannotPay(state, card)) continue;
     if (new RegExp(`Play ${escapeRegExp(cardName(card))}\\b`, "i").test(text)) return card;
@@ -959,12 +962,56 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
 function endTurnWhy(state: GameState): string {
   const croc = tickTockAt(state);
   const crocLine = croc ? ` ${locName(croc)} has Tick Tock, so do not step on that square next.` : "";
-  return `No Discard, Gain, or Play is left uncovered here. Ending refills the hand.${crocLine} The next move should be a stop where one of those actions is usable, not a walk back to a clash you cannot start.`;
+  const acts = liveActions(state);
+  const idle: string[] = [];
+  if (state.hand.length > 0 && acts.some((action) => action.kind === "playCard")) {
+    idle.push("Play is uncovered, but nothing in hand can be paid right now.");
+  }
+  if (state.hand.length > 0 && acts.some((action) => action.kind === "discard") && discardPicks(state).length === 0) {
+    idle.push("Discard is uncovered, but every card in hand still serves the chain.");
+  }
+  const base = idle.length ? idle.join(" ") : "No Discard, Gain, or Play is left uncovered here.";
+  return `${base} Ending refills the hand.${crocLine} The next move should be a stop where one of those actions is usable, not a walk back to a clash you cannot start.`;
+}
+
+function liveCunningAdvice(state: GameState): CoachAdvice | null {
+  if (!canPlayCunning(state)) return null;
+  const cunning = state.hand.find((card) => card.defId === "cunning");
+  const ally = state.hand
+    .filter((card) => def(card.defId).type === "ally")
+    .sort((a, b) => def(b.defId).strength - def(a.defId).strength)[0];
+  if (!cunning || !ally) return null;
+  const dest = legalPlayLocations(state).includes("jollyRoger") ? "jollyRoger" : state.villainLocation;
+  return say(
+    `Play Cunning (click Cunning in your hand), then click ${cardName(ally)} and ${placeVerb(dest)}. It does not spend a Play a Card action.`,
+    `A Hero of Strength 4 or more is ashore, and ${cardName(ally)} is in hand. Cunning is a printed Condition. This practice tool’s trigger lets you slip that Ally in for free on your turn.`,
+    [`card:${cunning.instanceId}`],
+    state,
+  );
+}
+
+function liveObsessionAdvice(state: GameState): CoachAdvice | null {
+  if (!canPlayObsession(state)) return null;
+  const obsession = state.hand.find((card) => card.defId === "obsession");
+  if (!obsession) return null;
+  return say(
+    "Play Obsession (click Obsession in your hand). If it finds Peter, play him — he goes to Hangman’s Tree.",
+    "Peter is still hidden. Obsession is a printed Condition. This practice tool’s trigger lets you hunt your Fate deck on your turn without spending Play a Card. At a table it watches another player’s turn.",
+    [`card:${obsession.instanceId}`],
+    state,
+  );
 }
 
 function adviseActions(state: GameState): CoachAdvice {
   const pick = pickAction(state);
+  const finishingPeter = Boolean(pick && pick !== "end" && pick.kind === "vanquish" && peterReadyToFinish(state));
+  if (!finishingPeter) {
+    const cunning = liveCunningAdvice(state);
+    if (cunning) return cunning;
+  }
   if (!pick || pick === "end") {
+    const obsession = liveObsessionAdvice(state);
+    if (obsession) return obsession;
     return say(
       "End the turn (click End turn). Draw back to four, then Fate will answer.",
       endTurnWhy(state),
@@ -1149,7 +1196,8 @@ function advisePending(state: GameState): CoachAdvice {
         return n + (ally ? allyStrength(state, ally) : 0);
       }, 0);
       const heroLoc = hero ? findCardLocation(state, hero.instanceId) : null;
-      if (selectedStr >= need && p.selected.length > 0) {
+      const boysShort = hero?.defId === "lostBoys" && p.selected.length < 2;
+      if (selectedStr >= need && p.selected.length > 0 && !boysShort) {
         const usedNeighbor = p.selected.some((id) => {
           const ally = pool.find((row) => row.ally.instanceId === id);
           return ally?.ally.defId === "boardingParty" && heroLoc && ally.location !== heroLoc;
@@ -1169,15 +1217,27 @@ function advisePending(state: GameState): CoachAdvice {
         .filter((a) => !p.selected.includes(a.ally.instanceId))
         .sort((a, b) => allyStrength(state, b.ally) - allyStrength(state, a.ally))[0];
       if (!nextAlly) {
+        if (hero?.defId === "lostBoys" && p.selected.length < 2) {
+          return say(
+            "Cancel the clash (click Cancel)",
+            `Lost Boys need two Allies (${p.selected.length}/2), even when Strength is already met. One Ally cannot finish this clash.`,
+            ["btn:cancel"],
+            state,
+          );
+        }
         return say("Cancel the clash", "You do not have the Strength. Back out and gather more crew.", ["btn:cancel"], state);
       }
       const neighborCrew =
         nextAlly.ally.defId === "boardingParty" && heroLoc && nextAlly.location !== heroLoc
           ? ` ${BOARDING_REACH_WHY}`
           : "";
+      const boysShortNow = hero?.defId === "lostBoys" && p.selected.length < 2;
+      const addLine = boysShortNow
+        ? `Add ${cardName(nextAlly.ally)} to the clash (click that Ally). Lost Boys need two Allies (${p.selected.length}/2), even when Strength already matches.`
+        : `Add ${cardName(nextAlly.ally)} to the clash (click that Ally). You need ${need} Strength.`;
       return say(
-        `Add ${cardName(nextAlly.ally)} to the clash (click that Ally). You need ${need} Strength.`,
-        `Click ${cardName(nextAlly.ally)} now. Keep tapping Allies at this place until the total meets the Hero, then Confirm.${neighborCrew}`,
+        addLine,
+        `Click ${cardName(nextAlly.ally)} now. Keep tapping Allies at this place until the total meets the Hero, then Confirm.${boysShortNow ? " Lost Boys need two Allies even if one Ally’s Strength is already enough." : ""}${neighborCrew}`,
         [`card:${nextAlly.ally.instanceId}`],
         state,
       );
@@ -1308,8 +1368,8 @@ function advisePending(state: GameState): CoachAdvice {
       const ally = state.hand.filter((c) => def(c.defId).type === "ally").sort((a, b) => def(b.defId).strength - def(a.defId).strength)[0];
       if (!ally) return say("Skip Cunning", "No Ally in hand to sneak ashore.", ["btn:skip-cond"], state);
       return say(
-        `Play ${cardName(ally)} for free (click ${cardName(ally)} in your hand, then ${placeVerb(bestAllyHome(state))}).`,
-        "Cunning spends no Play action. Drop the strongest Ally you can onto the ship.",
+        `Slip ${cardName(ally)} ashore for free (click ${cardName(ally)} in your hand, then ${placeVerb(bestAllyHome(state))}).`,
+        "Cunning spends no Play action and no Power. Drop the strongest Ally you can onto the ship.",
         [`card:${ally.instanceId}`],
         state,
       );
