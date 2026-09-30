@@ -388,16 +388,28 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
     </div></div>`;
   }
   if (p?.kind === "scarePeek") {
+    const [topA, topB] = p.cards;
+    const solo = topB ? undefined : topA;
+    const orderButtons =
+      topA && topB
+        ? `<button class="btn${coachClass(coached, `btn:scare-order:${topA.instanceId},${topB.instanceId}`)}" data-scare-order="${topA.instanceId},${topB.instanceId}">${esc(cardName(topA))} on top</button>
+        <button class="btn${coachClass(coached, `btn:scare-order:${topB.instanceId},${topA.instanceId}`)}" data-scare-order="${topB.instanceId},${topA.instanceId}">${esc(cardName(topB))} on top</button>`
+        : solo
+          ? `<button class="btn${coachClass(coached, `btn:scare-order:${solo.instanceId},${solo.instanceId}`)}" data-scare-order="${solo.instanceId},${solo.instanceId}">Put ${esc(cardName(solo))} back on top</button>`
+          : "";
     return `<div class="overlay"><div class="modal">
       <h2>Give Them a Scare</h2>
-      <p>Discard both to the Fate discard (they can return when Fate reshuffles), or return them with the first button’s card on top.</p>
+      <p>${
+        solo
+          ? "Only one Fate card was left. Discard it to the Fate discard (it can return when Fate reshuffles), or put it back on top."
+          : "Discard both to the Fate discard (they can return when Fate reshuffles), or return them with the first button’s card on top."
+      }</p>
       <div class="modal-cards">${p.cards
         .map((c) => renderCard(state, c, { size: "reveal", legal: true, selected: false }))
         .join("")}</div>
       <div class="actions-row">
-        <button class="btn${coachClass(coached, "btn:scare-discard")}" data-scare-discard>Discard both</button>
-        <button class="btn${coachClass(coached, `btn:scare-order:${p.cards[0].instanceId},${p.cards[1]?.instanceId ?? p.cards[0].instanceId}`)}" data-scare-order="${p.cards[0].instanceId},${p.cards[1]?.instanceId ?? p.cards[0].instanceId}">${esc(cardName(p.cards[0]))} on top</button>
-        ${p.cards[1] ? `<button class="btn${coachClass(coached, `btn:scare-order:${p.cards[1].instanceId},${p.cards[0].instanceId}`)}" data-scare-order="${p.cards[1].instanceId},${p.cards[0].instanceId}">${esc(cardName(p.cards[1]))} on top</button>` : ""}
+        <button class="btn${coachClass(coached, "btn:scare-discard")}" data-scare-discard>${solo ? "Discard it" : "Discard both"}</button>
+        ${orderButtons}
       </div>
     </div></div>`;
   }
@@ -430,13 +442,15 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
     const cost = card ? def(card.defId).cost : 0;
     const name = card ? cardName(card) : "this card";
     const canPay = state.power >= cost;
-    const mapOut = mapInRealm(state) && card?.defId !== "neverLandMap";
+    const mapOut = Boolean(
+      card && def(card.defId).type === "item" && card.defId !== "neverLandMap" && mapInRealm(state),
+    );
     return `<div class="overlay" data-overlay="blocking"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="pay-title">
       <h2 id="pay-title">Pay the cost</h2>
       <p>${esc(name)} costs <b>${cost} Power</b>. You have <b>${state.power} Power</b>.</p>
       <p>${
         mapOut
-          ? "The Never Land Map is in the realm and can cover this cost instead of Power."
+          ? "The Never Land Map is in the realm and can cover this Item instead of Power."
           : `Pay ${cost} Power to play ${esc(name)}.`
       }</p>
       <div class="pay-meter" role="status">Pay ${cost} · you have ${state.power} · ${Math.max(0, state.power - cost)} left${mapOut ? " · Map available" : ""}</div>

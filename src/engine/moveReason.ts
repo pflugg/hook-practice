@@ -777,9 +777,11 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
           ? "Discard the Never Land Map to cover this Item, or Cancel and Gain Power if you want to keep the Map. Fate does not pay a card cost."
           : short
             ? `Cancel and Gain Power. Save ${name} for when you have ${cost} Power.`
-            : map
-              ? "You may pay with Power or discard the Never Land Map if it is already unlocking the tree."
-              : `You have ${after.power} Power. Pay ${cost} to put ${name} on the table.`,
+            : map && item
+              ? "You may pay with Power, or discard the Never Land Map to cover this Item. The tree stays open either way."
+              : map
+                ? `You have ${after.power} Power. Pay ${cost} to put ${name} on the table. The Never Land Map covers other Items, not this card.`
+                : `You have ${after.power} Power. Pay ${cost} to put ${name} on the table.`,
       );
     }
     if (findCardLocation(after, cardId) !== locationId) return null;

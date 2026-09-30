@@ -325,8 +325,8 @@ export function playableHandCards(state: GameState): CardInstance[] {
   return state.hand.filter((card) => {
     const d = def(card.defId);
     if (d.type === "condition") return false;
-    if (d.type === "item" && map && d.cost > 0) return true;
-    if (d.cost > state.power) return false;
+    const mapCovers = d.type === "item" && Boolean(map) && d.cost > 0 && d.id !== "neverLandMap";
+    if (!mapCovers && d.cost > state.power) return false;
     if (d.id === "cutlass" && allAllies(state).length === 0) return false;
     if (d.id === "ayeAyeSir" && allAllies(state).filter((a) => isUnlocked(state, a.location)).length === 0) {
       return false;
@@ -588,7 +588,10 @@ export function promptText(state: GameState): string {
       const card = findCard(state, p.cardId);
       const cost = card ? def(card.defId).cost : 0;
       const name = card ? cardName(card) : "this card";
-      if (mapInRealm(state)) return "Pay with Power, or discard the Never Land Map instead?";
+      const mapCoversItem = Boolean(
+        card && def(card.defId).type === "item" && card.defId !== "neverLandMap" && mapInRealm(state),
+      );
+      if (mapCoversItem) return "Pay with Power, or discard the Never Land Map instead of paying for this Item?";
       return `${name} costs ${cost}. You have ${state.power}. Pay ${cost} Power.`;
     }
     case "starkeyHero":

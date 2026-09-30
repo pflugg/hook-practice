@@ -60,7 +60,8 @@ export function dropTargets(state: GameState, instanceId: string): DropTargets {
     return { locations: legalPlayLocations(state), cards: [] };
   }
   if (p.kind === "cunningAlly") {
-    if (!card || def(card.defId).type !== "ally") return empty;
+    const inHand = state.hand.some((c) => c.instanceId === instanceId && def(c.defId).type === "ally");
+    if (!inHand) return empty;
     return { locations: legalPlayLocations(state), cards: [] };
   }
   if (p.kind === "cunningLocation" && p.allyId === instanceId) {
