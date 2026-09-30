@@ -76,11 +76,11 @@ describe("full objective win", () => {
 
     next = applyInput(next, { type: "selectAction", actionKey: "sr-play" });
     next = applyInput(next, { type: "selectCard", instanceId: map.instanceId });
-    next = applyInput(next, { type: "selectLocation", locationId: "jollyRoger" });
+    next = applyInput(next, { type: "selectLocation", locationId: "skullRock" });
     next = applyInput(next, { type: "payWithPower" });
     expect(next.hangmansUnlocked).toBe(true);
     expect(next.voyage.mapOpened).toBe(true);
-    expect(next.locations.jollyRoger.items.some((card) => card.defId === "neverLandMap")).toBe(true);
+    expect(next.locations.skullRock.items.some((card) => card.defId === "neverLandMap")).toBe(true);
 
     next = applyInput(next, { type: "selectAction", actionKey: "sr-fate" });
     expect(next.peterPanRevealed).toBe(true);

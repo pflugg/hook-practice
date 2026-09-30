@@ -9,7 +9,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 3,
     cost: 2,
     strength: 2,
-    text: "This crew may join a clash here or at a neighboring unlocked place.",
+    text: "This crew may join a clash at the captain’s place or with a Hero one unlocked step away. A party on that Hero’s far side does not reach.",
   },
   giveThemAScare: {
     id: "giveThemAScare",
@@ -69,7 +69,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 0,
     strength: 0,
-    text: "Practice rule: if any Hero of Strength 4 or more is in the realm, play an Ally from hand without using a Play action.",
+    text: "Practice rule: if any Hero of Strength 4 or more is in the realm, play an Ally from hand to the captain’s place without using a Play action.",
   },
   cutlass: {
     id: "cutlass",
@@ -99,7 +99,7 @@ export const CARDS: Record<string, CardDef> = {
     copies: 2,
     cost: 0,
     strength: 0,
-    text: "Practice rule: if Peter is not yet in the realm, draw Fate cards until a Hero appears, then play or remove that Hero.",
+    text: "Practice rule: if Peter is not yet in the realm, draw Fate cards until a Hero appears. Peter must be played to Hangman’s Tree. Any other Hero may be played, or discarded to the Fate discard (they can return).",
   },
   pirateBrute: {
     id: "pirateBrute",

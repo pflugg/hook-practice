@@ -45,7 +45,7 @@ describe("sticky command / prompt bar", () => {
     expect(prompt?.querySelector("[data-cancel]")).toBeTruthy();
     const places = [...prompt!.querySelectorAll<HTMLButtonElement>("[data-move]")].map((el) => el.textContent);
     expect(places.some((t) => t?.includes("Choose this place") && t.includes("Jolly Roger"))).toBe(true);
-    expect(places.some((t) => t?.includes("Skull Rock"))).toBe(true);
+    expect(places.some((t) => t?.includes("Skull Rock"))).toBe(false);
     expect(root.querySelectorAll(".location .drop-hint").length).toBeGreaterThan(0);
   });
 

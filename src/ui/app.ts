@@ -326,6 +326,7 @@ export function helpView(fromPlay: boolean): string {
     <p><b>Finding Peter:</b> At a table, Hook finds Peter with hunt cards (Worthy Opponent, Give Them a Scare, Obsession) and by being Fated. Your Fate action there hits another villain. This solo tool always Fates you after each turn, and your Fate action is a <b>practice self-Fate</b> — it flips Hook’s own Fate deck so you can practice the find without a second player.</p>
     <p><b>Printed Conditions:</b> Cunning and Obsession <b>are</b> printed two-player Conditions. At a table they wait for another player’s turn (a strong Ally in another realm; another player defeating a strong Hero). This tool rewrites those triggers so they can fire on your turn: Cunning if a Strength 4+ Hero is already ashore and you hold an Ally; Obsession if Peter is still hidden. A grey Condition is not ready yet.</p>
     <p><b>Drag:</b> When a card can move or be played onto a place, grab it and slide onto a glowing location (or Ally, for the Cutlass). Drop outside to cancel the slide; clicking still works.</p>
+    <p><b>Play a Card:</b> An Ally or Item lands where the captain stands. It does not travel to another shore. Walk crew toward the ship afterward. Fate may still seat a Hero on any unlocked place.</p>
     <p><b>Practice tips:</b> Discard aggressively for the Map. Hunt cards (Worthy Opponent, Give Them a Scare) are how Hook finds Peter at a table — plus being Fated. Station strength at the ship before walking Peter across. Beware Tick Tock (hand empties only if the captain moves onto him) and Splitting Headache.</p>
     <div class="actions-row"><button class="btn primary" data-close-help>${fromPlay ? "Return to the realm" : "Back"}</button></div>
   </div></div>`;
@@ -476,17 +477,26 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
   }
   if (p?.kind === "obsessionDecide") {
     const hero = state.heldCard;
+    const peter = hero?.defId === "peterPan";
     return `<div class="overlay"><div class="modal">
       <h2>Obsession</h2>
-      <p>A Hero was found. Play them into the realm, or banish them?</p>
+      <p>${
+        peter
+          ? "Peter Pan was revealed. He must be played to Hangman’s Tree. He cannot be discarded."
+          : "A Hero was found. Play them into the realm, or discard them to the Fate discard? A discarded Hero can return when Fate reshuffles."
+      }</p>
       ${
         hero
           ? `<div class="modal-cards">${renderCard(state, hero, { size: "reveal", legal: false, selected: true })}</div>`
           : ""
       }
       <div class="actions-row">
-        <button class="btn primary${coachClass(coached, "btn:play-hero")}" data-play-hero>Play the Hero</button>
-        <button class="btn${coachClass(coached, "btn:banish-hero")}" data-banish-hero>Banish</button>
+        <button class="btn primary${coachClass(coached, "btn:play-hero")}" data-play-hero>${peter ? "Play Peter Pan" : "Play the Hero"}</button>
+        ${
+          peter
+            ? ""
+            : `<button class="btn${coachClass(coached, "btn:discard-hero")}" data-discard-hero>Discard</button>`
+        }
       </div>
     </div></div>`;
   }
@@ -1269,7 +1279,7 @@ export function mount(root: HTMLElement): void {
     if (t.closest("[data-accept-cond]")) return dispatch({ type: "acceptCondition" });
     if (t.closest("[data-skip-cond]")) return dispatch({ type: "skipCondition" });
     if (t.closest("[data-play-hero]")) return dispatch({ type: "playOrDiscardHero", play: true });
-    if (t.closest("[data-banish-hero]")) return dispatch({ type: "playOrDiscardHero", play: false });
+    if (t.closest("[data-discard-hero]")) return dispatch({ type: "playOrDiscardHero", play: false });
 
     const cardEl = t.closest<HTMLElement>("[data-card]");
     if (cardEl && !t.closest(".overlay")) {

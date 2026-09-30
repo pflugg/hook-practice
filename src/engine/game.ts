@@ -450,6 +450,19 @@ function revealPeter(state: GameState, peter: CardInstance, extras: CardInstance
   log(state, "Peter Pan is revealed and lands at Hangman's Tree.", "fate");
 }
 
+function forceObsessionPeter(state: GameState, hero: CardInstance): void {
+  const peterNote = "Obsession finds Peter Pan. A revealed Peter must be played to Hangman's Tree.";
+  revealPeter(state, hero, [], peterNote);
+  openFateReport(state, {
+    drawn: [hero],
+    played: hero,
+    discarded: [],
+    note: peterNote,
+    resume: "actions",
+    markAction: true,
+  });
+}
+
 function spendPower(state: GameState, n: number): boolean {
   if (state.power < n) return false;
   state.power -= n;
@@ -896,6 +909,31 @@ export function applyInput(prev: GameState, input: Input): GameState {
 
   if (input.type === "cancel") {
     if (state.pending?.kind === "fateReport") return state;
+    if (state.pending?.kind === "conditionOffer") {
+      const offered = findCard(state, state.pending.conditionId);
+      const name = offered ? def(offered.defId).name : "The Condition";
+      log(state, `${name} stays in hand.`);
+      state.pending = null;
+      state.phase = "actions";
+      return state;
+    }
+    if (state.pending?.kind === "cunningLocation") {
+      const note =
+        "Cunning is already played. Choose an Ally again, or Cancel to decline the free crew. The Condition does not return.";
+      log(state, note);
+      state.bannerNote = note;
+      state.pending = { kind: "cunningAlly" };
+      return state;
+    }
+    if (state.pending?.kind === "cunningAlly") {
+      const note = "Cunning stays in the discard. You declined the free Ally, so no crew comes ashore.";
+      log(state, note);
+      state.bannerNote = note;
+      state.pending = null;
+      state.phase = "actions";
+      state.actionKey = undefined;
+      return state;
+    }
     // These steps already pulled a card out of a deck. Cancel used to drop `pending`
     // and leave the card only on `heldCard`, so the next Fate overwrite deleted it.
     if (
@@ -1021,23 +1059,14 @@ export function applyInput(prev: GameState, input: Input): GameState {
     if (state.pending?.kind !== "obsessionDecide") return state;
     const hero = state.heldCard;
     if (!hero) return state;
-    if (!input.play) {
-      discardFateCard(state, hero);
-      log(state, `${def(hero.defId).name} is banished by Obsession.`);
-      consumeCurrentAction(state);
+    if (hero.defId === "peterPan") {
+      forceObsessionPeter(state, hero);
       return state;
     }
-    if (hero.defId === "peterPan") {
-      const peterNote = "Obsession finds Peter Pan. He is forced to Hangman's Tree.";
-      revealPeter(state, hero, [], peterNote);
-      openFateReport(state, {
-        drawn: [hero],
-        played: hero,
-        discarded: [],
-        note: peterNote,
-        resume: "actions",
-        markAction: true,
-      });
+    if (!input.play) {
+      discardFateCard(state, hero);
+      log(state, `${def(hero.defId).name} goes to the Fate discard. The Hero can return when Fate reshuffles.`);
+      consumeCurrentAction(state);
       return state;
     }
     state.pending = { kind: "obsessionLocation", heroId: hero.instanceId };
@@ -1045,6 +1074,9 @@ export function applyInput(prev: GameState, input: Input): GameState {
   }
   if (input.type === "skipCondition") {
     if (state.pending?.kind === "conditionOffer") {
+      const offered = findCard(state, state.pending.conditionId);
+      const name = offered ? def(offered.defId).name : "The Condition";
+      log(state, `${name} stays in hand.`);
       state.pending = null;
       state.phase = "actions";
     }
@@ -1076,11 +1108,13 @@ export function applyInput(prev: GameState, input: Input): GameState {
     if (!cond) return state;
     discardVillainCard(state, cond);
     if (cond.defId === "cunning") {
+      log(state, "Cunning is played and goes to the discard. Choose an Ally to slip ashore where the captain stands.");
       state.phase = "resolving";
       state.pending = { kind: "cunningAlly" };
       return state;
     }
     if (cond.defId === "obsession") {
+      log(state, "Obsession is played and goes to the discard. Fate is hunted until a Hero appears.");
       const extras: CardInstance[] = [];
       let hero: CardInstance | undefined;
       for (let i = 0; i < 20; i++) {
@@ -1097,6 +1131,10 @@ export function applyInput(prev: GameState, input: Input): GameState {
         log(state, "Obsession finds no Hero.");
         state.pending = null;
         state.phase = "actions";
+        return state;
+      }
+      if (hero.defId === "peterPan") {
+        forceObsessionPeter(state, hero);
         return state;
       }
       state.heldCard = hero;
@@ -1574,10 +1612,12 @@ export function highlightSet(state: GameState): Set<string> {
       break;
     case "playChooseLocation":
     case "cunningLocation":
+      legalPlayLocations(state).forEach((id) => set.add(`loc:${id}`));
+      break;
     case "fateChooseLocation":
     case "worthyLocation":
     case "obsessionLocation":
-      legalPlayLocations(state).forEach((id) => set.add(`loc:${id}`));
+      unlockedLocations(state).forEach((id) => set.add(`loc:${id}`));
       break;
     case "playChooseAllyAttach":
       allAllies(state).forEach((a) => set.add(`card:${a.ally.instanceId}`));

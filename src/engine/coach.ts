@@ -17,6 +17,7 @@ import {
   adjacentUnlocked,
   legalMoveLocations,
   legalPlayLocations,
+  unlockedLocations,
   mapInHand,
   mapInRealm,
   movableAlliesAndItems,
@@ -263,7 +264,7 @@ function discardWhy(state: GameState, picks: CardInstance[]): string {
 }
 
 function parkHeroLocation(state: GameState, hero: CardInstance): LocationId {
-  const legal = legalPlayLocations(state);
+  const legal = unlockedLocations(state);
   if (hero.defId === "tickTock") {
     const quiet = legal.find((id) => id !== "mermaidLagoon" && id !== "hangmansTree" && id !== state.villainLocation);
     return quiet ?? legal[0] ?? "jollyRoger";
@@ -319,7 +320,7 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
 }
 
 const BOARDING_REACH_WHY =
-  "Boarding Party’s neighboring reach is the exception: that crew may join a clash at the captain’s place or one unlocked step away. Other Allies cannot be spent on a Hero the captain is not standing beside.";
+  "Boarding Party’s neighboring reach is the exception: that crew may join a clash at the captain’s place or one unlocked step away when the party stands with the captain or with the Hero. A Boarding Party on the Hero’s far side does not reach. Other Allies cannot be spent on a Hero the captain is not standing beside.";
 
 function withReach(why: string, state: GameState, heroLoc: LocationId | null | undefined): string {
   if (!heroLoc || heroLoc === state.villainLocation) return why;
@@ -716,7 +717,7 @@ function moveWhy(state: GameState, dest: LocationId): string {
       : "The tree is open and Peter is ashore. After you land, click Move a Hero, then Peter Pan, then the glowing square toward the Jolly Roger.";
   }
   if (playableMap(state) && hasKind(state, dest, "playCard")) {
-    return "You are holding the Never Land Map with enough Power. After you land, click Play a Card, then the Map in your hand, then Choose this place on any unlocked square.";
+    return "You are holding the Never Land Map with enough Power. After you land, click Play a Card, then the Map in your hand, then Choose this place where the captain stands. The Map unlocks Hangman’s Tree from that square.";
   }
   if (needPowerForMap(state) && dest === "mermaidLagoon") {
     return "Gain 3 Power here — you are holding the Never Land Map and still need 4 to play it.";
@@ -891,12 +892,15 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
       : "Click Move a Hero, then Peter Pan, then the glowing square toward the Jolly Roger. He only loses the duel if you vanquish him anywhere else.";
   }
   if (slot.kind === "playCard" && playableMap(state)) {
-    return "Click Play a Card, then Never Land Map in your hand, then Choose this place on any unlocked square. The Map unlocks Hangman’s Tree — until that hideout opens, Peter cannot start the walk to the ship.";
+    return "Click Play a Card, then Never Land Map in your hand, then Choose this place where the captain stands. The Map unlocks Hangman’s Tree from that square — until that hideout opens, Peter cannot start the walk to the ship.";
   }
   if (slot.kind === "playCard") {
     const card = usefulPlay(state);
     if (card && def(card.defId).type === "ally") {
-      return `Click Play a Card, then ${cardName(card)} in your hand, then ${placeVerb(playHome(state, card))}. An Ally on the Jolly Roger is Strength waiting for Peter.`;
+      const home = playHome(state, card);
+      return home === "jollyRoger"
+        ? `Click Play a Card, then ${cardName(card)} in your hand, then ${placeVerb(home)}. An Ally on the Jolly Roger is Strength waiting for Peter.`
+        : `Click Play a Card, then ${cardName(card)} in your hand, then ${placeVerb(home)}. Allies and Items land where the captain stands. Walk that crew toward the ship later with Move Ally/Item.`;
     }
     if (card && (card.defId === "worthyOpponent" || card.defId === "giveThemAScare")) {
       return `Click Play a Card, then ${cardName(card)} in your hand. Hunt cards are how Hook finds Peter at a table — plus being Fated. The computer always Fates you here after each turn.`;
@@ -987,9 +991,13 @@ function liveCunningAdvice(state: GameState): CoachAdvice | null {
     .sort((a, b) => def(b.defId).strength - def(a.defId).strength)[0];
   if (!cunning || !ally) return null;
   const dest = legalPlayLocations(state).includes("jollyRoger") ? "jollyRoger" : state.villainLocation;
+  const ashore =
+    dest === "jollyRoger"
+      ? `${cardName(ally)} comes ashore on the Jolly Roger.`
+      : `${cardName(ally)} comes ashore at ${locName(dest)}, where the captain stands.`;
   return say(
     `Play Cunning (click Cunning in your hand), then click ${cardName(ally)} and ${placeVerb(dest)}. It does not spend a Play a Card action.`,
-    `A Hero of Strength 4 or more is ashore, and ${cardName(ally)} is in hand. Cunning is a printed Condition. This practice tool’s trigger lets you slip that Ally in for free on your turn.`,
+    `A Hero of Strength 4 or more is ashore, and ${cardName(ally)} is in hand. ${ashore} Cunning is a printed Condition. This practice tool’s trigger lets you slip that Ally in for free on your turn.`,
     [`card:${cunning.instanceId}`],
     state,
   );
@@ -1058,7 +1066,7 @@ function advisePending(state: GameState): CoachAdvice {
       }
       const why =
         card.defId === "neverLandMap"
-          ? "The Map is the only key to Hangman’s Tree. Click it in your hand, then Choose this place on any unlocked square."
+          ? "The Map is the only key to Hangman’s Tree. Click it in your hand, then Choose this place where the captain stands."
           : def(card.defId).type === "ally"
             ? `Click ${cardName(card)} in your hand, then ${placeVerb(playHome(state, card))}. Allies at the Jolly Roger become the clash that finishes Peter.`
             : playTargetWhy(card, playHome(state, card));
@@ -1066,7 +1074,7 @@ function advisePending(state: GameState): CoachAdvice {
     }
     case "playChooseLocation": {
       const card = findCard(state, p.cardId);
-      if (!card) return say("Choose a glowing location (click Choose this place on an unlocked square).", "Drop the card on an unlocked place.", [], state);
+      if (!card) return say("Choose this place where the captain stands.", "Allies and Items from Play a Card land at the captain’s location.", [], state);
       const dest = playHome(state, card);
       return say(
         playCta(state, card, "place"),
@@ -1374,17 +1382,33 @@ function advisePending(state: GameState): CoachAdvice {
     }
     case "cunningAlly": {
       const ally = state.hand.filter((c) => def(c.defId).type === "ally").sort((a, b) => def(b.defId).strength - def(a.defId).strength)[0];
-      if (!ally) return say("Skip Cunning", "No Ally in hand to sneak ashore.", ["btn:skip-cond"], state);
+      if (!ally) {
+        return say(
+          "Cancel — Cunning is already spent",
+          "No Ally remains in hand. Cancel declines the free crew. The Condition stays in the discard and does not return.",
+          ["btn:cancel"],
+          state,
+        );
+      }
+      const dest = bestAllyHome(state);
+      const ashore =
+        dest === "jollyRoger"
+          ? "They come ashore on the Jolly Roger, where Peter’s clash is won."
+          : `They come ashore at ${locName(dest)}, where the captain stands. Walk them toward the ship later with Move Ally/Item.`;
       return say(
-        `Slip ${cardName(ally)} ashore for free (click ${cardName(ally)} in your hand, then ${placeVerb(bestAllyHome(state))}).`,
-        "Cunning spends no Play action and no Power. Drop the strongest Ally you can onto the ship.",
+        `Slip ${cardName(ally)} ashore for free (click ${cardName(ally)} in your hand, then ${placeVerb(dest)}).`,
+        `Cunning is already in the discard and spends no Play action and no Power. ${ashore} Cancel declines the free crew and does not return the Condition.`,
         [`card:${ally.instanceId}`],
         state,
       );
     }
     case "cunningLocation": {
       const dest = bestAllyHome(state);
-      return say(`Place the Ally at ${locName(dest)} (click ${placeVerb(dest)}).`, "Free crew belongs at the Jolly Roger.", [`loc:${dest}`], state);
+      const why =
+        dest === "jollyRoger"
+          ? "The free Ally comes ashore on the Jolly Roger. Cancel returns to the Ally choice; Cunning stays spent."
+          : `The free Ally comes ashore at ${locName(dest)}, where the captain stands. Cancel returns to the Ally choice; Cunning stays spent.`;
+      return say(`Place the Ally at ${locName(dest)} (click ${placeVerb(dest)}).`, why, [`loc:${dest}`], state);
     }
     case "fateChooseCard": {
       const peter = p.cards.find((c) => c.defId === "peterPan");
@@ -1410,7 +1434,7 @@ function advisePending(state: GameState): CoachAdvice {
     case "worthyLocation":
     case "obsessionLocation": {
       const card = findCard(state, "cardId" in p ? p.cardId : p.heroId) ?? state.heldCard;
-      const dest = card ? parkHeroLocation(state, card) : legalPlayLocations(state)[0];
+      const dest = card ? parkHeroLocation(state, card) : unlockedLocations(state)[0];
       if (!dest) return say("Choose an unlocked location", "Heroes need an open place to land.", [], state);
       return say(
         `Place ${card ? cardName(card) : "the Hero"} at ${locName(dest)} (click ${placeVerb(dest)}).`,
@@ -1502,12 +1526,18 @@ function advisePending(state: GameState): CoachAdvice {
         );
       }
       if (hero?.defId === "tickTock") {
-        return say("Banish Tick Tock", "The crocodile is a hand-wiping trap. Send him out of the realm.", ["btn:banish-hero"], state);
+        return say(
+          "Discard Tick Tock",
+          "Tick Tock is a hand-wiping trap. He goes to the Fate discard and can return when Fate reshuffles. This is not remove-from-game.",
+          ["btn:discard-hero"],
+          state,
+        );
       }
+      const found = hero ? cardName(hero) : "this Hero";
       return say(
-        "Banish this Hero",
-        "A quieter realm leaves your actions uncovered while you finish the Map and the walk.",
-        ["btn:banish-hero"],
+        `Discard ${found}`,
+        `${found} goes to the Fate discard and can return when Fate reshuffles. A quieter realm leaves your actions uncovered while you finish the Map and the walk.`,
+        ["btn:discard-hero"],
         state,
       );
     }
@@ -1764,6 +1794,10 @@ function discardNames(state: GameState): string[] {
     ...allLocationItems(state).map(({ item }) => cardName(item)),
   ];
   if (state.pending?.kind === "scarePeek") names.push(...state.pending.cards.map((card) => cardName(card)));
+  if (state.pending?.kind === "obsessionDecide") {
+    const hero = state.heldCard ?? findCard(state, state.pending.heroId);
+    if (hero) names.push(cardName(hero));
+  }
   if (state.pending?.kind === "discardSelect") {
     for (const id of state.pending.selected) {
       const card = findCard(state, id);

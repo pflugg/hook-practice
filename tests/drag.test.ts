@@ -13,8 +13,8 @@ describe("card drag targets", () => {
     const choosing = applyInput(state, { type: "selectAction", actionKey: "jr-play" });
     expect(isDraggableCard(choosing, smee.instanceId)).toBe(true);
     const targets = dropTargets(choosing, smee.instanceId);
-    expect(targets.locations).toContain("jollyRoger");
-    expect(targets.locations).toContain("skullRock");
+    expect(targets.locations).toEqual(["jollyRoger"]);
+    expect(targets.locations).not.toContain("skullRock");
     expect(targets.locations).not.toContain("hangmansTree");
 
     const inputs = inputsForDrop(choosing, smee.instanceId, { locationId: "jollyRoger" });
