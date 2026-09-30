@@ -1098,7 +1098,10 @@ function advisePending(state: GameState): CoachAdvice {
       const card = findCard(state, p.cardId);
       const cost = card ? def(card.defId).cost : 0;
       const name = card ? cardName(card) : "this card";
-      const mapOut = mapInRealm(state);
+      const mapOut = Boolean(mapInRealm(state));
+      const mapCoversItem = Boolean(
+        card && def(card.defId).type === "item" && card.defId !== "neverLandMap" && mapOut,
+      );
       if (state.power >= cost) {
         return say(
           `Pay with Power (click Pay with Power) — ${name} costs ${cost} and you have ${state.power}.`,
@@ -1109,10 +1112,10 @@ function advisePending(state: GameState): CoachAdvice {
           state,
         );
       }
-      if (mapOut) {
+      if (mapCoversItem) {
         return say(
           "Discard the Map to pay (click Discard the Map)",
-          "Power is short. The tree is already open, so spending the Map keeps the plan moving.",
+          "Power is short. The tree is already open, so spending the Map keeps this Item moving. The Map covers another Item, not an Ally or Effect.",
           ["btn:pay-map"],
           state,
         );

@@ -974,16 +974,28 @@ export function applyInput(prev: GameState, input: Input): GameState {
     return state;
   }
   if (input.type === "scareReturn") {
-    if (state.pending?.kind === "scarePeek") {
-      const a = state.pending.cards.find((c) => c.instanceId === input.order[0]);
-      const b = state.pending.cards.find((c) => c.instanceId === input.order[1]);
-      if (a && b) {
-        state.fateDeck.unshift(b);
-        state.fateDeck.unshift(a);
-        log(state, "Peeked Fate cards return to the top of the deck.");
-      }
-      consumeCurrentAction(state);
+    if (state.pending?.kind !== "scarePeek") return state;
+    const peeked = state.pending.cards;
+    const wanted = new Set(peeked.map((c) => c.instanceId));
+    const ordered: string[] = [];
+    for (const id of input.order) {
+      if (!wanted.has(id) || ordered.includes(id)) continue;
+      ordered.push(id);
     }
+    // A one-card peek used to send the same id twice and unshift that card twice.
+    if (ordered.length !== peeked.length) return state;
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      const card = peeked.find((c) => c.instanceId === ordered[i]);
+      if (!card) return state;
+      state.fateDeck.unshift(card);
+    }
+    log(
+      state,
+      peeked.length === 1
+        ? "The peeked Fate card returns to the top of the deck."
+        : "Peeked Fate cards return to the top of the deck.",
+    );
+    consumeCurrentAction(state);
     return state;
   }
   if (input.type === "payWithMap" || input.type === "payWithPower") {
@@ -991,6 +1003,8 @@ export function applyInput(prev: GameState, input: Input): GameState {
     const card = findCard(state, state.pending.cardId);
     if (!card) return state;
     if (input.type === "payWithMap") {
+      // The Map substitutes for another Item only — never an Ally or Effect.
+      if (def(card.defId).type !== "item" || card.defId === "neverLandMap") return state;
       if (!discardMap(state)) return state;
     } else {
       const cost = def(card.defId).cost;
@@ -1566,9 +1580,14 @@ export function highlightSet(state: GameState): Set<string> {
       legalPlayLocations(state).forEach((id) => set.add(`loc:${id}`));
       break;
     case "playChooseAllyAttach":
-    case "ayeAyeAlly":
-    case "cunningAlly":
       allAllies(state).forEach((a) => set.add(`card:${a.ally.instanceId}`));
+      break;
+    case "ayeAyeAlly":
+      allAllies(state)
+        .filter((a) => isUnlocked(state, a.location))
+        .forEach((a) => set.add(`card:${a.ally.instanceId}`));
+      break;
+    case "cunningAlly":
       state.hand.filter((c) => def(c.defId).type === "ally").forEach((c) => set.add(`card:${c.instanceId}`));
       break;
     case "discardSelect":
