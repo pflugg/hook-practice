@@ -9,6 +9,7 @@ import {
   coveringHero,
   hasTaunt,
   heroStrength,
+  emptyHandCopy,
   fateEmptyLine,
   mapInRealm,
   playableHandCards,
@@ -159,7 +160,7 @@ function whereYouAre(state: GameState): string {
 
   const handNote =
     hand === 0
-      ? "Your hand is empty. That usually means Tick Tock just snapped it, or you spent everything; ending the turn is how you draw back to four."
+      ? emptyHandCopy(state)
       : hand <= 2
         ? `Your hand is thin (${hand} card${hand === 1 ? "" : "s"}). A Discard now digs, but it also spends cards you may want for the ship.`
         : `You hold ${hand} cards${playable ? `, and ${playable} look playable with your current Power` : ""}. A full hand is a good time to Discard junk if you are still hunting the Map.`;

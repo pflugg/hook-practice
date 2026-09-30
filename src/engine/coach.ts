@@ -962,12 +962,17 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
 function endTurnWhy(state: GameState): string {
   const croc = tickTockAt(state);
   const crocLine = croc ? ` ${locName(croc)} has Tick Tock, so do not step on that square next.` : "";
-  const acts = liveActions(state);
+  const slots = availableActions(state);
   const idle: string[] = [];
-  if (state.hand.length > 0 && acts.some((action) => action.kind === "playCard")) {
+  const playOpen = slots.some((action) => action.kind === "playCard" && !action.used && !action.covered);
+  if (state.hand.length > 0 && playOpen && playableHandCards(state).length === 0) {
     idle.push("Play is uncovered, but nothing in hand can be paid right now.");
   }
-  if (state.hand.length > 0 && acts.some((action) => action.kind === "discard") && discardPicks(state).length === 0) {
+  if (
+    state.hand.length > 0 &&
+    slots.some((action) => action.kind === "discard" && action.available) &&
+    discardPicks(state).length === 0
+  ) {
     idle.push("Discard is uncovered, but every card in hand still serves the chain.");
   }
   const base = idle.length ? idle.join(" ") : "No Discard, Gain, or Play is left uncovered here.";
@@ -1114,7 +1119,7 @@ function advisePending(state: GameState): CoachAdvice {
       }
       return say(
         "Cancel — not enough Power (click Cancel)",
-        `${name} costs ${cost} and you have ${state.power}. Click Cancel, then Gain more Power before you play it.`,
+        `${name} costs ${cost} and you have ${state.power}. Click Cancel in this window, or press Escape. That returns you safely so you can Gain more Power.`,
         ["btn:cancel"],
         state,
       );
