@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { advise } from "../src/engine/coach";
 import { createGame } from "../src/engine/game";
 import { IDLE_MOVE_REASON } from "../src/engine/moveReason";
-import { MAP_COAST, MAP_COMPASS, locationDecor } from "../src/ui/decor";
+import { MAP_COAST, MAP_COMPASS, TREASURE_MAP, locationDecor } from "../src/ui/decor";
 import { renderPlay } from "../src/ui/app";
 import { barePlayState, give } from "./helpers";
 
@@ -210,14 +210,22 @@ describe("game graphics UI pass", () => {
     expect(board?.querySelectorAll(":scope > .location").length).toBe(4);
     expect(board?.querySelector("svg.map-compass")).toBeTruthy();
     expect(board?.querySelector("svg.map-coast")).toBeTruthy();
+    expect(board?.querySelector("svg.map-scene")).toBeTruthy();
     expect(root.querySelector(".loc-head h2")?.textContent).toMatch(/Jolly Roger/);
 
-    const chart = `${MAP_COMPASS}${MAP_COAST}${locationDecor("jollyRoger")}${locationDecor("skullRock")}${locationDecor("mermaidLagoon")}${locationDecor("hangmansTree")}`;
-    expect(chart).not.toMatch(/Disney|Peter Pan|Tinker Bell|Lost Boy/i);
+    const chart = `${MAP_COMPASS}${MAP_COAST}${TREASURE_MAP}${locationDecor("jollyRoger")}${locationDecor("skullRock")}${locationDecor("mermaidLagoon")}${locationDecor("hangmansTree")}`;
+    expect(chart).not.toMatch(/Disney|Peter Pan|Tinker Bell|Lost Boy|Neverland|Cannibal|Indian Camp/i);
     expect(MAP_COMPASS).not.toMatch(/Never Land|Jolly|Skull|Mermaid|Hangman/);
-
+    expect(TREASURE_MAP).toContain('class="map-road"');
+    expect(TREASURE_MAP).toContain('class="treasure-x"');
+    expect(TREASURE_MAP).toContain('class="treasure-chest"');
+    expect(TREASURE_MAP).toContain('class="map-ship"');
+    expect(TREASURE_MAP).toContain("#e10600");
     const css = readFileSync(join(process.cwd(), "src/ui/styles.css"), "utf8");
+    expect(css).toContain("--chart-line");
+    expect(css).toContain("--chart-sea");
     expect(css).toContain("--parchment-fiber");
+    expect(css).toMatch(/\.map-scene\s*\{[^}]*position:\s*absolute/);
     expect(css).toMatch(/\.loc-head h2 \{[^}]*color:\s*var\(--parchment-ink\)/);
     expect(css).toMatch(/\.lock-need \{[^}]*color:\s*#6e2c24/);
     expect(css).toMatch(
