@@ -177,6 +177,35 @@ export function fateEmptyLine(state: GameState): string {
   return "Fate has no cards left, so the computer will not answer.";
 }
 
+/** Empty-hand sentence that matches the control actually on the board. */
+export function emptyHandCopy(state: GameState): string {
+  const p = state.pending;
+  if (p?.kind === "discardSelect") {
+    return "Your hand is empty. Confirm still spends this Discard. End turn is not the control for this step.";
+  }
+  if (p?.kind === "fateReport") {
+    const snap = /snap|emptied|discard every card/i.test(`${p.note} ${p.abilityText ?? ""}`);
+    return snap
+      ? "Tick Tock emptied your hand. Continue on the card. You draw back to four when you later end the turn."
+      : "Your hand is empty. Continue, then draw back to four when End turn is on the board.";
+  }
+  if (state.phase === "move") {
+    return "Your hand is empty. Move to another unlocked place first. You draw back to four when you end the turn.";
+  }
+  if (state.phase === "actions" && !p) {
+    return "Your hand is empty. End the turn to draw back to four.";
+  }
+  if (
+    p?.kind === "playChooseCard" ||
+    p?.kind === "playChooseLocation" ||
+    p?.kind === "playChoosePayment" ||
+    p?.kind === "playChooseAllyAttach"
+  ) {
+    return "Your hand is empty, so this Play cannot finish from the hand. Cancel to return to the action stretch.";
+  }
+  return "Your hand is empty. Draw back to four when End turn is the live control.";
+}
+
 /** A cheap clash sitting on Tick Tock’s square — wipe and vanquish are one sentence. */
 export function clashBesideCroc(state: GameState): {
   location: LocationId;
@@ -274,6 +303,23 @@ export function vanquishBlockedReason(state: GameState): string {
   return `No Hero can be vanquished right now. ${bits.join("; ")}.`;
 }
 
+export function playBlockedReason(state: GameState): string {
+  if (state.hand.length === 0) return "Play a Card is dark: your hand is empty, so the action stays unused.";
+  const cutlassWaiting = state.hand.some((c) => c.defId === "cutlass") && allAllies(state).length === 0;
+  if (cutlassWaiting && playableHandCards(state).length === 0) {
+    return "Play a Card is dark: the Cutlass needs an Ally already ashore, and nothing else in hand can be paid. The action stays unused.";
+  }
+  return "Play a Card is dark: nothing in hand can be paid with your Power. The action stays unused.";
+}
+
+export function movePieceBlockedReason(_state: GameState): string {
+  return "Move Ally/Item is dark: no Ally or loose Item can step to an unlocked neighbor. The action stays unused.";
+}
+
+export function moveHeroBlockedReason(_state: GameState): string {
+  return "Move a Hero is dark: no Hero can step to an unlocked neighbor. The action stays unused.";
+}
+
 export function playableHandCards(state: GameState): CardInstance[] {
   const map = mapInRealm(state);
   return state.hand.filter((card) => {
@@ -310,8 +356,10 @@ export function availableActions(
   const slots: ActionSlot[] = loc.actions.map((printed) => {
     const isCovered = printed.row === "top" && covered;
     const used = state.usedActions.includes(printed.key);
-    const clashReady =
-      printed.kind !== "vanquish" || vanquishableHeroes(state).length > 0;
+    const clashReady = printed.kind !== "vanquish" || vanquishableHeroes(state).length > 0;
+    const playReady = printed.kind !== "playCard" || playableHandCards(state).length > 0;
+    const movePieceReady = printed.kind !== "moveItemAlly" || movableAlliesAndItems(state).length > 0;
+    const moveHeroReady = printed.kind !== "moveHero" || movableHeroes(state).length > 0;
     return {
       key: printed.key,
       kind: printed.kind,
@@ -319,7 +367,7 @@ export function availableActions(
       amount: printed.amount,
       covered: isCovered,
       used,
-      available: live && !isCovered && !used && clashReady,
+      available: live && !isCovered && !used && clashReady && playReady && movePieceReady && moveHeroReady,
       label: actionLabel(printed.kind, printed.amount),
     };
   });
@@ -336,7 +384,9 @@ export function availableActions(
     if (!extra) continue;
     const key = `extra:${item.instanceId}`;
     const used = state.usedActions.includes(key);
-    const extraReady = extra.kind !== "vanquish" || vanquishableHeroes(state).length > 0;
+    const extraReady =
+      (extra.kind !== "vanquish" || vanquishableHeroes(state).length > 0) &&
+      (extra.kind !== "moveHero" || movableHeroes(state).length > 0);
     slots.push({
       key,
       kind: extra.kind,
@@ -487,6 +537,21 @@ function withClashAndCroc(state: GameState, text: string): string {
   return extra ? `${text} ${extra}` : text;
 }
 
+function actionBlockNotes(state: GameState): string {
+  if (!actionsAreLive(state)) return "";
+  const seen = new Set<string>();
+  const bits: string[] = [];
+  for (const slot of availableActions(state)) {
+    if (slot.available || slot.used || slot.covered || seen.has(slot.kind)) continue;
+    if (slot.kind !== "playCard" && slot.kind !== "moveItemAlly" && slot.kind !== "moveHero") continue;
+    seen.add(slot.kind);
+    if (slot.kind === "playCard") bits.push(playBlockedReason(state));
+    else if (slot.kind === "moveItemAlly") bits.push(movePieceBlockedReason(state));
+    else bits.push(moveHeroBlockedReason(state));
+  }
+  return bits.length ? ` ${bits.join(" ")}` : "";
+}
+
 export function promptText(state: GameState): string {
   if (state.phase === "title") return "Choose a heading and set sail.";
   if (state.won) return "Peter Pan is vanquished at the Jolly Roger. The duel is yours.";
@@ -505,7 +570,7 @@ export function promptText(state: GameState): string {
       const base = clashLocked
         ? `Perform any available actions, play a ready Condition, or end the turn. ${vanquishBlockedReason(state)}`
         : "Perform any available actions, play a ready Condition, or end the turn.";
-      return withClashAndCroc(state, base);
+      return withClashAndCroc(state, `${base}${actionBlockNotes(state)}`);
     }
     return "";
   }

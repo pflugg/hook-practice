@@ -29,7 +29,10 @@ import {
   mapInRealm,
   movableAlliesAndItems,
   movableHeroes,
+  moveHeroBlockedReason,
+  movePieceBlockedReason,
   playableHandCards,
+  playBlockedReason,
   unlockedLocations,
   vanquishAllyPool,
   vanquishBlockedReason,
@@ -819,7 +822,29 @@ export function createGame(difficulty: GameState["difficulty"] = "normal", seed 
   return state;
 }
 
+const RESIGN_BLOCKING_PENDING = new Set([
+  "fateReport",
+  "scarePeek",
+  "fateChooseCard",
+  "fateChooseItem",
+  "playChoosePayment",
+  "conditionOffer",
+  "obsessionDecide",
+  "vanquishConfirmLoss",
+  "worthyLocation",
+  "obsessionLocation",
+  "playChooseAllyAttach",
+]);
+
+/** Resign must not fire through a blocking modal, Fate, a win/loss overlay, or after the duel is over. */
+export function resignBlocked(state: GameState): boolean {
+  if (state.phase === "over" || state.won || state.lost || state.screen === "help") return true;
+  const kind = state.pending?.kind;
+  return Boolean(kind && RESIGN_BLOCKING_PENDING.has(kind));
+}
+
 export function applyInput(prev: GameState, input: Input): GameState {
+  if (input.type === "resign" && resignBlocked(prev)) return prev;
   const state = structuredClone(prev);
   if (input.type !== "openHelp" && input.type !== "closeHelp") {
     state.bannerNote = "";
@@ -1166,6 +1191,24 @@ function handleAction(state: GameState, actionKey: string): GameState {
     state.bannerNote = why;
     return state;
   }
+  if (slot.kind === "playCard" && !slot.used && !slot.covered && playableHandCards(state).length === 0) {
+    const why = playBlockedReason(state);
+    log(state, why);
+    state.bannerNote = why;
+    return state;
+  }
+  if (slot.kind === "moveItemAlly" && !slot.used && !slot.covered && movableAlliesAndItems(state).length === 0) {
+    const why = movePieceBlockedReason(state);
+    log(state, why);
+    state.bannerNote = why;
+    return state;
+  }
+  if (slot.kind === "moveHero" && !slot.used && !slot.covered && movableHeroes(state).length === 0) {
+    const why = moveHeroBlockedReason(state);
+    log(state, why);
+    state.bannerNote = why;
+    return state;
+  }
   if (!slot.available) return state;
 
   if (slot.kind === "gainPower") {
@@ -1180,11 +1223,6 @@ function handleAction(state: GameState, actionKey: string): GameState {
     return state;
   }
   if (slot.kind === "playCard") {
-    if (playableHandCards(state).length === 0) {
-      log(state, "No playable cards in hand.");
-      markActionUsed(state, slot.key);
-      return state;
-    }
     beginAction(state, slot.key, { kind: "playChooseCard" });
     return state;
   }
@@ -1198,20 +1236,10 @@ function handleAction(state: GameState, actionKey: string): GameState {
     return state;
   }
   if (slot.kind === "moveItemAlly") {
-    if (movableAlliesAndItems(state).length === 0) {
-      log(state, "Nothing can be moved.");
-      markActionUsed(state, slot.key);
-      return state;
-    }
     beginAction(state, slot.key, { kind: "movePieceSelect" });
     return state;
   }
   if (slot.kind === "moveHero") {
-    if (movableHeroes(state).length === 0) {
-      log(state, "No Hero can be moved from an unlocked location.");
-      markActionUsed(state, slot.key);
-      return state;
-    }
     beginAction(state, slot.key, { kind: "moveHeroSelect" });
     return state;
   }
@@ -1222,6 +1250,12 @@ function handleCard(state: GameState, instanceId: string): GameState {
   if (state.phase === "actions" && !state.pending) {
     const card = state.hand.find((c) => c.instanceId === instanceId);
     if (!card) return state;
+    if (card.defId === "cutlass" && allAllies(state).length === 0) {
+      const why = "The Cutlass needs an Ally already ashore. Play a crew member first.";
+      log(state, why, "info");
+      state.bannerNote = why;
+      return state;
+    }
     if (card.defId === "cunning") {
       if (canPlayCunning(state)) {
         state.pending = {
@@ -1253,6 +1287,13 @@ function handleCard(state: GameState, instanceId: string): GameState {
   if (!p) return state;
 
   if (p.kind === "playChooseCard") {
+    const held = state.hand.find((c) => c.instanceId === instanceId);
+    if (held?.defId === "cutlass" && allAllies(state).length === 0) {
+      const why = "The Cutlass needs an Ally already ashore. Play a crew member first.";
+      log(state, why, "info");
+      state.bannerNote = why;
+      return state;
+    }
     if (!playableHandCards(state).some((c) => c.instanceId === instanceId)) return state;
     const card = findCard(state, instanceId)!;
     const d = def(card.defId);
@@ -1261,10 +1302,6 @@ function handleCard(state: GameState, instanceId: string): GameState {
       return state;
     }
     if (d.id === "cutlass") {
-      if (allAllies(state).length === 0) {
-        log(state, "The Cutlass needs an Ally already ashore. Play a crew member first.", "info");
-        return state;
-      }
       state.pending = { kind: "playChooseAllyAttach", cardId: instanceId };
       return state;
     }
@@ -1294,7 +1331,11 @@ function handleCard(state: GameState, instanceId: string): GameState {
 
   if (p.kind === "vanquishHero") {
     const target = vanquishableHeroes(state).find((h) => h.hero.instanceId === instanceId);
-    if (!target) return state;
+    if (!target) {
+      state.bannerNote =
+        "That Hero cannot be vanquished from here. Choose a glowing Hero at the captain’s place, or one a Boarding Party can reach.";
+      return state;
+    }
     if (target.hero.defId === "peterPan" && target.location !== "jollyRoger") {
       state.pending = { kind: "vanquishConfirmLoss", heroId: instanceId };
       return state;
@@ -1305,7 +1346,11 @@ function handleCard(state: GameState, instanceId: string): GameState {
 
   if (p.kind === "vanquishAllies") {
     const pool = vanquishAllyPool(state, p.heroId);
-    if (!pool.some((a) => a.ally.instanceId === instanceId)) return state;
+    if (!pool.some((a) => a.ally.instanceId === instanceId)) {
+      state.bannerNote =
+        "That Ally cannot join this clash. Choose a glowing Ally at the Hero’s place, or a Boarding Party that can reach it.";
+      return state;
+    }
     const selected = p.selected.includes(instanceId)
       ? p.selected.filter((id) => id !== instanceId)
       : [...p.selected, instanceId];

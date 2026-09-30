@@ -56,7 +56,35 @@ function isCardPickCopy(reason: MoveReason): boolean {
   );
 }
 
+function isFalseCompletion(state: GameState, last: MoveReason): boolean {
+  const chose = last.chose;
+  const captainMove = /^You moved the captain to (.+)\.$/.exec(chose);
+  if (captainMove && captainMove[1] !== locName(state.villainLocation)) return true;
+  if (/^You played .+ to /.test(chose)) {
+    const kind = state.pending?.kind;
+    if (kind === "playChooseCard" || kind === "playChooseLocation" || kind === "playChoosePayment") return true;
+  }
+  if (/^You strapped /.test(chose)) {
+    const kind = state.pending?.kind;
+    if (kind === "playChooseCard" || kind === "playChooseAllyAttach" || kind === "playChoosePayment") return true;
+  }
+  if (/^You moved .+ to /.test(chose) && !/^You moved the captain /.test(chose)) {
+    const kind = state.pending?.kind;
+    if (kind === "moveHeroSelect" || kind === "moveHeroDest" || kind === "starkeyHero" || kind === "starkeyDest") return true;
+  }
+  if (/^You slid /.test(chose)) {
+    const kind = state.pending?.kind;
+    if (kind === "movePieceSelect" || kind === "movePieceDest" || kind === "ayeAyeAlly" || kind === "ayeAyeDest") return true;
+  }
+  if (/^You seated /.test(chose)) {
+    const kind = state.pending?.kind;
+    if (kind === "worthyLocation" || kind === "obsessionLocation" || kind === "fateChooseLocation") return true;
+  }
+  return false;
+}
+
 function isStaleReason(state: GameState, last: MoveReason): boolean {
+  if (isFalseCompletion(state, last)) return true;
   if (isCardPickCopy(last) && !isPlayPending(state)) return true;
   if (/You opened Vanquish/i.test(last.chose) && state.pending?.kind !== "vanquishHero" && state.pending?.kind !== "vanquishAllies") {
     return true;
@@ -606,12 +634,20 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
   if (input.type === "selectAction") {
     if (before.phase !== "actions") return null;
     if (!actionTookEffect(before, after, input.actionKey)) return null;
-    if (after.bannerNote) {
-      return pack(
-        "Vanquish cannot name a Hero right now.",
-        after.bannerNote,
-        "Clear Taunt or bring more Strength to that Hero before you open the clash. The Vanquish action is still unused.",
-      );
+    if (after.bannerNote && !after.usedActions.includes(input.actionKey)) {
+      const slot = availableActions(before, { asIfOnActionStretch: true }).find((a) => a.key === input.actionKey);
+      if (slot?.kind === "vanquish" || /vanquish|taunt/i.test(after.bannerNote)) {
+        return pack(
+          "Vanquish cannot name a Hero right now.",
+          after.bannerNote,
+          "Clear Taunt or bring more Strength to that Hero before you open the clash. The Vanquish action is still unused.",
+        );
+      }
+      if (slot?.kind === "playCard" || slot?.kind === "moveItemAlly" || slot?.kind === "moveHero") {
+        const label =
+          slot.kind === "playCard" ? "Play a Card" : slot.kind === "moveHero" ? "Move a Hero" : "Move Ally/Item";
+        return pack(`${label} did not spend.`, after.bannerNote, "That action is still unused.");
+      }
     }
     if (sameTable(before, after)) return null;
     return explainAction(before, after, input.actionKey);
@@ -723,9 +759,11 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
   if (!p) return null;
 
   if (p.kind === "playChooseLocation" || p.kind === "cunningLocation") {
-    const card = findCard(before, p.kind === "playChooseLocation" ? p.cardId : p.allyId);
+    const cardId = p.kind === "playChooseLocation" ? p.cardId : p.allyId;
+    const card = findCard(before, cardId);
     const name = card ? cardName(card) : "that card";
     if (p.kind === "playChooseLocation" && after.pending?.kind === "playChoosePayment") {
+      if (after.pending.locationId !== locationId) return null;
       const cost = card ? def(card.defId).cost : 0;
       const short = after.power < cost;
       const map = mapInRealm(after);
@@ -744,6 +782,7 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
               : `You have ${after.power} Power. Pay ${cost} to put ${name} on the table.`,
       );
     }
+    if (findCardLocation(after, cardId) !== locationId) return null;
     const extra = card ? playCardWhy(card.defId, after) : { why: chainLine(after), next: crocWatch(after) };
     return pack(
       `You played ${name} to ${locName(locationId)}.`,
@@ -753,7 +792,8 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
   }
   if (p.kind === "fateChooseLocation" || p.kind === "worthyLocation" || p.kind === "obsessionLocation") {
     const hero = before.heldCard ?? findCard(before, "cardId" in p ? p.cardId : p.heroId);
-    const name = hero ? cardName(hero) : "that Hero";
+    if (!hero || findCardLocation(after, hero.instanceId) !== locationId) return null;
+    const name = cardName(hero);
     return pack(
       `You seated ${name} at ${locName(locationId)}.`,
       hero?.defId === "tickTock"
@@ -763,6 +803,7 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
     );
   }
   if (p.kind === "moveHeroDest" || p.kind === "starkeyDest") {
+    if (findCardLocation(after, p.heroId) !== locationId) return null;
     const hero = findCard(after, p.heroId) ?? findCard(before, p.heroId);
     const name = hero ? cardName(hero) : "that Hero";
     const towardShip = LOCATION_IDS.indexOf(locationId) < LOCATION_IDS.indexOf(findCardLocation(before, p.heroId) ?? locationId);
@@ -784,6 +825,8 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
     );
   }
   if (p.kind === "ayeAyeDest" || p.kind === "movePieceDest") {
+    const pieceId = p.kind === "ayeAyeDest" ? p.allyId : p.pieceId;
+    if (findCardLocation(after, pieceId) !== locationId) return null;
     return pack(
       `You slid that piece to ${locName(locationId)}.`,
       "This is logistics for the ship. Crew and loose gear on Skull Rock or the lagoon is late-game Strength that has not arrived yet.",
@@ -886,9 +929,18 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
 
   if (p.kind === "playChooseCard") {
     if (!card) return null;
+    if (after.pending?.kind === "playChooseCard") {
+      if (after.bannerNote) {
+        return pack(
+          `${name} did not leave your hand.`,
+          after.bannerNote,
+          "Cancel returns you to the action stretch.",
+        );
+      }
+      return null;
+    }
     if (
       after.pending?.kind &&
-      after.pending.kind !== "playChooseCard" &&
       after.pending.kind !== "playChooseLocation" &&
       after.pending.kind !== "playChoosePayment" &&
       after.pending.kind !== "playChooseAllyAttach"
@@ -915,6 +967,20 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
     );
   }
   if (p.kind === "playChooseAllyAttach") {
+    if (after.pending?.kind === "playChoosePayment") {
+      const cost = card ? def(card.defId).cost : 1;
+      const held = findCard(before, p.cardId);
+      const itemCost = held ? def(held.defId).cost : cost;
+      return pack(
+        `You chose ${name} for the Cutlass.`,
+        `${name} is not strapped yet. The Cutlass still costs ${itemCost} Power, and you have ${after.power}.`,
+        after.power >= itemCost
+          ? "Click Pay with Power to finish the strap, or Cancel to return to Play a Card."
+          : "Click Cancel — there is not enough Power to finish the strap.",
+      );
+    }
+    const strapped = after.attachments.some((a) => a.attachedTo === instanceId && a.item.defId === "cutlass");
+    if (!strapped) return null;
     return pack(
       `You strapped the Cutlass to ${name}.`,
       `${name} is now +2 Strength. That is how a thin ship becomes a honest clash.`,
@@ -933,6 +999,14 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
     );
   }
   if (p.kind === "vanquishHero") {
+    if (after.pending?.kind === "vanquishHero") {
+      if (!after.bannerNote) return null;
+      return pack(
+        "That Hero was not named.",
+        after.bannerNote,
+        "Choose a glowing Hero at the captain’s place, or one a Boarding Party can reach.",
+      );
+    }
     const lossWarn = after.pending?.kind === "vanquishConfirmLoss";
     return pack(
       `You named ${name} as the vanquish target.`,
@@ -947,6 +1021,15 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
     );
   }
   if (p.kind === "vanquishAllies") {
+    const selected = after.pending?.kind === "vanquishAllies" ? after.pending.selected : p.selected;
+    if (after.pending?.kind !== "vanquishAllies" || (selected.join() === p.selected.join() && after.bannerNote)) {
+      if (!after.bannerNote) return null;
+      return pack(
+        "That Ally stayed out of the clash.",
+        after.bannerNote,
+        "Choose a glowing Ally at the Hero’s place, or a Boarding Party that can reach it.",
+      );
+    }
     return pack(
       `You toggled ${name} into the vanquish party.`,
       "You do not have to spend every Ally if a smaller group meets the number. Lost Boys still need at least two bodies.",

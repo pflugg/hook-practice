@@ -8,10 +8,12 @@ import {
   findCard,
   HEADACHE_NO_ITEM_BANNER,
   HEADACHE_NO_ITEM_NOTE,
+  emptyHandCopy,
   fateEmptyLine,
   fateShowStillInPlay,
   highlightSet,
   isNoItemFateDiscard,
+  resignBlocked,
   promptText,
   REALM,
   selectedSet,
@@ -146,6 +148,27 @@ function zone(title: string, body: string): string {
   return `<div class="zone"><h3>${title}</h3>${body}</div>`;
 }
 
+function cardDimmed(state: GameState, card: CardInstance, hi: Set<string>): boolean {
+  const kind = state.pending?.kind;
+  if (kind === "vanquishAllies" && def(card.defId).type === "ally" && !hi.has(`card:${card.instanceId}`)) return true;
+  if (kind === "vanquishHero" && def(card.defId).type === "hero" && !hi.has(`card:${card.instanceId}`)) return true;
+  if (kind && ["playChooseCard", "discardSelect", "cunningAlly"].includes(kind) && !hi.has(`card:${card.instanceId}`)) {
+    return true;
+  }
+  return false;
+}
+
+function shouldRefuseCard(state: GameState, id: string): boolean {
+  const card = findCard(state, id);
+  if (!card) return false;
+  const kind = state.pending?.kind;
+  if (card.defId === "cutlass" && allAllies(state).length === 0) {
+    if (!state.pending && state.phase === "actions" && state.hand.some((c) => c.instanceId === id)) return true;
+    if (kind === "playChooseCard") return true;
+  }
+  return kind === "vanquishHero" || kind === "vanquishAllies";
+}
+
 function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: Set<string>, coached: Set<string>): string {
   const meta = REALM[id];
   const loc = state.locations[id];
@@ -182,6 +205,7 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
               size: "mini",
               legal: hi.has(`card:${c.instanceId}`),
               selected: sel.has(c.instanceId),
+              dimmed: cardDimmed(state, c, hi),
               coached: coached.has(`card:${c.instanceId}`),
               inspectable: true,
             });
@@ -273,17 +297,18 @@ function titleView(
         <button data-diff="easy" class="${difficulty === "easy" ? "is-on" : ""}">Easy — random Fate</button>
         <button data-diff="normal" class="${difficulty === "normal" ? "is-on" : ""}">Normal — heuristic Fate</button>
       </div>
-      <div class="diff coach-diff">
-        <button type="button" data-coach-toggle class="${coachEnabled ? "is-on" : ""}">${coachEnabled ? "Coach on" : "Coach off"}</button>
-        <button type="button" data-brief-toggle class="${briefEnabled ? "is-on" : ""}">${briefEnabled ? "Strategy brief on" : "Strategy brief off"}</button>
-        <button type="button" data-reasons-toggle class="${reasonsEnabled ? "is-on" : ""}">${reasonsEnabled ? "Move reasons on" : "Move reasons off"}</button>
+      <div class="ctrl-row">
+        <button type="button" class="ctrl ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
+        <button type="button" class="ctrl ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
+        <button type="button" class="ctrl ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
+        <button type="button" class="ctrl" data-help>How to play</button>
       </div>
       <p class="coach-lede">Coach names the next click. Coach, <b>Why this move</b>, and the Strategy brief stack in the right teaching rail — each pane scrolls on its own. Move reasons names what you picked, why it helps the chain, and what to watch. Tutorial starts all three on. Hide any during play.</p>
-      <div class="actions-row">
-        <button class="btn primary" data-tutorial>Tutorial</button>
-        <button class="btn" data-start>Set Sail</button>
-        <button class="btn ghost" data-help>How to play</button>
+      <div class="actions-row title-starts">
+        <button class="btn primary" data-start>Set Sail</button>
+        <button class="btn" data-tutorial>Tutorial</button>
       </div>
+      <p class="fine title-tutorial-note">Tutorial is the same voyage with Coach, the Strategy brief, and Why this move turned on. Set Sail is the way in.</p>
       ${sceneWarning ? `<p class="fine" data-scene-warning>${esc(sceneWarning)}</p>` : ""}
       <p class="fine">Unofficial personal practice tool. Not affiliated with, endorsed by, or associated with Disney or Ravensburger.</p>
     </section>
@@ -406,8 +431,8 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
     const name = card ? cardName(card) : "this card";
     const canPay = state.power >= cost;
     const mapOut = mapInRealm(state) && card?.defId !== "neverLandMap";
-    return `<div class="overlay"><div class="modal">
-      <h2>Pay the cost</h2>
+    return `<div class="overlay" data-overlay="blocking"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="pay-title">
+      <h2 id="pay-title">Pay the cost</h2>
       <p>${esc(name)} costs <b>${cost} Power</b>. You have <b>${state.power} Power</b>.</p>
       <p>${
         mapOut
@@ -416,12 +441,13 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
       }</p>
       <div class="pay-meter" role="status">Pay ${cost} · you have ${state.power} · ${Math.max(0, state.power - cost)} left${mapOut ? " · Map available" : ""}</div>
       <div class="actions-row">
-        <button class="btn primary${coachClass(coached, "btn:pay-power")}" data-pay-power ${canPay ? "" : "disabled"}>Pay ${cost} Power</button>
+        <button type="button" class="btn primary${coachClass(coached, "btn:pay-power")}" data-pay-power ${canPay ? "" : "disabled"}>Pay ${cost} Power</button>
         ${
           mapOut
-            ? `<button class="btn${coachClass(coached, "btn:pay-map")}" data-pay-map>Discard the Map</button>`
+            ? `<button type="button" class="btn${coachClass(coached, "btn:pay-map")}" data-pay-map>Discard the Map</button>`
             : ""
         }
+        <button type="button" class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel>Cancel</button>
       </div>
     </div></div>`;
   }
@@ -513,6 +539,7 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
 
 function fateRail(state: GameState): string {
   const show = state.lastFateShow;
+  const empty = fateEmptyLine(state);
   const live =
     state.pending?.kind === "fateReport" && state.pending.resume === "nextTurn" ? state.pending : null;
   const active = live ?? (fateShowStillInPlay(state, show) ? show : null);
@@ -526,6 +553,7 @@ function fateRail(state: GameState): string {
       <p class="fate-kicker">Across the table</p>
       <h2>Fate adversary</h2>
       <p>${esc(note || "Last revealed Fate play.")}</p>
+      ${empty ? `<p>${esc(empty)}</p>` : ""}
       ${ability ? `<p class="fate-ability">${esc(ability)}</p>` : ""}
       <p class="fate-fine">Revealed this Fate only. The rest of the Fate deck stays face down, as at a real table.</p>
     </div>
@@ -543,14 +571,18 @@ function fateRail(state: GameState): string {
         <p class="fate-kicker">Across the table</p>
         <h2>That Fate is over</h2>
         <p>That was last Fate; it is over. The card is no longer on the table.</p>
+        ${empty ? `<p>${esc(empty)}</p>` : ""}
       </div>
     </aside>`;
   }
-  return `<aside class="fate-rail is-empty" aria-label="Fate adversary">
+  return `<aside class="fate-rail is-empty${empty ? " is-deck-empty" : ""}" aria-label="Fate adversary">
       <div class="fate-rail-copy">
         <p class="fate-kicker">Across the table</p>
-        <h2>Fate adversary</h2>
-        <p>This strip is the practice stand-in for another player Fating you. Only cards that were just revealed or seated appear here — never the face-down Fate deck.</p>
+        <h2>${empty ? "Fate deck empty" : "Fate adversary"}</h2>
+        <p>${esc(
+          empty ||
+            "This strip is the practice stand-in for another player Fating you. Only cards that were just revealed or seated appear here — never the face-down Fate deck.",
+        )}</p>
       </div>
     </aside>`;
 }
@@ -617,8 +649,11 @@ function teachRailHtml(brief: string, coach: string, reasons: string, active: Te
 function coachPanel(advice: CoachAdvice): string {
   return `<section class="teach-pane coach-panel" data-teach-pane="coach" aria-live="polite">
     <header class="teach-pane-head">
-      <p class="coach-kicker">Coach</p>
-      <button type="button" class="btn ghost coach-hide" data-coach-toggle>Hide coach</button>
+      <div class="pane-titles">
+        <p class="coach-kicker">Coach</p>
+        <h2 class="pane-title">Next click</h2>
+      </div>
+      <button type="button" class="btn ghost pane-hide coach-hide" data-coach-toggle>Hide</button>
     </header>
     <div class="coach-copy">
       <p class="coach-do">${esc(advice.do)}</p>
@@ -630,12 +665,12 @@ function coachPanel(advice: CoachAdvice): string {
 
 function strategySidebar(brief: StrategyBrief): string {
   return `<section class="teach-pane strategy-brief" data-teach-pane="brief" aria-label="Strategy brief">
-    <header class="brief-head">
-      <div>
+    <header class="teach-pane-head brief-head">
+      <div class="pane-titles">
         <p class="brief-kicker">Strategy brief</p>
-        <h2>How the voyage stands</h2>
+        <h2 class="pane-title">How the voyage stands</h2>
       </div>
-      <button type="button" class="btn ghost brief-hide" data-brief-toggle>Hide brief</button>
+      <button type="button" class="btn ghost pane-hide brief-hide" data-brief-toggle>Hide</button>
     </header>
     <section class="brief-block">
       <h3>Objective progress</h3>
@@ -668,11 +703,11 @@ function strategySidebar(brief: StrategyBrief): string {
 function reasonDock(reason: MoveReason): string {
   return `<section class="teach-pane reason-dock${reason.soft ? " is-soft" : ""}" data-teach-pane="reasons" data-reason-dock aria-label="Why this move">
     <header class="teach-pane-head">
-      <div>
+      <div class="pane-titles">
         <p class="reason-kicker">Why this move</p>
-        <h2>Post-selection</h2>
+        <h2 class="pane-title">Post-selection</h2>
       </div>
-      <button type="button" class="btn ghost reason-hide" data-reasons-toggle>Hide</button>
+      <button type="button" class="btn ghost pane-hide reason-hide" data-reasons-toggle>Hide</button>
     </header>
     <section class="reason-block">
       <h3>What you chose</h3>
@@ -776,11 +811,11 @@ function playView(
         <div class="hud-toggles">
           ${sceneId ? `<div class="chip" data-scene-chip>Scene: ${esc(sceneId)}</div>` : ""}
           <div class="chip">${state.difficulty === "easy" ? "Easy Fate" : "Normal Fate"}</div>
-          <button type="button" class="chip ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
-          <button type="button" class="chip ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
-          <button type="button" class="chip ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
-          <button class="chip" data-help>Help</button>
-          <button class="chip" data-resign>Resign</button>
+          <button type="button" class="ctrl ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
+          <button type="button" class="ctrl ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
+          <button type="button" class="ctrl ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
+          <button type="button" class="ctrl" data-help>Help</button>
+          <button type="button" class="ctrl" data-resign ${resignBlocked(state) ? "disabled" : ""}>Resign</button>
         </div>
       </div>
     </header>
@@ -803,13 +838,13 @@ function playView(
                       size: "hand",
                       legal: hi.has(`card:${c.instanceId}`),
                       selected: sel.has(c.instanceId),
-                      dimmed: Boolean(state.pending && ["playChooseCard", "discardSelect", "cunningAlly"].includes(state.pending.kind) && !hi.has(`card:${c.instanceId}`)),
+                      dimmed: cardDimmed(state, c, hi),
                       coached: coached.has(`card:${c.instanceId}`),
                       inspectable: true,
                     }),
                   )
                   .join("")
-              : `<p class="empty">Your hand is empty. End the turn to draw back up — unless Tick Tock just snapped it away.</p>`
+              : `<p class="empty">${esc(emptyHandCopy(state))}</p>`
           }
         </div>
       </section>
@@ -1051,7 +1086,38 @@ export function mount(root: HTMLElement): void {
     window.scrollTo(pageScrollX, pageScrollY);
   };
 
+  const focusSignature = (el: Element | null): string | null => {
+    const node = el instanceof HTMLElement ? el.closest("button") : null;
+    if (!(node instanceof HTMLButtonElement)) return null;
+    const data = Object.entries(node.dataset)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}=${value ?? ""}`)
+      .join("|");
+    return `${data}|${node.className}`;
+  };
+  let savedFocus: string | null = null;
+
+  const restoreFocus = () => {
+    const blocking = root.querySelector<HTMLElement>(".overlay:not(.pass-through)");
+    const play = root.querySelector<HTMLElement>(".play");
+    if (play && blocking) play.setAttribute("inert", "");
+    else play?.removeAttribute("inert");
+    if (inspectId) {
+      root.querySelectorAll<HTMLButtonElement>("[data-resign]").forEach((btn) => btn.setAttribute("disabled", ""));
+    }
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>("button")];
+    if (savedFocus) {
+      const match = buttons.find((btn) => focusSignature(btn) === savedFocus);
+      if (match && (!blocking || blocking.contains(match))) {
+        match.focus({ preventScroll: true });
+        return;
+      }
+    }
+    blocking?.querySelector<HTMLButtonElement>("button:not([disabled])")?.focus({ preventScroll: true });
+  };
+
   const render = () => {
+    savedFocus = focusSignature(document.activeElement);
     captureScroll();
     const inspect = inspectId ? inspectOverlay(state, inspectId) : "";
     const reason = reasonsEnabled ? lastReason : null;
@@ -1068,6 +1134,7 @@ export function mount(root: HTMLElement): void {
     } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId) + inspect;
     bindCardDrag();
     restoreScroll();
+    restoreFocus();
     requestAnimationFrame(restoreScroll);
   };
 
@@ -1148,7 +1215,11 @@ export function mount(root: HTMLElement): void {
     }
     if (t.closest("[data-help]")) return dispatch({ type: "openHelp" });
     if (t.closest("[data-close-help]")) return dispatch({ type: "closeHelp" });
-    if (t.closest("[data-resign]")) return dispatch({ type: "resign" });
+    if (t.closest("[data-resign]")) {
+      const btn = t.closest("button");
+      if (btn?.hasAttribute("disabled") || resignBlocked(state) || inspectId) return;
+      return dispatch({ type: "resign" });
+    }
     if (t.closest("[data-home]") || t.closest("[data-again]")) {
       difficulty = t.closest("[data-again]") ? state.difficulty : difficulty;
       if (t.closest("[data-again]")) {
@@ -1192,6 +1263,10 @@ export function mount(root: HTMLElement): void {
       const id = cardEl.dataset.card;
       const legal = Boolean(id && highlightSet(state).has(`card:${id}`));
       if (id && !legal) {
+        if (shouldRefuseCard(state, id)) {
+          dispatch({ type: "selectCard", instanceId: id });
+          return;
+        }
         inspectId = id;
         render();
         return;
@@ -1200,6 +1275,41 @@ export function mount(root: HTMLElement): void {
 
     const boardInput = resolveBoardClick(t, state);
     if (boardInput) dispatch(boardInput);
+  });
+
+  root.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (inspectId) {
+      event.preventDefault();
+      inspectId = null;
+      render();
+      return;
+    }
+    if (state.screen === "help") {
+      event.preventDefault();
+      dispatch({ type: "closeHelp" });
+      return;
+    }
+    const kind = state.pending?.kind;
+    const cancellable =
+      kind === "playChooseCard" ||
+      kind === "playChooseLocation" ||
+      kind === "playChooseAllyAttach" ||
+      kind === "playChoosePayment" ||
+      kind === "conditionOffer" ||
+      kind === "vanquishHero" ||
+      kind === "vanquishAllies" ||
+      kind === "vanquishConfirmLoss" ||
+      kind === "discardSelect" ||
+      kind === "movePieceSelect" ||
+      kind === "movePieceDest" ||
+      kind === "moveHeroSelect" ||
+      kind === "moveHeroDest" ||
+      kind === "cunningAlly" ||
+      kind === "cunningLocation";
+    if (!cancellable) return;
+    event.preventDefault();
+    dispatch({ type: "cancel" });
   });
 
   render();

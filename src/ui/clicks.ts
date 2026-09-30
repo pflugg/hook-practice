@@ -75,8 +75,8 @@ export function resolveBoardClick(target: EventTarget | null, state: GameState):
   if (actionEnabled) {
     return { type: "selectAction", actionKey: act!.dataset.act! };
   }
-  if (loc) {
-    return { type: "selectLocation", locationId: loc.dataset.loc as LocationId };
-  }
+  // A disabled action only falls through when the location is already a legal target.
+  // An illegal place must not become a move/play/slide the engine will reject.
+  if (act) return null;
   return null;
 }
