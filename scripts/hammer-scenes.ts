@@ -27,6 +27,8 @@ function install(url: string): { root: HTMLElement; click: (selector: string) =>
   assign("window", w);
   assign("document", w.document);
   assign("HTMLElement", w.HTMLElement);
+  assign("HTMLButtonElement", w.HTMLButtonElement);
+  assign("Element", w.Element);
   assign("Node", w.Node);
   assign("MouseEvent", w.MouseEvent);
   assign("sessionStorage", w.sessionStorage);
