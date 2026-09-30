@@ -65,7 +65,7 @@ import {
 } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
 import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
-import { CAPTAIN_TOKEN, CREST, TITLE_SCENE, TOPBAR_MAP, locationDecor } from "./decor";
+import { CAPTAIN_TOKEN, CREST, MAP_COAST, MAP_COMPASS, TITLE_SCENE, TOPBAR_MAP, TREASURE_MAP } from "./decor";
 import "./styles.css";
 
 function esc(s: string): string {
@@ -229,7 +229,6 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
   const moveLabel = state.phase === "move" ? "Move here" : "Choose this place";
   const coachLoc = legal && coached.has(`loc:${id}`);
   return `<section class="location ${id} ${current ? "is-current" : ""} ${legal ? "is-legal" : ""} ${coachLoc ? "is-coached" : ""} ${locked ? "is-locked" : ""}" data-loc="${id}">
-    <div class="loc-atmos" aria-hidden="true">${locationDecor(id)}</div>
     <div class="loc-vignette" aria-hidden="true"></div>
     ${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : ""}
     <div class="loc-head">
@@ -838,7 +837,7 @@ function playView(
     <div class="play-scroll" data-play-scroll>
     <div class="stage">
       ${fateRail(state)}
-      <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
+      <div class="board-wrap realm-sheet" data-realm-map><div class="board">${TREASURE_MAP}${MAP_COMPASS}${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}${MAP_COAST}</div></div>
     </div>
     <footer class="dock">
       <section class="hand ${state.pending?.kind === "playChooseCard" || state.pending?.kind === "discardSelect" ? "is-picking" : ""}">

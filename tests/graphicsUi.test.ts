@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { advise } from "../src/engine/coach";
 import { createGame } from "../src/engine/game";
 import { IDLE_MOVE_REASON } from "../src/engine/moveReason";
+import { MAP_COAST, MAP_COMPASS, TREASURE_MAP, locationDecor } from "../src/ui/decor";
 import { renderPlay } from "../src/ui/app";
 import { barePlayState, give } from "./helpers";
 
@@ -193,5 +194,47 @@ describe("game graphics UI pass", () => {
     const powerLoud = css.slice(css.indexOf(".power.is-loud {"), css.indexOf(".power span {"));
     expect(powerLoud).toMatch(/min-height:\s*46px/);
     expect(css).toMatch(/\.power b \{[^}]*font-size:\s*28px/);
+  });
+
+  it("inks the four shores on one parchment chart with readable cartouches", () => {
+    const html = renderPlay(createGame("normal", 7), {
+      coachEnabled: false,
+      briefEnabled: false,
+      reasonsEnabled: false,
+    });
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    const sheet = root.querySelector("[data-realm-map]");
+    expect(sheet?.classList.contains("realm-sheet")).toBe(true);
+    const board = sheet?.querySelector(".board");
+    expect(board?.querySelectorAll(":scope > .location").length).toBe(4);
+    expect(board?.querySelector("svg.map-compass")).toBeTruthy();
+    expect(board?.querySelector("svg.map-coast")).toBeTruthy();
+    expect(board?.querySelector("svg.map-scene")).toBeTruthy();
+    expect(root.querySelector(".loc-head h2")?.textContent).toMatch(/Jolly Roger/);
+
+    const chart = `${MAP_COMPASS}${MAP_COAST}${TREASURE_MAP}${locationDecor("jollyRoger")}${locationDecor("skullRock")}${locationDecor("mermaidLagoon")}${locationDecor("hangmansTree")}`;
+    expect(chart).not.toMatch(/Disney|Peter Pan|Tinker Bell|Lost Boy|Neverland|Cannibal|Indian Camp/i);
+    expect(MAP_COMPASS).not.toMatch(/Never Land|Jolly|Skull|Mermaid|Hangman/);
+    expect(TREASURE_MAP).toContain('class="map-road"');
+    expect(TREASURE_MAP).toContain('class="treasure-x"');
+    expect(TREASURE_MAP).toContain('class="treasure-chest"');
+    expect(TREASURE_MAP).toContain('class="map-ship"');
+    expect(TREASURE_MAP).toContain("#e10600");
+    const css = readFileSync(join(process.cwd(), "src/ui/styles.css"), "utf8");
+    expect(css).toContain("--chart-line");
+    expect(css).toContain("--chart-sea");
+    expect(css).toContain("--parchment-fiber");
+    expect(css).toMatch(/\.map-scene\s*\{[^}]*position:\s*absolute/);
+    expect(css).toMatch(/\.loc-head h2 \{[^}]*color:\s*var\(--parchment-ink\)/);
+    expect(css).toMatch(/\.lock-need \{[^}]*color:\s*#6e2c24/);
+    expect(css).toMatch(
+      /\.action:disabled,\s*\.action\.is-inert,\s*\.action\.is-used,\s*\.action\.is-covered \{\s*opacity:\s*1/,
+    );
+    expect(css).toMatch(/\.coach-do\s*\{[^}]*font-size:\s*18px/);
+    expect(css).toMatch(/\.coach-why\s*\{[^}]*font-size:\s*14px/);
+    expect(css).toMatch(/\.brief-block p\s*\{[^}]*font-size:\s*14\.5px/);
+    expect(css).toMatch(/\.reason-block p\s*\{[^}]*font-size:\s*14px/);
+    expect(css).toMatch(/@media \(max-width: 760px\)[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
   });
 });
