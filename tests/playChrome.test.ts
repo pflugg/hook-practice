@@ -76,6 +76,15 @@ describe("play chrome rescue", () => {
     expect(css).toMatch(/\.power\.is-loud\s*\{[^}]*min-height:\s*46px/);
   });
 
+  it("lets voyage meters wrap so Coach and Reasons are not clipped beside the rail", () => {
+    const css = readFileSync(join(process.cwd(), "src/ui/styles.css"), "utf8");
+    const topbar = css.slice(css.indexOf(".topbar {"), css.indexOf(".topbar-map"));
+    expect(topbar).toMatch(/minmax\(0,\s*max-content\)/);
+    expect(css).toMatch(/\.meters \{[^}]*flex-wrap:\s*wrap/);
+    expect(css).toMatch(/\.hud-core,\s*\.hud-toggles \{[^}]*flex-wrap:\s*wrap/);
+    expect(css).toMatch(/\.hud-core,\s*\.hud-toggles \{[^}]*min-width:\s*0/);
+  });
+
   it("paints an inline chart in the logo-to-Power gap at a whisper opacity", () => {
     expect(TOPBAR_MAP).toContain('class="topbar-map"');
     expect(TOPBAR_MAP).toContain('viewBox="0 0 1600 56"');

@@ -115,11 +115,11 @@ export function locationDecor(id: string): string {
   if (id === "skullRock") {
     return `<svg class="loc-art" viewBox="0 0 280 160" aria-hidden="true">
       ${CHART_CORNERS}
-      <path d="M36 136 L52 78 Q78 40 118 58 Q104 96 92 136 Z" fill="#cbb892" stroke="#4a3820" stroke-width="1.6"/>
-      <path d="M108 136 L124 70 Q168 28 214 64 L228 136 Q186 108 150 112 Q124 118 108 136 Z" fill="#d9c7a4" stroke="#4a3820" stroke-width="1.7"/>
-      <path d="M148 136 Q168 102 196 136" fill="#2c2418"/>
-      <path d="M20 140c40-16 70-8 104-2 36 6 62-8 96 0 22 5 36 2 46 4" fill="none" stroke="#5c4630" stroke-width="2" opacity=".7"/>
-      <path d="M124 64 l8 6 M176 52 l10 4" stroke="#6a5438" stroke-width="1.2" opacity=".7"/>
+      <path d="M28 138 C48 108 62 96 84 104 C70 118 52 128 40 138 Z" fill="#cbb892" stroke="#4a3820" stroke-width="1.5"/>
+      <path d="M78 140 C96 92 132 70 168 78 C150 96 124 112 108 140 C96 118 84 124 78 140 Z" fill="#d4c09a" stroke="#4a3820" stroke-width="1.6"/>
+      <path d="M150 140 C168 78 214 64 248 108 L236 140 C214 112 186 118 164 140 C158 124 152 128 150 140 Z" fill="#e2d2b0" stroke="#4a3820" stroke-width="1.6"/>
+      <path d="M168 140 Q196 108 224 140" fill="#2a2218"/>
+      <path d="M16 142c36-10 70-4 108 0 40 4 70-8 112 0 28 6 36 2 44 2" fill="none" stroke="#5c4630" stroke-width="2" opacity=".65"/>
     </svg>`;
   }
   if (id === "mermaidLagoon") {
