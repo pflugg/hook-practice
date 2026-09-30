@@ -83,10 +83,11 @@ describe("coach suggestions", () => {
 
     const advice = advise(state);
     expect(advice.do).toMatch(/Boarding Party/);
-    expect(advice.do).toMatch(/Jolly Roger/);
+    expect(advice.do).toMatch(/Mermaid Lagoon/);
     expect(advice.do).toMatch(/Play a Card/);
     expect(advice.do).toMatch(/click/i);
     expect(advice.do).toMatch(/Choose this place/i);
+    expect(advice.why).toMatch(/where the captain stands/);
     expect(advice.do).not.toMatch(/where it would help|if it helps/i);
     expect(advice.highlights).toContain("act:ml-play1");
     expectLegalHighlights(state, advice.highlights);
@@ -94,7 +95,7 @@ describe("coach suggestions", () => {
     const choosing = applyInput(state, { type: "selectAction", actionKey: "ml-play1" });
     const pick = advise(choosing);
     expect(pick.do).toMatch(/Boarding Party/);
-    expect(pick.do).toMatch(/Jolly Roger/);
+    expect(pick.do).toMatch(/Mermaid Lagoon/);
     expect(pick.do).toMatch(/click/i);
     expect(pick.do).toMatch(/Choose this place/i);
     expectLegalHighlights(choosing, pick.highlights);

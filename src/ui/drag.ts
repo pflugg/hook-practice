@@ -5,6 +5,7 @@ import {
   findCard,
   findCardLocation,
   legalPlayLocations,
+  unlockedLocations,
 } from "../engine/queries";
 import { highlightSet } from "../engine/game";
 import type { GameState, Input, LocationId } from "../engine/types";
@@ -100,7 +101,7 @@ export function dropTargets(state: GameState, instanceId: string): DropTargets {
     (p.kind === "worthyLocation" && p.heroId === instanceId) ||
     (p.kind === "obsessionLocation" && p.heroId === instanceId)
   ) {
-    return { locations: legalPlayLocations(state), cards: [] };
+    return { locations: unlockedLocations(state), cards: [] };
   }
   return empty;
 }

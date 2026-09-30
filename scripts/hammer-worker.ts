@@ -614,7 +614,7 @@ function inputFromAdvice(state: GameState, advice: { highlights: string[] }): In
     if (key === "btn:accept-cond") return { type: "acceptCondition" };
     if (key === "btn:skip-cond") return { type: "skipCondition" };
     if (key === "btn:play-hero") return { type: "playOrDiscardHero", play: true };
-    if (key === "btn:banish-hero") return { type: "playOrDiscardHero", play: false };
+    if (key === "btn:discard-hero" || key === "btn:banish-hero") return { type: "playOrDiscardHero", play: false };
     if (key === "btn:scare-discard") return { type: "scareDiscardBoth" };
     if (key.startsWith("btn:scare-order:")) {
       const [a, b] = key.slice("btn:scare-order:".length).split(",");

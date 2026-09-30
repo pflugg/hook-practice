@@ -284,14 +284,14 @@ export function vanquishBlockedReason(state: GameState): string {
     const name = cardName(taunted.hero);
     const place = locName(taunted.location);
     if (!canVanquishAt(state, taunted.location)) {
-      return `Taunt: ${name} must be vanquished first. ${name} is at ${place} — stand there, or send a Boarding Party to that neighboring unlocked place. Allies who can reach him total ${have} vs his ${need}.`;
+      return `Taunt: ${name} must be vanquished first. ${name} is at ${place} — stand there, or reach that neighboring place with a Boarding Party at your side or with the Hero. A party on the Hero’s far side does not reach. Allies who can reach him total ${have} vs his ${need}.`;
     }
     return `Taunt: ${name} must be vanquished first, and your Allies here total ${have} vs his ${need}.`;
   }
 
   const inRange = allHeroes(state).filter(({ location }) => canVanquishAt(state, location));
   if (inRange.length === 0) {
-    return "No Hero is in range of a Vanquish here. Name a Hero at the captain’s place, or a neighboring unlocked Hero a Boarding Party can reach.";
+    return "No Hero is in range of a Vanquish here. Name a Hero at the captain’s place, or a neighboring unlocked Hero a Boarding Party can reach from the captain’s place or the Hero’s place.";
   }
   const bits = inRange.map(({ hero, location }) => {
     const pool = vanquishAllyPoolAt(state, location);
@@ -406,8 +406,26 @@ export function legalMoveLocations(state: GameState): LocationId[] {
   return unlockedLocations(state).filter((id) => id !== state.villainLocation);
 }
 
-export function legalPlayLocations(_state: GameState): LocationId[] {
-  return unlockedLocations(_state);
+/** Play a Card (and Cunning’s free Ally) lands where the captain stands. */
+export function legalPlayLocations(state: GameState): LocationId[] {
+  if (!isUnlocked(state, state.villainLocation)) return [];
+  return [state.villainLocation];
+}
+
+/**
+ * A Boarding Party joins a clash at the Hero’s place, from the captain’s place
+ * into a neighboring Hero, or from next door into a clash at the captain’s place.
+ * A party on the Hero’s far side does not reach across the captain.
+ */
+export function boardingPartyJoinsClash(
+  state: GameState,
+  heroLocation: LocationId,
+  partyLocation: LocationId,
+): boolean {
+  if (!isUnlocked(state, partyLocation) || !isUnlocked(state, heroLocation)) return false;
+  if (partyLocation === heroLocation) return true;
+  if (!adjacentIds(partyLocation).includes(heroLocation)) return false;
+  return heroLocation === state.villainLocation || partyLocation === state.villainLocation;
 }
 
 export function adjacentUnlocked(state: GameState, id: LocationId): LocationId[] {
@@ -423,10 +441,7 @@ export function vanquishAllyPoolAt(
     location,
   }));
   const boarding = allAllies(state).filter(
-    (a) =>
-      a.ally.defId === "boardingParty" &&
-      isUnlocked(state, a.location) &&
-      (a.location === location || (isUnlocked(state, location) && adjacentIds(a.location).includes(location))),
+    (a) => a.ally.defId === "boardingParty" && boardingPartyJoinsClash(state, location, a.location),
   );
   const seen = new Set<string>();
   return [...local, ...boarding].filter((a) => {
@@ -580,7 +595,7 @@ export function promptText(state: GameState): string {
     case "playChooseLocation":
       return withClashAndCroc(
         state,
-        `Click a glowing location to play ${cardName(findCard(state, p.cardId)!)}.`,
+        `Play ${cardName(findCard(state, p.cardId)!)} where the captain stands — ${locName(state.villainLocation)}. Allies and Items from Play a Card do not travel to another shore.`,
       );
     case "playChooseAllyAttach":
       return `${cutlassStrapLine(state)} Cancel returns to your hand.`;
@@ -607,7 +622,7 @@ export function promptText(state: GameState): string {
     case "vanquishHero":
       return withClashAndCroc(
         state,
-        "Choose a Hero at the captain's place. A Boarding Party can reach a neighboring unlocked Hero.",
+        "Choose a Hero at the captain's place. A Boarding Party at the captain’s place or with the Hero can reach a neighboring unlocked Hero.",
       );
     case "vanquishConfirmLoss":
       return "Vanquishing Peter away from the Jolly Roger loses this practice duel. Continue only if you mean to practice that failure.";
@@ -643,14 +658,19 @@ export function promptText(state: GameState): string {
       return "Tinker Bell may discard one Ally here. Choose one or skip.";
     case "worthyLocation":
       return "Choose where this revealed Hero lands.";
-    case "obsessionDecide":
-      return "Play this Hero into the realm, or banish them?";
+    case "obsessionDecide": {
+      const hero = state.heldCard ?? findCard(state, p.heroId);
+      if (hero?.defId === "peterPan") {
+        return "Peter Pan was revealed. He must be played to Hangman’s Tree.";
+      }
+      return "Play this Hero into the realm, or discard them to the Fate discard? A discarded Hero can return when Fate reshuffles.";
+    }
     case "obsessionLocation":
       return "Choose an unlocked location for this Hero.";
     case "cunningAlly":
-      return "Cunning: play an Ally from hand for free.";
+      return "Cunning is already played. Choose an Ally to slip ashore where the captain stands, or Cancel to decline — the Condition stays spent.";
     case "cunningLocation":
-      return "Where should that Ally come ashore?";
+      return `That Ally comes ashore at ${locName(state.villainLocation)}, where the captain stands. Cancel returns to the Ally choice; Cunning stays spent.`;
     case "fateReport":
       return p.abilityText ? `${p.note} ${p.abilityText}` : p.note;
     case "conditionOffer":

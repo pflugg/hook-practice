@@ -123,17 +123,16 @@ function explainCurrentMoment(state: GameState): MoveReason {
     const ally = playable.find((c) => def(c.defId).type === "ally");
     const card = map ?? ally ?? playable[0];
     const name = card ? cardName(card) : "a glowing card";
-    const dest =
-      card && def(card.defId).type === "ally"
-        ? "jollyRoger"
-        : state.villainLocation;
+    const dest = state.villainLocation;
     return pack(
       `You opened Play a Card at ${locName(state.villainLocation)}.`,
       `Click ${name} in your hand — affordable cards are outlined in gold. ${
         card && def(card.defId).type === "ally"
-          ? `${name} belongs on the Jolly Roger so Strength is waiting.`
+          ? dest === "jollyRoger"
+            ? `${name} comes ashore on the Jolly Roger, where the captain stands, so Strength is waiting.`
+            : `${name} comes ashore at ${locName(dest)}, where the captain stands. Walk that crew toward the ship later.`
           : card?.defId === "neverLandMap"
-            ? "The Map can sit on any unlocked square — playing it is what opens Hangman’s Tree."
+            ? "The Map lands where the captain stands. Playing it is what opens Hangman’s Tree."
             : "Pick the card that serves the Map, the escort, or the ship clash."
       } ${chainLine(state)}`,
       card && def(card.defId).type !== "effect" && card.defId !== "cutlass"
@@ -144,13 +143,10 @@ function explainCurrentMoment(state: GameState): MoveReason {
   if (p?.kind === "playChooseLocation") {
     const card = findCard(state, p.cardId);
     const name = card ? cardName(card) : "that card";
-    const dest =
-      card && (def(card.defId).type === "ally" || card.defId === "cannon" || card.defId === "hooksCase")
-        ? "jollyRoger"
-        : state.villainLocation;
+    const dest = state.villainLocation;
     return pack(
       `You chose ${name} and still need a place.`,
-      `${promptText(state)} Click ${placeVerb(dest)} to drop ${name} on ${locName(dest)}. Allies and ship gear want the Jolly Roger; the Map can sit anywhere unlocked. ${chainLine(state)}`,
+      `${promptText(state)} Click ${placeVerb(dest)} to drop ${name} where the captain stands. Allies and Items from Play a Card do not travel to another shore. ${chainLine(state)}`,
       `If a payment prompt appears next, click Pay with Power (or Cancel to keep the rest of this stop).`,
     );
   }
@@ -398,7 +394,7 @@ function playCardWhy(defId: string, state: GameState): { why: string; next: stri
     case "neverLandMap":
       return {
         why: "The Never Land Map is the only key that unlocks Hangman’s Tree. That is gate one of the chain: Map → open the hideout → find Peter → walk him to the Jolly Roger → vanquish him there. Playing it is not flavor; without it Peter cannot leave the tree.",
-        next: `The Map can sit at any unlocked place — the unlock is what matters, not the square. ${chainLine(state)} After this you can start thinking about Fate hunts and an Ally stack on the ship.`,
+        next: `The Map lands where the captain stands — the unlock is what matters. ${chainLine(state)} After this you can start thinking about Fate hunts and an Ally stack on the ship.`,
       };
     case "pirateBrute":
     case "smee":
@@ -457,12 +453,12 @@ function playCardWhy(defId: string, state: GameState): { why: string; next: stri
     case "cunning":
       return {
         why: "Cunning is a printed Condition. At a table it waits for another player’s turn and a strong Ally in another realm. Here the trigger is rewritten: when a Strength 4+ Hero is ashore and you hold an Ally, you may slip that Ally in for free. Without an Ally in hand the Condition stays put.",
-        next: "Put that free Ally on the Jolly Roger. You can still take other actions this stop.",
+        next: "That free Ally comes ashore where the captain stands. You can still take other actions this stop.",
       };
     case "obsession":
       return {
         why: "Obsession is a printed Condition. At a table it waits for another player to defeat a strong Hero. Here the trigger is rewritten so you may hunt Fate for a Hero on your own turn while Peter is still hidden.",
-        next: "If it finds Peter, play him — he goes to Hangman’s Tree. If it finds Tick Tock, banishing him saves the hand later.",
+        next: "If it finds Peter, he must be played to Hangman’s Tree. If it finds Tick Tock, discarding him to the Fate discard saves the hand later — he can return when Fate reshuffles.",
       };
     default:
       return {
@@ -586,6 +582,30 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
 
   if (input.type === "cancel") {
     if (sameTable(before, after) && before.pending?.kind === "fateReport") return null;
+    if (before.pending?.kind === "cunningAlly") {
+      return pack(
+        "You declined the free Ally.",
+        "Cunning was already played, so it stays in the discard. Cancel does not put the Condition back in hand. No crew comes ashore.",
+        "The rest of this stop is still open. Coach names the next click if it is on.",
+        true,
+      );
+    }
+    if (before.pending?.kind === "cunningLocation") {
+      return pack(
+        "You stepped back to the Ally choice.",
+        "Cunning is already in the discard. Pick an Ally in hand, or Cancel again to decline the free crew. The Condition does not return.",
+        "The Ally still comes ashore where the captain stands.",
+        true,
+      );
+    }
+    if (before.pending?.kind === "conditionOffer") {
+      return pack(
+        "You set the Condition aside.",
+        "It stays in hand. That is the same as Not now — nothing was spent.",
+        `${chainLine(after)} You can still take the rest of this stop’s actions.`,
+        true,
+      );
+    }
     return pack(
       "You cancelled that choice.",
       `Nothing on the chain committed. The captain is still at ${locName(after.villainLocation)} with ${after.power} Power. ${chainLine(after)}`,
@@ -700,8 +720,8 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
       "You played the ready Condition.",
       "Conditions fire because the table already meets their trigger — a strong Hero ashore for Cunning, or Peter still hidden for Obsession. That is free or discounted progress on the chain.",
       after.pending?.kind === "cunningAlly"
-        ? "Choose an Ally in hand and drop them on the Jolly Roger if you can."
-        : "Follow the hunt. Play Peter if he appears; consider banishing Tick Tock.",
+        ? "Choose an Ally in hand. They come ashore where the captain stands. Cancel declines the gift and does not return Cunning."
+        : "If Peter appears, he must be played to Hangman’s Tree. Any other Hero may be played, or discarded to the Fate discard — they can return when Fate reshuffles.",
     );
   }
   if (input.type === "skipCondition") {
@@ -722,16 +742,24 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
           ? "Peter still goes to Hangman’s Tree. That is the find you wanted."
           : `Seating ${name} covers a stop and may raise vanquish costs. Park them where they block the fewest actions you still need.`,
         hero?.defId === "tickTock"
-          ? "If you can still banish instead, consider it. Otherwise keep the captain off that square."
+          ? "If you can still discard him to the Fate discard instead, consider it. Otherwise keep the captain off that square."
           : "Choose the unlocked place next, then read the lasting text before you leave the report.",
       );
     }
+    const forcedPeter = hero?.defId === "peterPan";
+    if (forcedPeter) {
+      return pack(
+        "Peter Pan was revealed, so he is played to Hangman’s Tree.",
+        "A revealed Peter must be played. Discarding him is not allowed. He lands at the hideout even while it is locked.",
+        `${chainLine(after)} Once the Map has opened the tree, you can start the walk to the ship.`,
+      );
+    }
     return pack(
-      `You banished ${name}.`,
+      `You discarded ${name} to the Fate discard.`,
       hero?.defId === "tickTock"
-        ? "Sending the crocodile out of the realm saves your hand later. That is a correct defensive spend of Obsession."
-        : `Banishing ${name} keeps the realm quieter so top-row actions stay open while you finish the Map and the walk.`,
-      `${chainLine(after)} Fate can still redraw pressure later.`,
+        ? "The crocodile goes to the Fate discard and can return when Fate reshuffles. That is not remove-from-game. Sending him there saves your hand later."
+        : `Discarding ${name} keeps the realm quieter so top-row actions stay open. The Hero can return when Fate reshuffles.`,
+      `${chainLine(after)} Fate can still redraw that pressure later.`,
     );
   }
 
@@ -788,7 +816,7 @@ function explainLocation(before: GameState, after: GameState, locationId: Locati
     const extra = card ? playCardWhy(card.defId, after) : { why: chainLine(after), next: crocWatch(after) };
     return pack(
       `You played ${name} to ${locName(locationId)}.`,
-      `${extra.why} This square is now part of that plan: Allies and ship gear want the Jolly Roger; the Map can sit anywhere unlocked.`,
+      `${extra.why} Allies and Items land where the captain stands. Walk crew toward the Jolly Roger later if this is not the ship.`,
       extra.next,
     );
   }
@@ -878,8 +906,8 @@ function explainAction(before: GameState, after: GameState, actionKey: string): 
     case "playCard":
       return pack(
         `You opened Play a Card at ${here}.`,
-        "This is not “play something because it glows.” Click a glowing card in your hand next. The Map opens the tree. Allies belong on the Jolly Roger. Hunt cards fish Fate. Escort pieces matter after the hideout is open.",
-        "Affordable cards are outlined. After you click the card, click Choose this place on the square you want (Allies want the Jolly Roger). Cancel returns you to the action stretch if this was the wrong tool.",
+        "This is not “play something because it glows.” Click a glowing card in your hand next. The Map opens the tree from the square where the captain stands. Allies and Items land there too. Hunt cards fish Fate. Escort pieces matter after the hideout is open.",
+        "Affordable cards are outlined. After you click the card, click Choose this place where the captain stands. Cancel returns you to the action stretch if this was the wrong tool.",
       );
     case "fate":
       return pack(
@@ -1052,7 +1080,7 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
   if (p.kind === "cunningAlly") {
     return pack(
       `You chose ${name} as the free Cunning Ally.`,
-      "This Ally skips its Power cost. Put that gift on the Jolly Roger if you can.",
+      "This Ally skips its Power cost and comes ashore where the captain stands.",
       "Click the glowing place next.",
     );
   }

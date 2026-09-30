@@ -254,11 +254,11 @@ function thisMoment(state: GameState): string {
       return "You peeked at two Fate cards without revealing them. Looking is not finding Peter — a peek will not force him onto the tree. You may discard both to the Fate discard (they can return when Fate reshuffles), or put them back in either order. If Peter is in the peek, return him on top so the next real Fate flip can find him. If the crocodile or a headache is there, discarding both is often the kinder table.";
     case "obsessionDecide":
     case "obsessionLocation":
-      return "Obsession hunted a Hero out of Fate. If it is Peter, play him — he still goes to Hangman’s Tree. If it is Tick Tock, sending him out of the realm saves your hand later. Obsession is a printed Condition; at a table it waits for another player to defeat a strong Hero. This tool rewrites that trigger so you may fire it on your own turn while Peter is still hidden.";
+      return "Obsession hunted a Hero out of Fate. If it is Peter, he must be played to Hangman’s Tree. If it is Tick Tock, discarding him to the Fate discard saves your hand later — he can return when Fate reshuffles. That is not remove-from-game. Obsession is a printed Condition; at a table it waits for another player to defeat a strong Hero. This tool rewrites that trigger so you may fire it on your own turn while Peter is still hidden.";
     case "cunningAlly":
     case "cunningLocation":
     case "conditionOffer":
-      return "A printed Condition is ready, with a solo trigger. At a table Cunning watches for a strong Ally in another realm on another player’s turn; here it fires on your turn if a Strength-4 Hero is already out — drop that Ally on the ship. Obsession is also printed; here it hunts a Hero while Peter is hidden. Playing the Condition is usually the lesson; skipping it is legal if the board is already loud.";
+      return "A printed Condition is ready, with a solo trigger. At a table Cunning watches for a strong Ally in another realm on another player’s turn; here it fires on your turn if a Strength-4 Hero is already out — the free Ally comes ashore where the captain stands. Once Cunning is played, Cancel declines the gift and does not return the Condition. Obsession is also printed; here it hunts a Hero while Peter is hidden, and a revealed Peter must be played. Playing the Condition is usually the lesson; skipping it before you accept is legal if the board is already loud.";
     case "tinkerDiscard":
       return "A newly placed Hero may discard one Ally at that same place. Skipping keeps your crew. Allies on the Jolly Roger are the clash that finishes Peter, so do not feed them away unless the Ally was stranded and useless.";
     default:

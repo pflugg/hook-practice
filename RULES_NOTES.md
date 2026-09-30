@@ -26,8 +26,8 @@ Cunning and Obsession **are printed two-player Conditions**. At a table they wai
 
 Those triggers almost never happen in solo play, so this tool **rewrites the triggers** (not the cards) so they can fire during your action phase:
 
-- **Cunning** — During your action phase, if a Hero of Strength 4+ is in this realm and you hold an Ally, you may play Cunning without using a Play a Card action, then play that Ally for free.
-- **Obsession** — During your action phase, if Peter Pan has not yet been revealed, you may play Obsession without using a Play a Card action, then reveal Fate cards until a Hero and play or discard that Hero (the card goes to the Fate discard and can return).
+- **Cunning** — During your action phase, if a Hero of Strength 4+ is in this realm and you hold an Ally, you may play Cunning without using a Play a Card action, then play that Ally for free at the captain’s current location. Accepting writes a log line. Cancel before you accept leaves the Condition in hand (Escape does the same as Not now). After Accept, Cancel during the place choice returns to the Ally choice. Cancel during the Ally choice declines the free crew: Cunning stays in the discard and does not return to hand. Coach and Why this move say that outright.
+- **Obsession** — During your action phase, if Peter Pan has not yet been revealed, you may play Obsession without using a Play a Card action, then reveal Fate cards until a Hero. A revealed Peter must be played to Hangman’s Tree (same as Worthy Opponent and a Fate reveal). Any other Hero may be played to an unlocked place, or discarded to the Fate discard. A discarded Hero can return when Fate reshuffles. This is not remove-from-game.
 
 Playing a Condition from hand without spending Play a Card is close to published Condition timing. The trigger rewrite is the adaptation.
 
@@ -40,11 +40,14 @@ If Peter is vanquished anywhere other than the Jolly Roger, the duel is an immed
 ### Give Them a Scare
 This card **looks** at the top two Fate cards. Looking does not count as revealing, so Peter Pan is not forced onto Hangman’s Tree by a peek. You may discard both cards to the Fate discard or return them in either order. Discarded peek cards can return when Fate reshuffles — this tool does not use a separate remove-from-game pile.
 
+### Play a Card locality
+Playing an Ally or Item puts it at the captain’s current location. It does not fly to another unlocked shore. Walk crew toward the ship afterward with Move Ally/Item. Fate, Worthy Opponent, and Obsession may still seat a non-Peter Hero on any unlocked place. Peter’s reveal placement is unchanged.
+
 ### Vanquish locality
-Vanquish names a Hero at the captain’s current location. Allies at that place contribute Strength. **Boarding Party** may also join a clash here or at a neighboring unlocked place, which is the only way to reach an adjacent Hero. Crew sitting with a distant Hero cannot be spent while the captain stands elsewhere.
+Vanquish names a Hero at the captain’s current location. Allies at that place contribute Strength. **Boarding Party** may also join when it stands with the captain and the Hero is one unlocked step away, or when it stands with that Hero (including a clash the captain starts next door). A Boarding Party on the Hero’s far side does not reach — captain on the ship, Hero at Skull Rock, party at the lagoon is not a legal clash. Crew sitting with a distant Hero cannot be spent while the captain stands elsewhere.
 
 ### Reveal vs play
-Whenever Peter Pan is *revealed* (Fate action, Worthy Opponent, Obsession), he is placed at Hangman’s Tree even if locked, and the other cards from that reveal are discarded. Player-chosen Fate plays of other Heroes go to unlocked locations only.
+Whenever Peter Pan is *revealed* (Fate action, Worthy Opponent, Obsession), he is placed at Hangman’s Tree even if locked, and the other cards from that reveal are discarded. Obsession cannot discard a just-found Peter. Player-chosen Fate plays of other Heroes go to unlocked locations only.
 
 ### Map cost substitution
 If the Never Land Map is in the realm, playing another Item offers a choice: pay Power, or discard the Map instead of paying. Unlocking the tree is permanent even if the Map later leaves play.

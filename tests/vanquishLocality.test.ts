@@ -47,6 +47,27 @@ describe("Vanquish is location-local", () => {
     expect(vanquishableHeroes(state).some((h) => h.hero.instanceId === john.instanceId)).toBe(true);
   });
 
+  it("does not let a Boarding Party on the Hero’s far side reach the clash", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    const john = putHero(state, "john", "skullRock");
+    putAlly(state, "boardingParty", "mermaidLagoon");
+    putAlly(state, "swashbuckler", "skullRock");
+
+    expect(vanquishableHeroes(state).some((h) => h.hero.instanceId === john.instanceId)).toBe(false);
+  });
+
+  it("lets a Boarding Party standing with the captain join a Hero at that same place from next door", () => {
+    const state = barePlayState();
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    const john = putHero(state, "john", "jollyRoger");
+    putAlly(state, "boardingParty", "skullRock");
+
+    expect(vanquishableHeroes(state).some((h) => h.hero.instanceId === john.instanceId)).toBe(true);
+  });
+
   it("does not let Boarding Party reach locked Hangman’s Tree", () => {
     const state = barePlayState();
     state.hangmansUnlocked = false;

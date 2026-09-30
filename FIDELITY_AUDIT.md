@@ -124,15 +124,15 @@ Easy and Normal both play a revealed Peter to Hangman’s Tree and discard the o
 
 Pixie Dust does not attach to Peter while Hangman’s Tree is still locked (`canAttachFateItem`). Taunt may still cling.
 
-### Distant Boarding Party joining an adjacent clash
+### Distant Boarding Party joining an adjacent clash — **fixed**
 
-Vanquish names a Hero at the captain’s place, or a neighboring unlocked Hero a Boarding Party can reach (`canVanquishAt`, `vanquishAllyPoolAt`). Same-location Allies plus neighboring Boarding Parties mixing is the usual table reading.
+Vanquish names a Hero at the captain’s place, or a neighboring unlocked Hero a Boarding Party can reach (`canVanquishAt`, `vanquishAllyPoolAt`, `boardingPartyJoinsClash`). Same-location Allies plus a neighboring Boarding Party still mix when the party stands with the captain or with the Hero.
 
-Edge: the captain can be adjacent to the Hero while the only Boarding Party sits on the Hero’s *other* neighbor (example: captain on the ship, Hero at Skull Rock, Boarding Party at the lagoon). The engine allows that clash. A pickier table might require the Boarding Party to be at the captain’s place or the Hero’s place. Rare; document before changing.
+The far-side case is no longer legal: captain on the ship, Hero at Skull Rock, Boarding Party only at the lagoon. That party is adjacent to the Hero but not to the captain, so it does not carry the captain’s Vanquish across. A party next door to a Hero who is standing with the captain still joins.
 
-### Obsession can discard a just-revealed Peter
+### Obsession can discard a just-revealed Peter — **fixed**
 
-Obsession’s practice resolve lets you play or “banish” the found Hero (`playOrDiscardHero`). If the Hero is Peter, play-path forces the hideout (`revealPeter`). Discard-path puts him in the Fate discard. Hunt-card wording usually allows play-or-discard; Peter’s own reveal clause usually says he must be played when revealed. Contested. The UI word **banish** also sounds like remove-from-game; the card goes to the Fate discard and can return.
+A revealed Peter must be played to Hangman’s Tree, the same path Worthy Opponent and a Fate reveal already use (`forceObsessionPeter`). The discard choice is not offered, and a discard input still seats him. Other Heroes may be played or discarded to the Fate discard. Coach, the button, the prompt, and the log say **Discard** and that the Hero can return when Fate reshuffles. They do not say the Hero leaves the realm.
 
 ### Off-ship loss and “always Fate” are documented but still habit-forming
 
@@ -172,7 +172,7 @@ Required move to a different unlocked stop (`phase === "move"`, `legalMoveLocati
 
 ### 4. Vanquish
 
-Same-location Hero, or neighboring unlocked Hero a Boarding Party can reach. Allies at the Hero’s place contribute; Boarding Party may join from here or next door (`vanquishAllyPoolAt`). Equal Strength is legal (`total >= heroStrength`, PR #17 / `tests/hourPlaytest.test.ts`). Taunt globally blocks non-Taunt targets (`anyTauntInRealm`). Lost Boys need two Allies even if Strength is already met. Remote Allies sitting with a distant Hero do **not** unlock that Hero (`tests/vanquishLocality.test.ts`). Good.
+Same-location Hero, or neighboring unlocked Hero a Boarding Party can reach from the captain’s place or the Hero’s place. A Boarding Party on the Hero’s far side does not join (`boardingPartyJoinsClash`). Allies at the Hero’s place contribute; Boarding Party may join from here or next door when that next door is the captain or the Hero (`vanquishAllyPoolAt`). Equal Strength is legal (`total >= heroStrength`, PR #17 / `tests/hourPlaytest.test.ts`). Taunt globally blocks non-Taunt targets (`anyTauntInRealm`). Lost Boys need two Allies even if Strength is already met. Remote Allies sitting with a distant Hero do **not** unlock that Hero (`tests/vanquishLocality.test.ts`).
 
 ### 5. Fate
 
@@ -180,7 +180,7 @@ Draw two, play one, discard the other. Peter in the pair is forced (player + Nor
 
 ### 6. Ally / Item attach and moves
 
-Cutlass attaches to any Ally already ashore; cancel returns it to hand (`tests/cutlass.test.ts`). Location Items (Cannon, Case, Device, Map) sit on an unlocked stop. Move Ally/Item and Move a Hero are one unlocked step; attachments travel with the host; attached Items are not independently movable (`movableAlliesAndItems` omits `attachments`). Starkey: Hero at *his* stop, one step. Aye Aye: Ally one step, +2 until the turn’s Fate / next turn clears `tempStrength`.
+Cutlass attaches to any Ally already ashore; cancel returns it to hand (`tests/cutlass.test.ts`). Location Items (Cannon, Case, Device, Map) and Allies from Play a Card sit where the captain stands (`legalPlayLocations`). Fate, Worthy Opponent, and Obsession still seat a non-Peter Hero on any unlocked stop. Move Ally/Item and Move a Hero are one unlocked step; attachments travel with the host; attached Items are not independently movable (`movableAlliesAndItems` omits `attachments`). Starkey: Hero at *his* stop, one step. Aye Aye: Ally one step, +2 until the turn’s Fate / next turn clears `tempStrength`.
 
 ### 7. Conditions
 
