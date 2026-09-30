@@ -804,6 +804,9 @@ button:focus-visible,
   height: 100%;
   z-index: 0;
   pointer-events: none;
+  object-fit: cover;
+  object-position: center;
+  user-select: none;
 }
 .map-compass {
   position: absolute;
