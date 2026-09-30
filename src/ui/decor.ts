@@ -95,45 +95,71 @@ export const TITLE_SCENE = `<svg class="title-scene" viewBox="0 0 1200 700" pres
   </g>
 </svg>`;
 
+const CHART_CORNERS = `<path d="M12 28V12H28M252 12h16v16M12 132v16h16M252 148h16v-16" fill="none" stroke="#6a4a22" stroke-width="1.6" opacity=".55"/>`;
+
+/** Original ink drawings for each shore. Generic chart sketches — not character likenesses. */
 export function locationDecor(id: string): string {
   if (id === "jollyRoger") {
     return `<svg class="loc-art" viewBox="0 0 280 160" aria-hidden="true">
-      <g fill="none" stroke="rgba(232,195,106,.26)" stroke-width="1.6">
-        <circle cx="228" cy="34" r="20"/>
-        <circle cx="228" cy="34" r="7"/>
-        <path d="M228 12v8M228 48v8M208 34h8M240 34h8"/>
-      </g>
-      <path d="M16 122h74l14-30h38l12 30h90" fill="none" stroke="rgba(212,90,88,.4)" stroke-width="3"/>
-      <path d="M42 122v-50M100 92v-30" stroke="rgba(243,230,196,.22)" stroke-width="2"/>
-      <circle cx="42" cy="68" r="3" fill="rgba(244,180,90,.45)"/>
-      <path d="M10 12h16M10 12v16M254 12h16M270 12v16M10 148h16M10 132v16M254 148h16M270 132v16" stroke="rgba(232,195,106,.22)" stroke-width="1.4" fill="none"/>
+      ${CHART_CORNERS}
+      <path d="M18 128c28 8 48-6 78-2 22 3 36 8 58 6 24-2 40 6 70 4 16-1 28 2 40 4" fill="none" stroke="#3e6270" stroke-width="2" opacity=".55"/>
+      <path d="M48 118 L78 132 H198 L228 114 L196 122 H80 Z" fill="#7a4034" stroke="#3a2416" stroke-width="1.5"/>
+      <path d="M86 122 V58 M142 122 V46 M188 122 V66" stroke="#3a2416" stroke-width="2"/>
+      <path d="M90 62 h34 v24 H90 Z M90 90 h28 v16 H90 Z" fill="#f7edd4" stroke="#3a2416" stroke-width="1.2"/>
+      <path d="M146 50 h40 v28 h-40 Z M146 82 h34 v20 h-34 Z" fill="#f7edd4" stroke="#3a2416" stroke-width="1.2"/>
+      <path d="M142 46 l18 7 -18 6 Z" fill="#a3453c"/>
+      <path d="M188 70 h22 v16 h-22 Z" fill="#f3e2bc" stroke="#3a2416" stroke-width="1"/>
+      <circle cx="118" cy="126" r="2" fill="#f0d48a"/>
     </svg>`;
   }
   if (id === "skullRock") {
     return `<svg class="loc-art" viewBox="0 0 280 160" aria-hidden="true">
-      <path d="M168 86l28-44 36 18 22-28 26 54" fill="rgba(243,230,196,.07)" stroke="rgba(230,211,166,.32)" stroke-width="2"/>
-      <path d="M176 86l18-22 20 8 16-16" fill="none" stroke="rgba(230,211,166,.2)" stroke-width="1.4"/>
-      <path d="M18 132c42-30 92-20 132-8 42 12 82-10 122 8" fill="none" stroke="rgba(230,211,166,.3)" stroke-width="3"/>
-      <path d="M10 12h16M10 12v16M254 12h16M270 12v16M10 148h16M10 132v16M254 148h16M270 132v16" stroke="rgba(230,211,166,.2)" stroke-width="1.4" fill="none"/>
+      ${CHART_CORNERS}
+      <path d="M36 136 L52 78 Q78 40 118 58 Q104 96 92 136 Z" fill="#cbb892" stroke="#4a3820" stroke-width="1.6"/>
+      <path d="M108 136 L124 70 Q168 28 214 64 L228 136 Q186 108 150 112 Q124 118 108 136 Z" fill="#d9c7a4" stroke="#4a3820" stroke-width="1.7"/>
+      <path d="M148 136 Q168 102 196 136" fill="#2c2418"/>
+      <path d="M20 140c40-16 70-8 104-2 36 6 62-8 96 0 22 5 36 2 46 4" fill="none" stroke="#5c4630" stroke-width="2" opacity=".7"/>
+      <path d="M124 64 l8 6 M176 52 l10 4" stroke="#6a5438" stroke-width="1.2" opacity=".7"/>
     </svg>`;
   }
   if (id === "mermaidLagoon") {
     return `<svg class="loc-art waves" viewBox="0 0 280 160" aria-hidden="true">
-      <path class="wave" d="M0 108c40 12 70-12 110 0s70-12 110 0 60 8 60 8v44H0z" fill="rgba(62,196,181,.14)"/>
-      <path class="wave delay" d="M0 122c36 10 68-8 104 2s72-10 108 0 68 8 68 8v28H0z" fill="rgba(62,196,181,.22)"/>
-      <path d="M0 136c30 6 60-6 90 2s70-8 100 0 90 6 90 6v24H0z" fill="rgba(62,196,181,.12)"/>
-      <circle cx="48" cy="72" r="1.6" fill="rgba(255,246,210,.45)"/>
-      <circle cx="210" cy="64" r="1.2" fill="rgba(126,231,212,.4)"/>
-      <path d="M10 12h16M10 12v16M254 12h16M270 12v16M10 148h16M10 132v16M254 148h16M270 132v16" stroke="rgba(62,196,181,.22)" stroke-width="1.4" fill="none"/>
+      ${CHART_CORNERS}
+      <path d="M156 108 Q178 72 206 100 Q184 116 156 108 Z" fill="#6e9464" stroke="#2e4a30" stroke-width="1.2"/>
+      <path d="M168 96 Q176 78 186 92" fill="none" stroke="#2e4a30" stroke-width="1.3"/>
+      <path class="wave" d="M0 112c36 12 64-14 102 0s66-12 102 0 48 10 76 6v42H0z" fill="#2f8f86" opacity=".28"/>
+      <path class="wave delay" d="M0 126c32 10 60-10 96 2s68-12 104 0 52 8 80 6v28H0z" fill="#1f6e78" opacity=".34"/>
+      <path d="M8 96c18-8 28 4 40-2" fill="none" stroke="#e8f6f2" stroke-width="1.4" opacity=".45"/>
+      <circle cx="46" cy="88" r="1.5" fill="#f6edd4"/>
+      <circle cx="228" cy="78" r="1.3" fill="#d5f3ee"/>
     </svg>`;
   }
   return `<svg class="loc-art" viewBox="0 0 280 160" aria-hidden="true">
-    <path d="M10 70c30-40 70-50 110-28 20-30 70-36 100-8 18-16 50-14 60 8" fill="rgba(48,92,52,.38)"/>
-    <path d="M0 88c40-18 80-8 120 4 36 10 70-10 110 2 30 8 50 4 50 4v20H0z" fill="rgba(32,72,36,.42)"/>
-    <circle cx="48" cy="36" r="3" fill="rgba(143,191,106,.5)"/>
-    <circle cx="92" cy="22" r="2" fill="rgba(143,191,106,.38)"/>
-    <circle cx="160" cy="30" r="2.5" fill="rgba(232,195,106,.34)"/>
-    <circle cx="204" cy="44" r="1.6" fill="rgba(255,246,210,.28)"/>
-    <path d="M10 12h16M10 12v16M254 12h16M270 12v16M10 148h16M10 132v16M254 148h16M270 132v16" stroke="rgba(143,191,106,.24)" stroke-width="1.4" fill="none"/>
+    ${CHART_CORNERS}
+    <path d="M24 138 L58 86 L92 138 Z" fill="#3f6b40" stroke="#24381e" stroke-width="1.2"/>
+    <path d="M78 138 L118 58 L162 138 Z" fill="#2f5a34" stroke="#1c3018" stroke-width="1.3"/>
+    <path d="M148 138 L186 74 L228 138 Z" fill="#4e7a48" stroke="#24381e" stroke-width="1.2"/>
+    <path d="M112 138 V108" stroke="#3a2a18" stroke-width="3"/>
+    <ellipse cx="112" cy="116" rx="9" ry="12" fill="#24180e"/>
+    <path d="M18 142h244" stroke="#5a4630" stroke-width="1.6" opacity=".55"/>
+    <circle cx="168" cy="70" r="2" fill="#d7ecb8" opacity=".8"/>
   </svg>`;
 }
+
+/** Margin compass for the realm chart. Original rose — no place names. */
+export const MAP_COMPASS = `<svg class="map-compass" viewBox="0 0 64 64" aria-hidden="true">
+  <circle cx="32" cy="32" r="30" fill="#f4e4c0" stroke="#5a3818" stroke-width="2"/>
+  <circle cx="32" cy="32" r="23" fill="none" stroke="#5a3818" stroke-width="1.1"/>
+  <circle cx="32" cy="32" r="17" fill="none" stroke="#a07840" stroke-width=".8" stroke-dasharray="2 2"/>
+  <path d="M32 5 L36.5 32 L32 59 L27.5 32 Z" fill="#8d3a34"/>
+  <path d="M32 5 L33.8 32 L32 59 L30.2 32 Z" fill="#f3d7a2"/>
+  <path d="M5 32 L32 27.5 L59 32 L32 36.5 Z" fill="#5a3818"/>
+  <path d="M5 32 L32 30.2 L59 32 L32 33.8 Z" fill="#e7c98a"/>
+  <circle cx="32" cy="32" r="3" fill="#f6e7c2" stroke="#3a2414" stroke-width="1"/>
+</svg>`;
+
+/** Decorative shoreline under the four shores. Not a movement rule. */
+export const MAP_COAST = `<svg class="map-coast" viewBox="0 0 800 18" preserveAspectRatio="none" aria-hidden="true">
+  <path d="M4 6 H796" fill="none" stroke="#6b4a22" stroke-width="1.5" stroke-dasharray="8 7" stroke-linecap="round"/>
+  <path d="M0 14 C48 8 86 16 132 11 C190 5 228 15 286 11 C352 6 390 15 454 11 C520 7 560 16 624 11 C690 6 730 14 800 12" fill="none" stroke="#3e5c62" stroke-width="1.7" stroke-linecap="round"/>
+</svg>`;

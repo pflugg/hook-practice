@@ -65,7 +65,7 @@ import {
 } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
 import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
-import { CAPTAIN_TOKEN, CREST, TITLE_SCENE, TOPBAR_MAP, locationDecor } from "./decor";
+import { CAPTAIN_TOKEN, CREST, MAP_COAST, MAP_COMPASS, TITLE_SCENE, TOPBAR_MAP, locationDecor } from "./decor";
 import "./styles.css";
 
 function esc(s: string): string {
@@ -838,7 +838,7 @@ function playView(
     <div class="play-scroll" data-play-scroll>
     <div class="stage">
       ${fateRail(state)}
-      <div class="board-wrap"><div class="board">${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}</div></div>
+      <div class="board-wrap realm-sheet" data-realm-map><div class="board">${MAP_COMPASS}${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}${MAP_COAST}</div></div>
     </div>
     <footer class="dock">
       <section class="hand ${state.pending?.kind === "playChooseCard" || state.pending?.kind === "discardSelect" ? "is-picking" : ""}">
