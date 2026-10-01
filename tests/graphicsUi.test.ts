@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { advise } from "../src/engine/coach";
@@ -210,22 +210,23 @@ describe("game graphics UI pass", () => {
     expect(board?.querySelectorAll(":scope > .location").length).toBe(4);
     expect(board?.querySelector("svg.map-compass")).toBeTruthy();
     expect(board?.querySelector("svg.map-coast")).toBeTruthy();
-    expect(board?.querySelector("svg.map-scene")).toBeTruthy();
+    const scene = board?.querySelector("img.map-scene");
+    expect(scene).toBeTruthy();
+    expect(scene?.getAttribute("src")).toBe("/assets/treasure-map.png");
     expect(root.querySelector(".loc-head h2")?.textContent).toMatch(/Jolly Roger/);
+    expect(existsSync(join(process.cwd(), "public/assets/treasure-map.png"))).toBe(true);
 
     const chart = `${MAP_COMPASS}${MAP_COAST}${TREASURE_MAP}${locationDecor("jollyRoger")}${locationDecor("skullRock")}${locationDecor("mermaidLagoon")}${locationDecor("hangmansTree")}`;
     expect(chart).not.toMatch(/Disney|Peter Pan|Tinker Bell|Lost Boy|Neverland|Cannibal|Indian Camp/i);
     expect(MAP_COMPASS).not.toMatch(/Never Land|Jolly|Skull|Mermaid|Hangman/);
-    expect(TREASURE_MAP).toContain('class="map-road"');
-    expect(TREASURE_MAP).toContain('class="treasure-x"');
-    expect(TREASURE_MAP).toContain('class="treasure-chest"');
-    expect(TREASURE_MAP).toContain('class="map-ship"');
-    expect(TREASURE_MAP).toContain("#e10600");
+    expect(TREASURE_MAP).toContain('class="map-scene"');
+    expect(TREASURE_MAP).not.toContain("<svg");
     const css = readFileSync(join(process.cwd(), "src/ui/styles.css"), "utf8");
     expect(css).toContain("--chart-line");
     expect(css).toContain("--chart-sea");
     expect(css).toContain("--parchment-fiber");
     expect(css).toMatch(/\.map-scene\s*\{[^}]*position:\s*absolute/);
+    expect(css).toMatch(/\.map-scene\s*\{[^}]*object-fit:\s*cover/);
     expect(css).toMatch(/\.loc-head h2 \{[^}]*color:\s*var\(--parchment-ink\)/);
     expect(css).toMatch(/\.lock-need \{[^}]*color:\s*#6e2c24/);
     expect(css).toMatch(
