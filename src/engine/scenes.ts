@@ -112,6 +112,41 @@ function emptyRealm(state: GameState): void {
   }
 }
 
+/** Worthy Opponent seating, with the reveal still open. */
+export function worthySeatScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.power = 2;
+  state.phase = "resolving";
+  state.villainLocation = "skullRock";
+  const hero = inst(state, "michael");
+  state.heldCard = hero;
+  state.pending = { kind: "worthyLocation", heroId: hero.instanceId };
+  state.log.unshift({ id: state.logSeq++, text: "Worthy Opponent found Michael. Choose an unlocked shore.", tone: "info" });
+  return state;
+}
+
+/** Reproduced Map starvation: covered ship income, crocodile on rich income. */
+export function mapReserveScene(): GameState {
+  const state = createGame("normal", 1);
+  emptyRealm(state);
+  state.turn = 7;
+  state.power = 0;
+  state.phase = "actions";
+  state.pending = null;
+  state.villainLocation = "skullRock";
+  state.departedFrom = "jollyRoger";
+  state.peterPanRevealed = true;
+  state.peterPanLocation = "hangmansTree";
+  state.locations.hangmansTree.heroes.push(inst(state, "peterPan"));
+  state.locations.jollyRoger.heroes.push(inst(state, "wendy"));
+  state.locations.mermaidLagoon.heroes.push(inst(state, "tickTock"));
+  state.locations.skullRock.allies.push(inst(state, "swashbuckler"));
+  state.hand.push(inst(state, "neverLandMap"), inst(state, "cutlass"), inst(state, "swashbuckler"), inst(state, "ingeniousDevice"));
+  state.log.unshift({ id: state.logSeq++, text: "The Map is held, the ship's income is covered, and Tick Tock guards the lagoon. Save the Skull Rock gains for the Map.", tone: "info" });
+  return state;
+}
+
 /** Scripted clash so the live Strength meter can be verified. */
 export function vanquishClashScene(): GameState {
   const state = createGame("normal", 1);

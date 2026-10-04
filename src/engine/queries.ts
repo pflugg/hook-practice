@@ -606,7 +606,7 @@ export function promptText(state: GameState): string {
       const mapCoversItem = Boolean(
         card && def(card.defId).type === "item" && card.defId !== "neverLandMap" && mapInRealm(state),
       );
-      if (mapCoversItem) return "Pay with Power, or discard the Never Land Map instead of paying for this Item?";
+      if (mapCoversItem) return `Pay ${cost} Power, or discard the Never Land Map instead of paying for this Item?`;
       return `${name} costs ${cost}. You have ${state.power}. Pay ${cost} Power.`;
     }
     case "starkeyHero":

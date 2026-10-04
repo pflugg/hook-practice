@@ -76,6 +76,15 @@ function liveSlots(state: GameState, id: LocationId): ActionSlot[] {
   return slotsAt(state, id).filter((a) => a.available);
 }
 
+/** Uncovered Gain stops that do not discard a held hand by walking onto Tick Tock. */
+function safeUncoveredGains(state: GameState): LocationId[] {
+  return LOCATION_IDS.filter((id) => {
+    if (id === "hangmansTree" && !state.hangmansUnlocked) return false;
+    if (tickTockAt(state) === id) return false;
+    return liveSlots(state, id).some((action) => action.kind === "gainPower");
+  });
+}
+
 function hasKind(state: GameState, id: LocationId, kind: ActionSlot["kind"]): ActionSlot | undefined {
   return liveSlots(state, id).find((a) => a.kind === kind);
 }
@@ -129,7 +138,9 @@ function blockedAttachInHand(state: GameState): CardInstance | null {
 }
 
 function coachPlayable(state: GameState): CardInstance[] {
-  return playableHandCards(state).filter((card) => canPayNow(state, card) && !attachBlocked(state, card));
+  const savingMap = !state.hangmansUnlocked && Boolean(mapInHand(state));
+  return playableHandCards(state).filter((card) => canPayNow(state, card) && !attachBlocked(state, card) &&
+    (!savingMap || card.defId === "neverLandMap" || def(card.defId).cost === 0 || state.power - def(card.defId).cost >= 4));
 }
 
 /** Hand has pays, and none of them can be played with current Power (Map substitute included). */
@@ -256,7 +267,7 @@ function discardWhy(state: GameState, picks: CardInstance[]): string {
     : `You have ${state.power} Power.`;
   const deadLine = picks.some((card) => isDeadCondition(state, card)) ? ` ${name} no longer serves this objective.` : "";
   const goal = !state.hangmansUnlocked
-    ? "cheaper crew and the Map"
+    ? mapInHand(state) ? "useful crew while keeping the Map" : "cheaper crew and the Map"
     : jrStrength(state) < 8
       ? "cheaper crew"
       : "the next card that serves the chain";
@@ -299,7 +310,9 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
     notes.push(pair);
   } else if (croc && state.phase === "move") {
     notes.push(
-      `Tick Tock waits at ${locName(croc)} — if the captain moves onto that place, the whole hand is discarded. Seating or sliding the crocodile onto the captain does not empty the hand.`,
+      mapInHand(state)
+        ? `Moving onto Tick Tock at ${locName(croc)} discards your held Never Land Map with the whole hand. Seating or sliding the crocodile onto the captain does not empty the hand.`
+        : `Tick Tock waits at ${locName(croc)} — if the captain moves onto that place, the whole hand is discarded. Seating or sliding the crocodile onto the captain does not empty the hand.`,
     );
   }
   const covering = coveringHero(state, state.villainLocation);
@@ -314,7 +327,9 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
     }
   }
   if (highlights.some((h) => croc && h === `loc:${croc}`)) {
-    notes.unshift("That recommended step lands on Tick Tock. Only go if you accept an empty hand.");
+    notes.unshift(mapInHand(state)
+      ? "That step lands on Tick Tock and discards your held Never Land Map with the whole hand. Keep the Map by choosing a safe shore if one is available."
+      : "That recommended step lands on Tick Tock. Only go if you accept an empty hand.");
   }
   return notes[0];
 }
@@ -344,7 +359,7 @@ function scoreMove(state: GameState, id: LocationId): number {
   const vanquish = hasKind(state, id, "vanquish");
   const gainAmt = gain.reduce((n, a) => n + (a.amount ?? 1), 0);
 
-  if (peterReadyToFinish(state) && vanquish) score += 1200;
+  if (peterReadyToFinish(relocated(state, id)) && vanquish) score += 1200;
   const peter = peterCard(state);
   if (peter && state.hangmansUnlocked && peter.location !== "jollyRoger" && moveHero) score += 900;
   if (playableMap(state) && play) score += 700;
@@ -454,7 +469,7 @@ function shipTrap(state: GameState, id: LocationId): boolean {
 }
 
 function concreteReturnReason(state: GameState, dest: LocationId): boolean {
-  if (peterReadyToFinish(state) && dest === "jollyRoger" && hasKind(state, dest, "vanquish")) return true;
+  if (dest === "jollyRoger" && hasKind(state, dest, "vanquish") && peterReadyToFinish(relocated(state, dest))) return true;
   if (peterWalkReason(state, dest)) return true;
   if (newVanquishAt(state, dest)) return true;
   if (uncoverReason(state, dest)) return true;
@@ -477,6 +492,30 @@ interface MoveChoice {
  */
 function chooseMove(state: GameState): MoveChoice {
   const legal = legalMoveLocations(state);
+  // Evaluate the board after the required move, not from the current shore.
+  // A legal winning clash takes priority over Power, backtracking, or a hand wipe.
+  if (legal.includes("jollyRoger") && hasKind(state, "jollyRoger", "vanquish") &&
+      peterReadyToFinish(relocated(state, "jollyRoger"))) {
+    return { dest: "jollyRoger", forcedBounce: false };
+  }
+  // A held Map is a concrete reason to revisit safe income. Do not spend its
+  // reserve on optional crew or lose it by entering Tick Tock's shore.
+  if (!state.hangmansUnlocked && mapInHand(state)) {
+    const safe = legal.filter((id) => tickTockAt(state) !== id);
+    const ready = state.power >= 4 ? safe.find((id) => hasKind(state, id, "playCard")) : undefined;
+    if (ready) return { dest: ready, forcedBounce: false };
+    const income = safe.map((id) => ({ id, amount: liveSlots(state, id).filter((a) => a.kind === "gainPower").reduce((n, a) => n + (a.amount ?? 1), 0) }))
+      .filter((stop) => stop.amount > 0).sort((a, b) => b.amount - a.amount)[0];
+    if (income) return { dest: income.id, forcedBounce: false };
+    // Covered Gains are not a reason to board Tick Tock. Uncover a Gain, or hold the Map on a safe shore.
+    if (state.power < 4) {
+      const uncover = safe.find((id) => uncoverReason(state, id));
+      if (uncover) return { dest: uncover, forcedBounce: false };
+      const hold = safe.find((id) => hasKind(state, id, "fate") || hasKind(state, id, "discard"));
+      if (hold) return { dest: hold, forcedBounce: false };
+      if (safe[0]) return { dest: safe[0], forcedBounce: false };
+    }
+  }
   const departed = state.departedFrom && legal.includes(state.departedFrom) ? state.departedFrom : null;
   const ranked = [...legal].sort((a, b) => scoreMove(state, b) - scoreMove(state, a));
   const best = ranked[0] ?? legal[0] ?? "skullRock";
@@ -582,7 +621,7 @@ function playCta(state: GameState, card: CardInstance, phase: "open" | "pick" | 
     return cutlassStrapLine(state);
   }
   if (d.type === "effect") {
-    const pay = d.cost > 0 ? ", then click Pay with Power" : "";
+    const pay = d.cost > 0 ? `, then click Pay ${d.cost} Power` : "";
     if (phase === "open") return `Play ${name} (click Play a Card, then click ${name} in your hand${pay}).`;
     return `Play ${name} (click ${name} in your hand${pay}).`;
   }
@@ -707,7 +746,7 @@ function fullActionDo(state: GameState, slot: ActionSlot): string {
 
 function moveWhy(state: GameState, dest: LocationId): string {
   const peter = peterCard(state);
-  if (peterReadyToFinish(state) && dest === "jollyRoger") {
+  if (dest === "jollyRoger" && peterReadyToFinish(relocated(state, dest))) {
     return "Peter is already on the ship and your crew can finish the clash. Take the Vanquish action there — that is the only place the win counts.";
   }
   if (peter && state.hangmansUnlocked && peter.location !== "jollyRoger" && hasKind(state, dest, "moveHero")) {
@@ -718,6 +757,9 @@ function moveWhy(state: GameState, dest: LocationId): string {
   }
   if (playableMap(state) && hasKind(state, dest, "playCard")) {
     return "You are holding the Never Land Map with enough Power. After you land, click Play a Card, then the Map in your hand, then Choose this place where the captain stands. The Map unlocks Hangman’s Tree from that square.";
+  }
+  if (needPowerForMap(state) && safeUncoveredGains(state).length === 0 && !hasKind(state, dest, "gainPower")) {
+    return `Safe Gains are covered, and moving onto Tick Tock would discard the held Never Land Map. ${locName(dest)} keeps the Map. Uncover a Gain, or play a free card such as Worthy Opponent, before any optional purchase.`;
   }
   if (needPowerForMap(state) && dest === "mermaidLagoon") {
     return "Gain 3 Power here — you are holding the Never Land Map and still need 4 to play it.";
@@ -758,6 +800,10 @@ function usefulPlay(state: GameState): CardInstance | null {
   const playable = coachPlayable(state);
   const map = playable.find((c) => c.defId === "neverLandMap");
   if (map) return map;
+  if (needPowerForMap(state)) {
+    const income = playable.find((c) => c.defId === "worthyOpponent");
+    if (income) return income;
+  }
   if (!state.peterPanRevealed) {
     const hunt = playable.find((c) => c.defId === "worthyOpponent" || c.defId === "giveThemAScare");
     if (hunt) return hunt;
@@ -903,6 +949,9 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
         : `Click Play a Card, then ${cardName(card)} in your hand, then ${placeVerb(home)}. Allies and Items land where the captain stands. Walk that crew toward the ship later with Move Ally/Item.`;
     }
     if (card && (card.defId === "worthyOpponent" || card.defId === "giveThemAScare")) {
+      if (card.defId === "worthyOpponent" && needPowerForMap(state)) {
+        return "Worthy Opponent costs no Power and gains 2 toward the Map’s 4-Power reserve. It also seats a Hero. Keep paid crew and Items waiting until the Map opens the tree.";
+      }
       return `Click Play a Card, then ${cardName(card)} in your hand. Hunt cards are how Hook finds Peter at a table — plus being Fated. The computer always Fates you here after each turn.`;
     }
     if (card) {
@@ -918,7 +967,7 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
     let base: string;
     const waitingAttach = blockedAttachInHand(state);
     if (needPowerForMap(state)) {
-      base = `Bank Power now so the Never Land Map is affordable. Allies for the final clash will want a reserve too.${tokenLine}`;
+      base = `Save 4 Power so the held Never Land Map is affordable. Keep optional crew and Items waiting until the tree opens.${tokenLine}`;
     } else if (waitingAttach && state.power < def(waitingAttach.defId).cost) {
       const cost = def(waitingAttach.defId).cost;
       const ashore = preferredAttachAlly(state)
@@ -980,7 +1029,12 @@ function endTurnWhy(state: GameState): string {
     idle.push("Discard is uncovered, but every card in hand still serves the chain.");
   }
   const base = idle.length ? idle.join(" ") : "No Discard, Gain, or Play is left uncovered here.";
-  return `${base} Ending refills the hand.${crocLine} The next move should be a stop where one of those actions is usable, not a walk back to a clash you cannot start.`;
+  const reserve = needPowerForMap(state)
+    ? safeUncoveredGains(state).length === 0
+      ? " Safe Gains are covered. Keep the held Map and do not step onto Tick Tock for a covered-path Gain — that discards the Map. A free hunt such as Worthy Opponent can still add Power."
+      : " Keep the held Map and save its 4 Power before optional purchases. Revisit a safe Gain next turn even if that means returning to the last shore."
+    : "";
+  return `${base} Ending refills the hand.${reserve}${crocLine} The next move should be a stop where one of those actions is usable, not a walk back to a clash you cannot start.`;
 }
 
 function liveCunningAdvice(state: GameState): CoachAdvice | null {
@@ -1036,6 +1090,9 @@ function adviseActions(state: GameState): CoachAdvice {
 }
 
 function playTargetWhy(card: CardInstance, dest: LocationId): string {
+  if (def(card.defId).type === "effect") {
+    return `Click ${cardName(card)} and follow its payment or effect choices. Effects resolve without choosing a place on the board.`;
+  }
   if (card.defId === "neverLandMap") {
     return `Playing the Map unlocks Hangman’s Tree right away. After that, Peter can be walked from the hideout toward the Jolly Roger.`;
   }
@@ -1059,7 +1116,9 @@ function advisePending(state: GameState): CoachAdvice {
       const card = usefulPlay(state);
       if (!card) {
         const waiting = blockedAttachInHand(state);
-        const why = waiting
+        const why = needPowerForMap(state)
+          ? "Keep the held Never Land Map and reserve 4 Power for it. Cancel this play rather than spend the reserve on optional crew or Items."
+          : waiting
           ? discardWhy(state, [waiting])
           : "Nothing in hand is worth the action right now.";
         return say("Cancel the play (click Cancel)", why, ["btn:cancel"], state);
@@ -1112,10 +1171,10 @@ function advisePending(state: GameState): CoachAdvice {
       );
       if (state.power >= cost) {
         return say(
-          `Pay with Power (click Pay with Power) — ${name} costs ${cost} and you have ${state.power}.`,
+          `Pay ${cost} Power (click Pay ${cost} Power) — ${name} costs ${cost} and you have ${state.power}.`,
           mapOut
             ? "Keep the Never Land Map in the realm. You already used it to open the tree, and later Items can still lean on it if you are short."
-            : `${name} costs ${cost}. You have ${state.power}. Click Pay with Power to finish the play.`,
+            : `${name} costs ${cost}. You have ${state.power}. Click Pay ${cost} Power to finish the play.`,
           ["btn:pay-power"],
           state,
         );

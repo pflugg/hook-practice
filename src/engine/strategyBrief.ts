@@ -7,6 +7,7 @@ import {
   availableActions,
   cardName,
   coveringHero,
+  findCard,
   hasTaunt,
   heroStrength,
   emptyHandCopy,
@@ -207,10 +208,13 @@ function thisMoment(state: GameState): string {
       return "You opened a Play action, so the decision is which card earns the slot. This is not “play something because it glows.” The Map opens the tree. Allies belong on the Jolly Roger so Strength is waiting. Hunt cards (Worthy Opponent, Give Them a Scare) fish Fate when Peter is still hidden. Escort pieces (the Device, Mr. Starkey, Aye Aye Sir) matter after the tree is open. If nothing serves those jobs, you can cancel and keep the rest of the turn.";
     case "playChooseLocation":
       return "The card is chosen; now it needs a place. Allies and ship gear want the Jolly Roger so the final clash is stocked. The Map can sit anywhere unlocked — playing it is what opens the tree, not the square you drop it on. Items that add extra actions belong where you will actually stand to use them.";
-    case "playChoosePayment":
+    case "playChoosePayment": {
+      const paying = findCard(state, p.cardId);
+      const cost = paying ? def(paying.defId).cost : 0;
       return mapInRealm(state)
         ? "An Item is asking for its cost. The Never Land Map is in the realm, so you may spend Power or discard the Map instead. Once the tree is open, keeping the Map is usually wiser."
-        : "This card is asking for its printed Power cost. Pay with Power to finish the play — there is no Map in the realm to substitute.";
+        : `This card is asking for its printed Power cost. Click Pay ${cost} Power — that is the button on the payment dialog. There is no Map in the realm to substitute.`;
+    }
     case "playChooseAllyAttach":
       {
         const host = preferredAttachAlly(state);
@@ -268,7 +272,7 @@ function thisMoment(state: GameState): string {
 
 function whatItSetsUp(state: GameState): string {
   if (state.won) {
-    return "What it set up was the whole voyage. You can Resign or Play again and watch the same gates from the other side of the table — Fate will try to cover them.";
+    return "What it set up was the whole voyage. Play again to watch the same gates with a new shuffle — Fate will try to cover them.";
   }
   if (state.lost) {
     return "The next voyage is the setup. Open the tree before you walk Peter, keep Strength on the ship before he arrives, and never clash him on the path. That is the whole curriculum.";
