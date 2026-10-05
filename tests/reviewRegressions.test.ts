@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { describe, expect, it } from "vitest";
 import { advise } from "../src/engine/coach";
-import { applyInput } from "../src/engine/game";
+import { applyInput, createGame } from "../src/engine/game";
 import { explainSelection } from "../src/engine/moveReason";
 import { mapReserveScene } from "../src/engine/scenes";
 import type { Input, LocationId } from "../src/engine/types";
@@ -192,5 +192,62 @@ describe("review regression cases", () => {
     expect(cursor.hand.some((card) => card.defId === "neverLandMap")).toBe(true);
     expect(cursor.hangmansUnlocked).toBe(false);
     expect(cursor.power).toBeGreaterThanOrEqual(2);
+  });
+
+  it("digs with an open Discard when covered Gains leave the Map one Power short", () => {
+    const stalled = barePlayState();
+    stalled.phase = "actions";
+    stalled.power = 3;
+    stalled.villainLocation = "skullRock";
+    stalled.departedFrom = "jollyRoger";
+    stalled.hangmansUnlocked = false;
+    stalled.peterPanRevealed = true;
+    stalled.peterPanLocation = "hangmansTree";
+    putHero(stalled, "peterPan", "hangmansTree");
+    putHero(stalled, "lostBoys", "jollyRoger");
+    putHero(stalled, "lostBoys", "skullRock");
+    putHero(stalled, "tickTock", "mermaidLagoon");
+    give(stalled, "neverLandMap");
+    give(stalled, "giveThemAScare");
+    give(stalled, "ayeAyeSir");
+
+    const advice = advise(stalled);
+    expect(advice.do).toMatch(/Discard (Give Them a Scare|Aye Aye Sir)/);
+    expect(advice.do).not.toMatch(/Discard Never Land Map at/);
+    expect(advice.why).not.toMatch(/No Discard, Gain, or Play is left uncovered/);
+    expect(advice.highlights).toContain("act:sr-discard");
+    const opened = applyInput(stalled, { type: "selectAction", actionKey: "sr-discard" });
+    const picking = advise(opened);
+    expect(picking.do).toMatch(/Give Them a Scare|Aye Aye Sir/);
+    expect(picking.highlights.join(" ")).not.toMatch(/neverLandMap/);
+
+    let state = createGame("easy", 1059823);
+    for (let i = 0; i < 450 && !state.hangmansUnlocked && !state.won && !state.lost; i++) {
+      const key = advise(state).highlights[0];
+      let input: Input | null = null;
+      if (key?.startsWith("act:")) input = { type: "selectAction", actionKey: key.slice(4) };
+      else if (key?.startsWith("loc:")) input = { type: "selectLocation", locationId: key.slice(4) as LocationId };
+      else if (key?.startsWith("card:")) input = { type: "selectCard", instanceId: key.slice(5) };
+      else if (key === "btn:end") input = { type: "endTurn" };
+      else if (key === "btn:ack") input = { type: "acknowledgeFate" };
+      else if (key === "btn:cancel") input = { type: "cancel" };
+      else if (key === "btn:confirm") input = { type: "confirm" };
+      else if (key === "btn:pay-power") input = { type: "payWithPower" };
+      else if (key === "btn:pay-map") input = { type: "payWithMap" };
+      else if (key === "btn:accept-cond") input = { type: "acceptCondition" };
+      else if (key === "btn:skip-cond") input = { type: "skipCondition" };
+      else if (key === "btn:play-hero") input = { type: "playOrDiscardHero", play: true };
+      else if (key === "btn:discard-hero") input = { type: "playOrDiscardHero", play: false };
+      else if (key === "btn:scare-discard") input = { type: "scareDiscardBoth" };
+      else if (key?.startsWith("btn:scare-order:")) {
+        const [a, b] = key.slice("btn:scare-order:".length).split(",");
+        input = { type: "scareReturn", order: [a, b] };
+      }
+      expect(input, key).toBeTruthy();
+      state = applyInput(state, input!);
+      expect(state.lost).toBe(false);
+    }
+    expect(state.hangmansUnlocked).toBe(true);
+    expect(state.turn).toBeLessThan(30);
   });
 });
