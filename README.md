@@ -64,12 +64,24 @@ Heroes cover the **top** actions at their location. Gold outlines mark legal cli
 - **Easy** — Fate picks randomly among legal plays in the drawn pair. If Peter is one of the two revealed cards, he is played to Hangman’s Tree and the other card is discarded — same as Normal and a table Fate aimed at Hook.
 - **Normal** (default) — Fate prefers Peter Pan, blocks useful actions, parks Tick Tock on rich locations, and spends Splitting Headache on your best Items (including attached Cutlass / Fate Items).
 
+## First voyage
+
+**Tutorial** on the title screen starts a short staged lesson, not a random deal. Coach, the Strategy brief, and Why this move turn on. Each beat asks for one action:
+
+1. Move to Skull Rock.
+2. Gain 1 Power. The Never Land Map is already in hand and costs 4.
+3. Play the Map and pay with the **Pay 4 Power** button. Hangman’s Tree opens.
+4. End the turn and acknowledge Fate. That deck reveals Peter Pan at the tree.
+5. Walk Peter one neighboring shore, from the tree to Mermaid Lagoon.
+6. Practice the clash. The lesson places him on the Jolly Roger with two Pirate Brutes (Strength 8 against 8). Equal Strength wins.
+
+Then **Begin a normal voyage** deals a shuffled game. **Not now** returns to the title. Set Sail still starts that shuffled game directly. The lesson does not change the rules; the ship placement in the last beat is a setup so the clash can be practiced without the long walk.
+
 ## Coach mode
 
 A heuristic advisor (not an LLM) sits beside the prompt and names the next concrete click — *Move to Skull Rock*, *Take Gain 3*, *Play Never Land Map to Mermaid Lagoon* — plus one or two sentences on why that step serves Hook’s chain: play the Map, unlock Hangman’s Tree, reveal Peter, walk him to the Jolly Roger, vanquish him there.
 
-- **Tutorial** on the title screen starts a game with Coach on.
-- **Set Sail** uses the title **Coach on/off** toggle (defaults on for a new session).
+- **Set Sail** uses the title **Coach on/off** toggle (defaults on for a new session) and skips the lesson.
 - During play, the top-bar **Coach** chip or the panel’s **Hide coach** button turns it off without ending the game. The choice persists for the browser tab.
 - Coach lives in the **right teaching rail** with Why this move and the Strategy brief (Coach on top, then Why, then the voyage brief). Each pane keeps the full *do* line and *why* paragraph at readable size and scrolls on its own, so one pane never buries another. The rail sits beside the board — it never covers Gain / Play / Move buttons.
 - Coach only *highlights* a recommended legal target more strongly — the suggested action uses a gold CTA; every other legal option stays clickable.
@@ -84,11 +96,11 @@ A persistent right-rail pane (default on, especially from **Tutorial**) teaches 
 - **What this moment is** — a phase-aware paragraph (required move, action stretch, targeting, Fate acknowledge) explaining what the rules are asking and why that beat exists.
 - **What we’re setting up for** — two to four sentences tying the current options to the mid/late game (Power engine, digging for the Map, escort, Ally stack at the Jolly Roger).
 
-Hide it with the top-bar **Brief** chip or **Hide brief**. On a laptop the four location columns squish (about 180px minimum). Below about 1100px the three teaching panes tab under the board so type stays at the desktop floor.
+Hide it with the top-bar **Brief** chip or **Hide brief**. On a laptop the four location columns squish (about 180px minimum). Below about 1100px the three teaching panes tab under the board so type stays at the desktop floor. On a phone the next Coach line sits above the board, and the four shores stay in order inside a sideways scroller.
 
 ## Move reasons
 
-A **Why this move** pane in the right teaching rail (default on, especially from **Tutorial**) explains the choice you just made. It is not Coach (the next suggested click) and not the Strategy brief (voyage status). After each legal location, action, card, confirm, or Fate Continue it names:
+A **Why this move** pane in the right teaching rail (default on, especially from **Tutorial**) explains the choice you just made. Tutorial is no longer a random voyage with the panels switched on; it is the staged first voyage above. It is not Coach (the next suggested click) and not the Strategy brief (voyage status). After each legal location, action, card, confirm, or Fate Continue it names:
 
 - **What you chose** — the place, action, or card in plain language
 - **Why it helps the plan** — how that click serves Map → unlock Hangman’s Tree → find Peter → walk to the Jolly Roger → vanquish there

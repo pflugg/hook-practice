@@ -147,7 +147,7 @@ function explainCurrentMoment(state: GameState): MoveReason {
     return pack(
       `You chose ${name} and still need a place.`,
       `${promptText(state)} Click ${placeVerb(dest)} to drop ${name} where the captain stands. Allies and Items from Play a Card do not travel to another shore. ${chainLine(state)}`,
-      `If a payment prompt appears next, click Pay with Power (or Cancel to keep the rest of this stop).`,
+      `If a payment prompt appears next, click Pay N Power — the button names the cost — or Cancel to keep the rest of this stop.`,
     );
   }
   if (p?.kind === "playChoosePayment") {
@@ -158,7 +158,7 @@ function explainCurrentMoment(state: GameState): MoveReason {
     if (state.power >= cost) {
       return pack(
         `You still owe Power for ${name}.`,
-        `${name} costs ${cost} and you have ${state.power}. Click Pay with Power to finish the play${map ? ". Keep the Never Land Map in the realm if the tree is already open" : ""}.`,
+        `${name} costs ${cost} and you have ${state.power}. Click Pay ${cost} Power to finish the play${map ? ". Keep the Never Land Map in the realm if the tree is already open" : ""}.`,
         "After you pay, the card lands and you return to the action stretch at this stop.",
       );
     }
@@ -253,6 +253,16 @@ function explainCurrentMoment(state: GameState): MoveReason {
 /** Keep Why-this-move aligned with the current prompt — card-pick copy must not linger after Play resolves. */
 export function liveMoveReason(state: GameState, last: MoveReason | null): MoveReason {
   if (state.phase === "title") return IDLE_MOVE_REASON;
+  if (state.phase === "over" || state.won || state.lost) {
+    return pack(
+      state.won ? "The clash is finished." : "The voyage is over.",
+      state.won
+        ? "Peter was vanquished at the Jolly Roger. The recap is the result. Earlier escort or resign instructions no longer apply."
+        : state.loseReason || "The chain stopped. The recap explains which gate broke.",
+      "Play again, or return to the title.",
+      true,
+    );
+  }
   if (!last || isStaleReason(state, last)) return explainCurrentMoment(state);
   return last;
 }
@@ -907,7 +917,7 @@ function explainAction(before: GameState, after: GameState, actionKey: string): 
       return pack(
         `You opened Play a Card at ${here}.`,
         "This is not “play something because it glows.” Click a glowing card in your hand next. The Map opens the tree from the square where the captain stands. Allies and Items land there too. Hunt cards fish Fate. Escort pieces matter after the hideout is open.",
-        "Affordable cards are outlined. After you click the card, click Choose this place where the captain stands. Cancel returns you to the action stretch if this was the wrong tool.",
+        "Affordable cards are outlined. Allies and most Items then ask for the captain’s place; Cutlass asks for an Ally. Effects go directly to payment or effect choices. Follow the next prompt. Cancel returns you to the action stretch if this was the wrong tool.",
       );
     case "fate":
       return pack(
@@ -1005,7 +1015,7 @@ function explainCard(before: GameState, after: GameState, instanceId: string): M
         `You chose ${name} for the Cutlass.`,
         `${name} is not strapped yet. The Cutlass still costs ${itemCost} Power, and you have ${after.power}.`,
         after.power >= itemCost
-          ? "Click Pay with Power to finish the strap, or Cancel to return to Play a Card."
+          ? `Click Pay ${itemCost} Power to finish the strap, or Cancel to return to Play a Card.`
           : "Click Cancel — there is not enough Power to finish the strap.",
       );
     }

@@ -32,6 +32,7 @@ import {
   type StrategyBrief,
   type MoveReason,
 } from "../engine";
+import { advanceLesson, lessonOpening, lessonView, type LessonStep, type LessonView } from "../engine/lesson";
 import { LOCATION_IDS } from "../engine/types";
 import {
   allAllies,
@@ -49,6 +50,7 @@ import {
   easyFizzleScene,
   fateSpentScene,
   lagoonCoverScene,
+  mapReserveScene,
   nearWinScene,
   obsessionDecideScene,
   tauntDigScene,
@@ -62,10 +64,11 @@ import {
   hourPlaytestWhyScene,
   vanquishClashScene,
   vanquishLocalScene,
+  worthySeatScene,
 } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
 import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
-import { CAPTAIN_TOKEN, CREST, MAP_COAST, MAP_COMPASS, TITLE_SCENE, TOPBAR_MAP, TREASURE_MAP } from "./decor";
+import { CAPTAIN_TOKEN, CREST, locationDecor, MAP_COAST, MAP_COMPASS, TITLE_SCENE, TOPBAR_MAP, TREASURE_MAP } from "./decor";
 import "./styles.css";
 
 function esc(s: string): string {
@@ -114,7 +117,7 @@ function renderCard(
     <h3>${esc(d.name)}</h3>
     <p class="text">${esc(cardText)}</p>
     ${attachNote}
-    ${d.type === "hero" || d.type === "ally" ? `<div class="str" title="Strength">${str}</div>` : ""}
+    ${d.type === "hero" || d.type === "ally" ? `<div class="str" title="Strength" aria-label="Strength ${str}">${str}</div>` : ""}
   </button>`;
 }
 
@@ -229,11 +232,10 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
   const moveLabel = state.phase === "move" ? "Move here" : "Choose this place";
   const coachLoc = legal && coached.has(`loc:${id}`);
   return `<section class="location ${id} ${current ? "is-current" : ""} ${legal ? "is-legal" : ""} ${coachLoc ? "is-coached" : ""} ${locked ? "is-locked" : ""}" data-loc="${id}">
-    <div class="loc-vignette" aria-hidden="true"></div>
-    ${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : ""}
+    <div class="loc-vignette" aria-hidden="true">${locationDecor(id)}</div>
     <div class="loc-head">
       <div>
-        <h2>${esc(meta.name)} ${locked ? `<span class="lock-badge">LOCKED</span>` : ""}</h2>
+        <h2><span class="shore-number" aria-label="Shore ${LOCATION_IDS.indexOf(id) + 1}">${LOCATION_IDS.indexOf(id) + 1}</span> ${esc(meta.name)} ${locked ? `<span class="lock-badge">LOCKED</span>` : ""}</h2>
         <p>${esc(meta.subtitle)}</p>
         ${locked ? `<p class="lock-need">Need: Never Land Map</p>` : ""}
       </div>
@@ -246,6 +248,7 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
           : ""
       }
     </div>
+    <div class="location-choice">${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : `<span>${current ? "Captain here" : locked ? "Closed until the Map" : "Actions on arrival"}</span>`}</div>
     <div class="loc-body">
       ${locked ? `<div class="lock-veil" aria-hidden="true"></div>` : ""}
       ${actBtns(top)}
@@ -307,7 +310,7 @@ function titleView(
         <button class="btn primary" data-start>Set Sail</button>
         <button class="btn" data-tutorial>Tutorial</button>
       </div>
-      <p class="fine title-tutorial-note">Tutorial is the same voyage with Coach, the Strategy brief, and Why this move turned on. Set Sail is the way in.</p>
+      <p class="fine title-tutorial-note">Tutorial is a short first voyage: one action at a time, with a guaranteed Map, then a normal shuffled voyage. Set Sail skips the lesson.</p>
       ${sceneWarning ? `<p class="fine" data-scene-warning>${esc(sceneWarning)}</p>` : ""}
       <p class="fine">Unofficial personal practice tool. Not affiliated with, endorsed by, or associated with Disney or Ravensburger.</p>
     </section>
@@ -315,20 +318,20 @@ function titleView(
 }
 
 export function helpView(fromPlay: boolean): string {
-  return `<div class="overlay"><div class="modal wood">
-    <h2>How to play</h2>
+  return `<div class="overlay" data-overlay="blocking"><div class="modal wood" ${namedDialog("help-title")}>
+    <h2 id="help-title">How to play</h2>
     <p>Each turn you <b>must move</b> to a different unlocked location, then may use each uncovered action there once. Heroes cover the top row. End the turn to refill to 4 cards; the computer then Fates you.</p>
     <p><b>Win</b> by vanquishing Peter Pan at the Jolly Roger after unlocking Hangman’s Tree with the Never Land Map. Vanquishing him anywhere else loses the duel.</p>
     <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable. It lives in the right teaching rail with the Strategy brief and Why this move — each pane scrolls independently.</p>
     <p><b>Strategy brief:</b> a persistent right-rail pane that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
-    <p><b>Move reasons:</b> a “Why this move” pane in that same right-hand stack. After each legal click it names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on. Below about 1100px the three panes tab under the board so type stays at the desktop floor.</p>
+    <p><b>Move reasons:</b> a “Why this move” pane in that same right-hand stack. After each legal click it names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on and teaches move, Gain, the Map, Fate, one escort step, and the ship clash before a normal voyage. Below about 1100px the three panes tab under the board so type stays at the desktop floor.</p>
     <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it. The <b>Across the table</b> strip keeps the last revealed Fate play visible while that card is still on the table — never the face-down deck.</p>
     <p><b>Finding Peter:</b> At a table, Hook finds Peter with hunt cards (Worthy Opponent, Give Them a Scare, Obsession) and by being Fated. Your Fate action there hits another villain. This solo tool always Fates you after each turn, and your Fate action is a <b>practice self-Fate</b> — it flips Hook’s own Fate deck so you can practice the find without a second player.</p>
     <p><b>Printed Conditions:</b> Cunning and Obsession <b>are</b> printed two-player Conditions. At a table they wait for another player’s turn (a strong Ally in another realm; another player defeating a strong Hero). This tool rewrites those triggers so they can fire on your turn: Cunning if a Strength 4+ Hero is already ashore and you hold an Ally; Obsession if Peter is still hidden. A grey Condition is not ready yet.</p>
     <p><b>Drag:</b> When a card can move or be played onto a place, grab it and slide onto a glowing location (or Ally, for the Cutlass). Drop outside to cancel the slide; clicking still works.</p>
     <p><b>Play a Card:</b> An Ally or Item lands where the captain stands. It does not travel to another shore. Walk crew toward the ship afterward. Fate may still seat a Hero on any unlocked place.</p>
     <p><b>Practice tips:</b> Discard aggressively for the Map. Hunt cards (Worthy Opponent, Give Them a Scare) are how Hook finds Peter at a table — plus being Fated. Station strength at the ship before walking Peter across. Beware Tick Tock (hand empties only if the captain moves onto him) and Splitting Headache.</p>
-    <div class="actions-row"><button class="btn primary" data-close-help>${fromPlay ? "Return to the realm" : "Back"}</button></div>
+    <div class="actions-row"><button class="btn primary" data-close-help data-initial-focus>${fromPlay ? "Return to the realm" : "Back"}</button></div>
   </div></div>`;
 }
 
@@ -336,13 +339,39 @@ function coachClass(coached: Set<string>, key: string): string {
   return coached.has(key) ? " is-coached" : "";
 }
 
-function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached: Set<string>): string {
+function namedDialog(titleId: string, modal = true): string {
+  return `role="dialog" aria-modal="${modal ? "true" : "false"}" aria-labelledby="${titleId}" data-dialog="${titleId}"`;
+}
+
+function overlayFor(
+  state: GameState,
+  hi: Set<string>,
+  sel: Set<string>,
+  coached: Set<string>,
+  lessonActive = false,
+): string {
   const p = state.pending;
   if (state.phase === "over") {
     const recap = endgameRecap(state);
-    return `<div class="overlay"><div class="modal wood endgame ${state.won ? "win celebrate" : "lose"}" data-recap>
+    const lessonHandoff = lessonActive
+      ? `<section class="recap-block" data-lesson-handoff>
+        <h3>First voyage</h3>
+        <p>${
+          state.won
+            ? "You practiced one action at a time: move, Gain, the Map, Fate, one escort step, and an equal-Strength clash. Peter’s last shore in that clash was set up for the lesson. A normal voyage shuffles both decks and does not skip the walk."
+            : "The first voyage stopped early. Replay it, begin a shuffled voyage, or return to the title."
+        }</p>
+      </section>`
+      : "";
+    const lessonActions = lessonActive
+      ? `<button type="button" class="btn primary" data-lesson-sail data-initial-focus>Begin a normal voyage</button>
+        <button type="button" class="btn" data-again>Replay the first voyage</button>
+        <button type="button" class="btn ghost" data-home>Not now</button>`
+      : `<button type="button" class="btn primary${coachClass(coached, "btn:again")}" data-again data-initial-focus>Play again</button>
+        <button type="button" class="btn ghost" data-home>Return to title</button>`;
+    return `<div class="overlay" data-overlay="blocking"><div class="modal wood endgame ${state.won ? "win celebrate" : "lose"}" data-recap ${namedDialog("recap-title")}>
       <p class="eyebrow">${state.won ? "Captain Hook wins" : "Voyage recap"}</p>
-      <h2>${esc(recap.headline)}</h2>
+      <h2 id="recap-title">${esc(recap.headline)}</h2>
       <p class="recap-lead">${esc(recap.lead)}</p>
       <section class="recap-block" data-recap-steps>
         <h3>The objective</h3>
@@ -356,9 +385,9 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
         <h3>What Fate did</h3>
         <p>${esc(recap.fate)}</p>
       </section>
+      ${lessonHandoff}
       <div class="actions-row">
-        <button class="btn primary${coachClass(coached, "btn:again")}" data-again>Play again</button>
-        <button class="btn ghost" data-home>Return to title</button>
+        ${lessonActions}
       </div>
     </div></div>`;
   }
@@ -371,9 +400,9 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
           : "Read this card";
     const eyebrow = p.resume === "nextTurn" ? "Across the table" : "Before you continue";
     const emptyShore = isNoItemFateDiscard(p.note);
-    return `<div class="overlay fate-in"><div class="modal wood fate">
+    return `<div class="overlay fate-in" data-overlay="blocking"><div class="modal wood fate" ${namedDialog("fate-title")}>
       <p class="eyebrow">${eyebrow}</p>
-      <h2>${heading}</h2>
+      <h2 id="fate-title">${heading}</h2>
       ${emptyShore ? noItemDiscardBanner() : ""}
       <p>${esc(p.note)}</p>
       ${p.choiceReason ? `<p class="fate-choice-why" data-fate-choice>${esc(p.choiceReason)}</p>` : ""}
@@ -384,7 +413,7 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
           return `<div class="${focus ? "is-focus" : "is-aside"}">${renderCard(state, c, { size: "reveal", legal: false, selected: focus })}</div>`;
         })
         .join("")}</div>
-      <div class="actions-row"><button type="button" class="btn primary${coachClass(coached, "btn:ack")}" data-ack>Continue</button></div>
+      <div class="actions-row"><button type="button" class="btn primary${coachClass(coached, "btn:ack")}" data-ack data-initial-focus>Continue</button></div>
     </div></div>`;
   }
   if (p?.kind === "scarePeek") {
@@ -397,8 +426,8 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
         : solo
           ? `<button class="btn${coachClass(coached, `btn:scare-order:${solo.instanceId},${solo.instanceId}`)}" data-scare-order="${solo.instanceId},${solo.instanceId}">Put ${esc(cardName(solo))} back on top</button>`
           : "";
-    return `<div class="overlay"><div class="modal">
-      <h2>Give Them a Scare</h2>
+    return `<div class="overlay" data-overlay="blocking"><div class="modal" ${namedDialog("scare-title")}>
+      <h2 id="scare-title">Give Them a Scare</h2>
       <p>${
         solo
           ? "Only one Fate card was left. Discard it to the Fate discard (it can return when Fate reshuffles), or put it back on top."
@@ -408,7 +437,7 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
         .map((c) => renderCard(state, c, { size: "reveal", legal: true, selected: false }))
         .join("")}</div>
       <div class="actions-row">
-        <button class="btn${coachClass(coached, "btn:scare-discard")}" data-scare-discard>${solo ? "Discard it" : "Discard both"}</button>
+        <button class="btn${coachClass(coached, "btn:scare-discard")}" data-scare-discard data-initial-focus>${solo ? "Discard it" : "Discard both"}</button>
         ${orderButtons}
       </div>
     </div></div>`;
@@ -418,19 +447,19 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
     if (items.length === 0) {
       const d = def("splittingHeadache");
       const ability = `${d.name}: ${d.text}`;
-      return `<div class="overlay fate-in"><div class="modal wood fate">
+      return `<div class="overlay fate-in" data-overlay="blocking"><div class="modal wood fate" ${namedDialog("fate-title")}>
       <p class="eyebrow">Across the table</p>
-      <h2>Fate intervening</h2>
+      <h2 id="fate-title">Fate intervening</h2>
       ${noItemDiscardBanner()}
       <p>${esc(HEADACHE_NO_ITEM_NOTE)}</p>
       ${abilityReadout("What it does", ability)}
-      <div class="actions-row"><button type="button" class="btn primary${coachClass(coached, "btn:ack")}" data-ack>Continue</button></div>
+      <div class="actions-row"><button type="button" class="btn primary${coachClass(coached, "btn:ack")}" data-ack data-initial-focus>Continue</button></div>
     </div></div>`;
     }
   }
   if (p?.kind === "fateChooseCard") {
-    return `<div class="overlay"><div class="modal">
-      <h2>Practice self-Fate</h2>
+    return `<div class="overlay" data-overlay="blocking"><div class="modal" ${namedDialog("self-fate-title")}>
+      <h2 id="self-fate-title">Practice self-Fate</h2>
       <p>This is a solo adaptation: you are flipping Hook’s own Fate deck. At a table the Fate action hits another villain; Hook finds Peter with hunt cards and by being Fated. Play one card; the other is discarded. Read the full text before you choose.</p>
       <div class="modal-cards">${p.cards
         .map((c) => renderCard(state, c, { size: "reveal", legal: hi.has(`card:${c.instanceId}`), selected: sel.has(c.instanceId), coached: coached.has(`card:${c.instanceId}`) }))
@@ -445,7 +474,7 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
     const mapOut = Boolean(
       card && def(card.defId).type === "item" && card.defId !== "neverLandMap" && mapInRealm(state),
     );
-    return `<div class="overlay" data-overlay="blocking"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="pay-title">
+    return `<div class="overlay" data-overlay="blocking"><div class="modal" ${namedDialog("pay-title")}>
       <h2 id="pay-title">Pay the cost</h2>
       <p>${esc(name)} costs <b>${cost} Power</b>. You have <b>${state.power} Power</b>.</p>
       <p>${
@@ -455,22 +484,22 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
       }</p>
       <div class="pay-meter" role="status">Pay ${cost} · you have ${state.power} · ${Math.max(0, state.power - cost)} left${mapOut ? " · Map available" : ""}</div>
       <div class="actions-row">
-        <button type="button" class="btn primary${coachClass(coached, "btn:pay-power")}" data-pay-power ${canPay ? "" : "disabled"}>Pay ${cost} Power</button>
+        <button type="button" class="btn primary${coachClass(coached, "btn:pay-power")}" data-pay-power ${canPay ? "data-initial-focus" : "disabled"}>Pay ${cost} Power</button>
         ${
           mapOut
             ? `<button type="button" class="btn${coachClass(coached, "btn:pay-map")}" data-pay-map>Discard the Map</button>`
             : ""
         }
-        <button type="button" class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel>Cancel</button>
+        <button type="button" class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel ${canPay ? "" : "data-initial-focus"}>Cancel</button>
       </div>
     </div></div>`;
   }
   if (p?.kind === "conditionOffer") {
-    return `<div class="overlay"><div class="modal">
-      <h2>A Condition is ready</h2>
+    return `<div class="overlay" data-overlay="blocking"><div class="modal" ${namedDialog("condition-title")}>
+      <h2 id="condition-title">A Condition is ready</h2>
       <p>${esc(p.reason)}</p>
       <div class="actions-row">
-        <button class="btn primary${coachClass(coached, "btn:accept-cond")}" data-accept-cond>Play it</button>
+        <button class="btn primary${coachClass(coached, "btn:accept-cond")}" data-accept-cond data-initial-focus>Play it</button>
         <button class="btn ghost${coachClass(coached, "btn:skip-cond")}" data-skip-cond>Not now</button>
       </div>
     </div></div>`;
@@ -478,8 +507,8 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
   if (p?.kind === "obsessionDecide") {
     const hero = state.heldCard;
     const peter = hero?.defId === "peterPan";
-    return `<div class="overlay"><div class="modal">
-      <h2>Obsession</h2>
+    return `<div class="overlay" data-overlay="blocking"><div class="modal" ${namedDialog("obsession-title")}>
+      <h2 id="obsession-title">Obsession</h2>
       <p>${
         peter
           ? "Peter Pan was revealed. He must be played to Hangman’s Tree. He cannot be discarded."
@@ -491,7 +520,7 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
           : ""
       }
       <div class="actions-row">
-        <button class="btn primary${coachClass(coached, "btn:play-hero")}" data-play-hero>${peter ? "Play Peter Pan" : "Play the Hero"}</button>
+        <button class="btn primary${coachClass(coached, "btn:play-hero")}" data-play-hero data-initial-focus>${peter ? "Play Peter Pan" : "Play the Hero"}</button>
         ${
           peter
             ? ""
@@ -503,21 +532,22 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
   if (p?.kind === "worthyLocation" || p?.kind === "obsessionLocation") {
     const hero = state.heldCard ?? findCard(state, p.heroId);
     const title = p.kind === "worthyLocation" ? "Worthy Opponent" : "Obsession";
-    return `<div class="overlay pass-through"><div class="modal wood">
+    return `<div class="overlay pass-through"><div class="modal wood placement-picker" data-placement-picker data-dialog="seat-hero-title" role="dialog" aria-modal="false" aria-labelledby="seat-hero-title">
       <p class="eyebrow">${esc(title)}</p>
-      <h2>Seat this Hero</h2>
-      <p>Click a glowing unlocked location. Peter still lands at Hangman’s Tree if he is the find.</p>
-      ${
-        hero
-          ? `<div class="modal-cards">${renderCard(state, hero, { size: "reveal", legal: false, selected: true })}</div>`
-          : ""
-      }
+      <h2 id="seat-hero-title">Seat this Hero</h2>
+      <p>Choose an unlocked shore below, or use a highlighted place on the board. Peter always lands at Hangman’s Tree when revealed.</p>
+      <div class="placement-layout">
+      ${hero ? `<div class="modal-cards">${renderCard(state, hero, { size: "reveal", legal: false, selected: true })}</div>` : ""}
+      <div class="placement-choices" aria-label="Legal destinations">${LOCATION_IDS.filter((id) => hi.has(`loc:${id}`)).map((id, index) =>
+        `<button type="button" class="btn primary${coachClass(coached, `loc:${id}`)}" data-move="${id}" ${index === 0 ? "data-initial-focus" : ""}>Choose this place: ${esc(REALM[id].name)}</button>`
+      ).join("")}</div>
+      </div>
     </div></div>`;
   }
   if (p?.kind === "vanquishConfirmLoss") {
     const hero = findCard(state, p.heroId) ?? state.heldCard;
-    return `<div class="overlay"><div class="modal wood lose">
-      <h2>This loses the practice duel</h2>
+    return `<div class="overlay" data-overlay="blocking"><div class="modal wood lose" ${namedDialog("loss-title")}>
+      <h2 id="loss-title">This loses the practice duel</h2>
       <p>Peter is not on the Jolly Roger. Vanquishing him here is the intentional-loss trap. Continue only if you mean to practice that failure.</p>
       ${
         hero
@@ -525,7 +555,7 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
           : ""
       }
       <div class="actions-row">
-        <button class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel>Cancel</button>
+        <button class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel data-initial-focus>Cancel</button>
         <button class="btn${coachClass(coached, "btn:confirm")}" data-confirm>Continue anyway</button>
       </div>
     </div></div>`;
@@ -534,9 +564,9 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
     const item = findCard(state, p.cardId);
     const itemName = item ? cardName(item) : "Cutlass";
     const allies = allAllies(state);
-    return `<div class="overlay pass-through"><div class="modal wood attach-picker">
+    return `<div class="overlay pass-through"><div class="modal wood attach-picker" ${namedDialog("attach-title", false)}>
       <p class="eyebrow">Arm an Ally</p>
-      <h2>Strap ${esc(itemName)}</h2>
+      <h2 id="attach-title">Strap ${esc(itemName)}</h2>
       <p>Choose any Ally in the realm. You can also click that Ally’s card on the board. Cancel returns to Play a Card.</p>
       ${
         allies.length
@@ -548,13 +578,13 @@ function overlayFor(state: GameState, hi: Set<string>, sel: Set<string>, coached
                   <strong>${esc(cardName(a.ally))}</strong>
                   <span>Strength ${allyStrength(state, a.ally)} · ${esc(REALM[a.location].name)}</span>
                 </div>
-                <button type="button" class="btn primary${strapClass}" data-card="${a.ally.instanceId}">Strap ${esc(itemName)} to ${esc(cardName(a.ally))}</button>
+                <button type="button" class="btn primary${strapClass}" data-card="${a.ally.instanceId}" ${a === allies[0] ? "data-initial-focus" : ""}>Strap ${esc(itemName)} to ${esc(cardName(a.ally))}</button>
               </li>`;
               })
               .join("")}</ul>`
           : `<p class="empty">No Allies are ashore. Cancel and play a crew member first.</p>`
       }
-      <div class="actions-row"><button class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel>Cancel</button></div>
+      <div class="actions-row"><button class="btn ghost${coachClass(coached, "btn:cancel")}" data-cancel ${allies.length ? "" : "data-initial-focus"}>Cancel</button></div>
     </div></div>`;
   }
   return "";
@@ -620,12 +650,12 @@ function inspectOverlay(state: GameState, instanceId: string): string {
   const card = findCard(state, instanceId) ?? fromPending ?? state.heldCard;
   if (!card || card.instanceId !== instanceId) return "";
   const d = def(card.defId);
-  return `<div class="overlay inspect-in"><div class="modal wood inspect">
+  return `<div class="overlay inspect-in" data-overlay="blocking"><div class="modal wood inspect" ${namedDialog("inspect-title")}>
     <p class="eyebrow">Inspect</p>
-    <h2>${esc(d.name)}</h2>
+    <h2 id="inspect-title">${esc(d.name)}</h2>
     ${abilityReadout("What it does", `${d.name}: ${d.text}`)}
     <div class="modal-cards">${renderCard(state, card, { size: "reveal", legal: false, selected: true })}</div>
-    <div class="actions-row"><button type="button" class="btn primary" data-inspect-close>Close</button></div>
+    <div class="actions-row"><button type="button" class="btn primary" data-inspect-close data-initial-focus>Close</button></div>
   </div></div>`;
 }
 
@@ -756,10 +786,12 @@ function playView(
   reason: MoveReason | null,
   teachTab: TeachTab = "brief",
   sceneId: string | null = null,
+  lesson: LessonView | null = null,
 ): string {
   const hi = highlightSet(state);
   const sel = selectedSet(state);
-  const advice = coachEnabled ? advise(state) : null;
+  const settled = state.phase === "over" || state.won || state.lost;
+  const advice = settled ? null : lesson && coachEnabled ? lesson.advice : coachEnabled ? advise(state) : null;
   const coached = new Set(advice?.highlights ?? []);
   const promptButtons: string[] = [];
   if (state.phase === "actions" && !state.pending) {
@@ -802,13 +834,14 @@ function playView(
     promptButtons.push(`<button class="btn ghost${coachClass(coached, "btn:skip-cond")}" data-skip-cond>Skip discard</button>`);
   }
 
-  const briefHtml = briefEnabled ? strategySidebar(strategyBrief(state)) : "";
+  const briefHtml = briefEnabled && !settled ? strategySidebar(strategyBrief(state)) : "";
   const coachHtml = advice ? coachPanel(advice) : "";
-  const reasonHtml = reasonsEnabled && reason ? reasonDock(reason) : "";
+  const reasonHtml = reasonsEnabled && reason && !settled ? reasonDock(reason) : "";
   const teachOn = Boolean(briefHtml || coachHtml || reasonHtml);
   const activeTab = resolveTeachTab(teachTab, Boolean(briefHtml), Boolean(coachHtml), Boolean(reasonHtml));
   const placeLabel = state.phase === "move" && !state.pending ? "Move here" : "Choose this place";
-  const placeButtons = LOCATION_IDS.filter((id) => hi.has(`loc:${id}`)).map(
+  const placementInPanel = state.pending?.kind === "worthyLocation" || state.pending?.kind === "obsessionLocation";
+  const placeButtons = placementInPanel ? [] : LOCATION_IDS.filter((id) => hi.has(`loc:${id}`)).map(
     (id) =>
       `<button type="button" class="btn primary prompt-place${coachClass(coached, `loc:${id}`)}" data-move="${id}">${placeLabel}: ${esc(REALM[id].name)}</button>`,
   );
@@ -843,11 +876,24 @@ function playView(
       </div>
     </header>
     <div class="prompt${clash ? " is-clash" : ""}" data-prompt>${clashMeter(clash)}<p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}${placeButtons.join("")}</div></div>
+    ${
+      lesson && !settled
+        ? `<section class="lesson-banner" data-lesson-banner aria-live="polite"><strong>Lesson ${lesson.index} of ${lesson.total} · ${esc(lesson.title)}</strong><p>${esc(lesson.advice.do)}</p></section>`
+        : ""
+    }
     </div>
+    ${advice ? `<div class="quick-coach"><span>Next click</span><p>${esc(advice.do)}</p></div>` : ""}
+    <ol class="voyage-progress" aria-label="Objective progress">${[
+      { label: "Map", done: state.hangmansUnlocked },
+      { label: "Peter", done: state.peterPanRevealed },
+      { label: "Escort", done: state.peterPanLocation === "jollyRoger" || state.won },
+      { label: "Clash", done: state.won },
+    ].map((step, i) => `<li class="${step.done ? "is-done" : ""}"><span aria-hidden="true">${step.done ? "✓" : i + 1}</span>${step.label}</li>`).join("")}</ol>
     <div class="play-scroll" data-play-scroll>
     <div class="stage">
       ${fateRail(state)}
-      <div class="board-wrap realm-sheet" data-realm-map><div class="board">${TREASURE_MAP}${MAP_COMPASS}${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}${MAP_COAST}</div></div>
+      <p class="shore-scroll-hint">Shores 1 → 2 → 3 → 4 stay in a row. Swipe, or focus the chart and use the arrow keys. Heroes move to neighboring shores.</p>
+      <div class="board-wrap realm-sheet" data-realm-map role="region" aria-label="Never Land shores, ordered from Jolly Roger to Hangman's Tree" tabindex="0"><div class="board">${TREASURE_MAP}${MAP_COMPASS}${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}${MAP_COAST}</div></div>
     </div>
     <footer class="dock">
       <section class="hand ${state.pending?.kind === "playChooseCard" || state.pending?.kind === "discardSelect" ? "is-picking" : ""}">
@@ -880,7 +926,7 @@ function playView(
     </div>
     ${teachRailHtml(briefHtml, coachHtml, reasonHtml, activeTab)}
   </div>
-  ${overlayFor(state, hi, sel, coached)}`;
+  ${overlayFor(state, hi, sel, coached, Boolean(lesson))}`;
 }
 
 export function renderOverlay(state: GameState): string {
@@ -895,6 +941,7 @@ export function renderPlay(
     reasonsEnabled?: boolean;
     reason?: MoveReason | null;
     teachTab?: TeachTab;
+    lesson?: LessonView | null;
   } = {},
 ): string {
   const coachEnabled = flags.coachEnabled ?? true;
@@ -902,7 +949,7 @@ export function renderPlay(
   const reasonsEnabled = flags.reasonsEnabled ?? true;
   const reason = reasonsEnabled ? (flags.reason ?? IDLE_MOVE_REASON) : null;
   const teachTab = flags.teachTab ?? "coach";
-  return playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, teachTab);
+  return playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, teachTab, null, flags.lesson ?? null);
 }
 
 function readFlag(key: string, fallback = true): boolean {
@@ -941,6 +988,8 @@ const SCENE_LOADERS: Record<string, () => GameState> = {
   hourwhy: hourPlaytestWhyScene,
   hourequal: hourEqualVanquishScene,
   nearwin: nearWinScene,
+  mapreserve: mapReserveScene,
+  worthy: worthySeatScene,
   bounceloop: bounceLoopScene,
   tauntdig: tauntDigScene,
 };
@@ -1000,6 +1049,7 @@ export function mount(root: HTMLElement): void {
   let lastReason: MoveReason = IDLE_MOVE_REASON;
   let teachTab: TeachTab = "coach";
   let inspectId: string | null = null;
+  let lesson: LessonStep | null = null;
   let suppressClick = false;
 
   const bindCardDrag = () => {
@@ -1087,12 +1137,16 @@ export function mount(root: HTMLElement): void {
   let pageScrollX = 0;
   let pageScrollY = 0;
   let mainScroll = 0;
+  let realmScroll = 0;
+  let handScroll = 0;
 
   const captureScroll = () => {
     pageScrollX = window.scrollX;
     pageScrollY = window.scrollY;
     const scroller = root.querySelector<HTMLElement>("[data-play-scroll]") ?? root.querySelector<HTMLElement>("[data-play-main]");
     if (scroller) mainScroll = scroller.scrollTop;
+    realmScroll = root.querySelector<HTMLElement>("[data-realm-map]")?.scrollLeft ?? 0;
+    handScroll = root.querySelector<HTMLElement>(".hand-row")?.scrollLeft ?? 0;
     root.querySelectorAll<HTMLElement>("[data-teach-pane]").forEach((pane) => {
       const key = pane.dataset.teachPane as TeachTab | undefined;
       if (key && key in paneScroll) paneScroll[key] = pane.scrollTop;
@@ -1106,6 +1160,10 @@ export function mount(root: HTMLElement): void {
     });
     const scroller = root.querySelector<HTMLElement>("[data-play-scroll]") ?? root.querySelector<HTMLElement>("[data-play-main]");
     if (scroller) scroller.scrollTop = mainScroll;
+    const realm = root.querySelector<HTMLElement>("[data-realm-map]");
+    if (realm) realm.scrollLeft = realmScroll;
+    const hand = root.querySelector<HTMLElement>(".hand-row");
+    if (hand) hand.scrollLeft = handScroll;
     window.scrollTo(pageScrollX, pageScrollY);
   };
 
@@ -1119,9 +1177,16 @@ export function mount(root: HTMLElement): void {
     return `${data}|${node.className}`;
   };
   let savedFocus: string | null = null;
+  let focusBeforeDialog: string | null = null;
+
+  const topDialog = () => {
+    const dialogs = [...root.querySelectorAll<HTMLElement>("[role=dialog]")];
+    return dialogs[dialogs.length - 1] ?? null;
+  };
 
   const restoreFocus = () => {
     const blocking = root.querySelector<HTMLElement>(".overlay:not(.pass-through)");
+    const dialog = topDialog();
     const play = root.querySelector<HTMLElement>(".play");
     if (play && blocking) play.setAttribute("inert", "");
     else play?.removeAttribute("inert");
@@ -1129,32 +1194,47 @@ export function mount(root: HTMLElement): void {
       root.querySelectorAll<HTMLButtonElement>("[data-resign]").forEach((btn) => btn.setAttribute("disabled", ""));
     }
     const buttons = [...root.querySelectorAll<HTMLButtonElement>("button")];
-    if (savedFocus) {
-      const match = buttons.find((btn) => focusSignature(btn) === savedFocus);
-      if (match && (!blocking || blocking.contains(match))) {
-        match.focus({ preventScroll: true });
-        return;
+    if (dialog) {
+      if (savedFocus) {
+        const match = buttons.find((btn) => focusSignature(btn) === savedFocus);
+        if (match && dialog.contains(match)) {
+          match.focus({ preventScroll: true });
+          return;
+        }
       }
+      const initial =
+        dialog.querySelector<HTMLButtonElement>("[data-initial-focus]:not([disabled])") ??
+        dialog.querySelector<HTMLButtonElement>("button:not([disabled])");
+      initial?.focus({ preventScroll: true });
+      return;
     }
-    blocking?.querySelector<HTMLButtonElement>("button:not([disabled])")?.focus({ preventScroll: true });
+    const restore = focusBeforeDialog ?? savedFocus;
+    if (restore) {
+      const match = buttons.find((btn) => focusSignature(btn) === restore);
+      match?.focus({ preventScroll: true });
+    }
   };
 
   const render = () => {
-    savedFocus = focusSignature(document.activeElement);
+    const hadDialog = Boolean(root.querySelector("[role=dialog]"));
+    const priorFocus = focusSignature(document.activeElement);
+    savedFocus = priorFocus;
+    if (!hadDialog) focusBeforeDialog = priorFocus;
     captureScroll();
     const inspect = inspectId ? inspectOverlay(state, inspectId) : "";
     const reason = reasonsEnabled ? lastReason : null;
     const tab = activeTeachTab();
     const sceneWarning = unknownSceneWarning();
+    const lessonBeat = lesson ? lessonView(state, lesson) : null;
     if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled, sceneWarning);
     else if (state.screen === "help") {
       root.innerHTML =
         (state.phase === "title"
           ? titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled, sceneWarning)
-          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId)) +
+          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat)) +
         helpView(state.phase !== "title") +
         inspect;
-    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId) + inspect;
+    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat) + inspect;
     bindCardDrag();
     restoreScroll();
     restoreFocus();
@@ -1165,6 +1245,21 @@ export function mount(root: HTMLElement): void {
     inspectId = null;
     const before = state;
     state = applyInput(state, input);
+    if (lesson) {
+      const advanced = advanceLesson(lesson, before, state);
+      const jumped = advanced.state !== state;
+      lesson = advanced.step;
+      state = advanced.state;
+      if (jumped) {
+        lastReason = {
+          chose: "The lesson moves to the ship clash.",
+          why: "You walked Peter one neighboring shore. This beat places him on the Jolly Roger with Strength 8 against two Pirate Brutes so the clash can be practiced. A normal voyage does not skip the rest of the walk.",
+          next: "Click Vanquish, then Peter Pan, then both Pirate Brutes, then Confirm.",
+        };
+        render();
+        return;
+      }
+    }
     const explained = explainSelection(before, input, state);
     if (explained) lastReason = explained;
     lastReason = liveMoveReason(state, lastReason);
@@ -1216,10 +1311,16 @@ export function mount(root: HTMLElement): void {
       writeFlag("nld-brief", true);
       writeFlag("nld-reasons", true);
       activeSceneId = null;
-      return dispatch({ type: "start", difficulty });
+      lesson = "move";
+      inspectId = null;
+      state = lessonOpening();
+      lastReason = IDLE_MOVE_REASON;
+      render();
+      return;
     }
     const start = t.closest<HTMLElement>("[data-start]");
     if (start) {
+      lesson = null;
       const staged = stagedScene();
       if (staged) {
         state = staged;
@@ -1243,9 +1344,27 @@ export function mount(root: HTMLElement): void {
       if (btn?.hasAttribute("disabled") || resignBlocked(state) || inspectId) return;
       return dispatch({ type: "resign" });
     }
+    if (t.closest("[data-lesson-sail]")) {
+      const sailDifficulty = state.difficulty;
+      lesson = null;
+      activeSceneId = null;
+      inspectId = null;
+      state = applyInput(state, { type: "start", difficulty: sailDifficulty });
+      lastReason = IDLE_MOVE_REASON;
+      render();
+      return;
+    }
     if (t.closest("[data-home]") || t.closest("[data-again]")) {
       difficulty = t.closest("[data-again]") ? state.difficulty : difficulty;
       if (t.closest("[data-again]")) {
+        if (lesson) {
+          lesson = "move";
+          inspectId = null;
+          state = lessonOpening();
+          lastReason = IDLE_MOVE_REASON;
+          render();
+          return;
+        }
         const staged = stagedScene();
         if (staged) {
           state = staged;
@@ -1256,6 +1375,7 @@ export function mount(root: HTMLElement): void {
         activeSceneId = null;
         return dispatch({ type: "start", difficulty: state.difficulty });
       }
+      lesson = null;
       activeSceneId = null;
       return dispatch({ type: "newGame" });
     }
@@ -1301,6 +1421,13 @@ export function mount(root: HTMLElement): void {
   });
 
   root.addEventListener("keydown", (event) => {
+    if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && event.target instanceof HTMLElement) {
+      const realm = event.target.closest<HTMLElement>("[data-realm-map]");
+      if (realm && event.target === realm) {
+        realm.scrollBy({ left: event.key === "ArrowRight" ? 280 : -280 });
+        event.preventDefault();
+      }
+    }
     if (event.key !== "Escape") return;
     if (inspectId) {
       event.preventDefault();
@@ -1311,6 +1438,13 @@ export function mount(root: HTMLElement): void {
     if (state.screen === "help") {
       event.preventDefault();
       dispatch({ type: "closeHelp" });
+      return;
+    }
+    if (state.phase === "over") {
+      event.preventDefault();
+      lesson = null;
+      activeSceneId = null;
+      dispatch({ type: "newGame" });
       return;
     }
     const kind = state.pending?.kind;
