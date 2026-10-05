@@ -192,7 +192,7 @@ describe("game graphics UI pass", () => {
     expect(css).toMatch(/\.card\.hand-card \.text \{[\s\S]*?font-size:\s*12px/);
 
     const powerLoud = css.slice(css.indexOf(".power.is-loud {"), css.indexOf(".power span {"));
-    expect(powerLoud).toMatch(/min-height:\s*46px/);
+    expect(powerLoud).toMatch(/min-height:\s*36px/);
     expect(css).toMatch(/\.power b \{[^}]*font-size:\s*28px/);
   });
 

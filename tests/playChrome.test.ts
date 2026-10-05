@@ -71,9 +71,10 @@ describe("play chrome rescue", () => {
     expect(css).toMatch(/\.location\s*\{[^}]*min-height:\s*380px/);
     expect(css).toMatch(/\.hand-row\s*\{[^}]*min-height:\s*226px/);
     expect(css).toMatch(/\.fate-rail\.is-spent \.fate-rail-copy p\s*\{[^}]*white-space:\s*nowrap/);
-    expect(css).toMatch(/\.prompt\s*\{[^}]*padding:\s*8px/);
-    expect(css).toMatch(/\.prompt\s*\{[^}]*min-height:\s*44px/);
-    expect(css).toMatch(/\.power\.is-loud\s*\{[^}]*min-height:\s*46px/);
+    const prompt = css.slice(css.indexOf(".prompt {"), css.indexOf(".prompt.is-clash"));
+    expect(prompt).toMatch(/padding:\s*4px 12px/);
+    expect(prompt).toMatch(/min-height:\s*36px/);
+    expect(css).toMatch(/\.power\.is-loud\s*\{[^}]*min-height:\s*36px/);
   });
 
   it("lets voyage meters wrap so Coach and Reasons are not clipped beside the rail", () => {
@@ -104,6 +105,43 @@ describe("play chrome rescue", () => {
     expect(power).toBeTruthy();
     expect(brand!.compareDocumentPosition(map!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(map!.compareDocumentPosition(power!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("tightens vertical button and chrome spacing without dropping laptop taps under 32px", () => {
+    const css = readFileSync(join(process.cwd(), "src/ui/styles.css"), "utf8");
+    const topbar = css.slice(css.indexOf(".topbar {"), css.indexOf(".topbar-map"));
+    expect(topbar).toMatch(/padding:\s*2px 12px/);
+    expect(topbar).toMatch(/min-height:\s*40px/);
+
+    const prompt = css.slice(css.indexOf(".prompt {"), css.indexOf(".prompt.is-clash"));
+    expect(prompt).toMatch(/padding:\s*4px 12px/);
+    expect(prompt).toMatch(/gap:\s*8px/);
+    expect(prompt).toMatch(/min-height:\s*36px/);
+    expect(css).toMatch(/\.prompt-actions\s*\{[^}]*gap:\s*6px/);
+    expect(css).toMatch(/\.prompt-actions \.btn\s*\{[^}]*padding:\s*4px 14px/);
+    expect(css).toMatch(/\.prompt-actions \.btn\s*\{[^}]*min-height:\s*32px/);
+
+    expect(css).toMatch(/\.action\s*\{[^}]*min-height:\s*32px/);
+    expect(css).toMatch(/\.action\s*\{[^}]*padding:\s*3px 6px/);
+    expect(css).toMatch(/\.row\s*\{[^}]*gap:\s*3px/);
+    expect(css).toMatch(/\.row\s*\{[^}]*margin-bottom:\s*2px/);
+    expect(css).toMatch(/\.chip\s*\{[^}]*min-height:\s*32px/);
+    expect(css).toMatch(/\.ctrl\s*\{[^}]*min-height:\s*32px/);
+    expect(css).toMatch(/\.meters \{[^}]*row-gap:\s*2px/);
+    expect(css).toMatch(/\.voyage-progress\s*\{[^}]*padding:\s*3px 12px/);
+    expect(css).toMatch(/\.location-choice \{[^}]*min-height:\s*32px/);
+    expect(css).toMatch(/\.location-choice \.drop-hint \{[^}]*min-height:\s*32px/);
+    expect(css).toMatch(/\.placement-choices \{[^}]*gap:\s*6px/);
+    expect(css).toMatch(/\.placement-choices \.btn \{[^}]*min-height:\s*36px/);
+    expect(css).toMatch(/\.dock\s*\{[^}]*padding:\s*2px 12px 4px/);
+
+    const phone = css.slice(css.lastIndexOf("@media (max-width: 760px)"));
+    expect(phone).toMatch(/\.prompt-actions \.btn\s*\{[^}]*min-height:\s*44px/);
+    expect(phone).toMatch(/\.action\s*\{[^}]*min-height:\s*44px/);
+    expect(phone).toMatch(/\.chip\s*\{[^}]*min-height:\s*44px/);
+    expect(phone).toMatch(/\.ctrl\s*\{[^}]*min-height:\s*44px/);
+    expect(phone).toMatch(/\.location-choice \.drop-hint\s*\{[^}]*min-height:\s*44px/);
+    expect(phone).toMatch(/\.placement-choices \.btn\s*\{[^}]*min-height:\s*44px/);
   });
 
   it("treats an open tree with Peter still hidden as honest brief and End-turn coach", () => {
