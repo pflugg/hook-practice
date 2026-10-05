@@ -185,6 +185,14 @@ function isDeadCondition(state: GameState, card: CardInstance): boolean {
 function discardRank(state: GameState, card: CardInstance): number {
   const d = def(card.defId);
   if (card.defId === "neverLandMap") return 10_000;
+  // Worthy Opponent is the free +2 that finishes a covered-Gain Map reserve. Never dig it away.
+  if (card.defId === "worthyOpponent" && needPowerForMap(state)) return 9_000;
+  if (reserveStall(state) && card.defId !== "worthyOpponent") {
+    const copies = state.hand.filter((other) => other.defId === card.defId).length;
+    if (copies > 1) return 30;
+    // These plays would spend the short reserve and still leave the Map unpaid.
+    if (d.cost > 0 && state.power - d.cost < 4) return 70 + d.cost;
+  }
   if (card.defId === "cunning" && canPlayCunning(state)) return 8_000;
   if (d.type === "ally" && canPlayCunning(state)) return 4_500 + d.strength;
   if (
@@ -222,9 +230,29 @@ function discardPicks(state: GameState, skip: string[] = []): CardInstance[] {
   return pick ? [pick] : [];
 }
 
+/** A Gain that is uncovered on a fresh visit, even if this turn already used it. */
+function freshSafeGains(state: GameState): LocationId[] {
+  return LOCATION_IDS.filter((id) => {
+    if (id === "hangmansTree" && !state.hangmansUnlocked) return false;
+    if (tickTockAt(state) === id) return false;
+    const fresh = { ...state, villainLocation: id, usedActions: [], pending: null, phase: "actions" as const };
+    return availableActions(fresh).some((action) => action.kind === "gainPower" && action.available);
+  });
+}
+
+/** No safe Gain will be open even on a fresh visit, and the Map is still short of 4. */
+function reserveStall(state: GameState): boolean {
+  return needPowerForMap(state) && freshSafeGains(state).length === 0;
+}
+
+/** Safe Gains are covered even on a fresh visit, and the Map is still short. Dig instead of pacing. */
+function mapReserveNeedsDig(state: GameState): boolean {
+  return reserveStall(state) && discardPicks(state).length > 0;
+}
+
 function wantsNamedDiscard(state: GameState): boolean {
   if (discardPicks(state).length === 0) return false;
-  if (handHasOnlyUnaffordablePays(state) || diggingForMap(state)) return true;
+  if (handHasOnlyUnaffordablePays(state) || diggingForMap(state) || mapReserveNeedsDig(state)) return true;
   if (state.hand.some((card) => isDeadCondition(state, card))) return true;
   if (blockedAttachInHand(state)) return true;
   return jrStrength(state) < 8 && state.hand.some((card) => def(card.defId).type === "ally" && cannotPay(state, card));
@@ -266,11 +294,13 @@ function discardWhy(state: GameState, picks: CardInstance[]): string {
     ? `You have ${state.power} Power; ${cardName(pricey)} costs ${def(pricey.defId).cost}.`
     : `You have ${state.power} Power.`;
   const deadLine = picks.some((card) => isDeadCondition(state, card)) ? ` ${name} no longer serves this objective.` : "";
-  const goal = !state.hangmansUnlocked
-    ? mapInHand(state) ? "useful crew while keeping the Map" : "cheaper crew and the Map"
-    : jrStrength(state) < 8
-      ? "cheaper crew"
-      : "the next card that serves the chain";
+  const goal = mapReserveNeedsDig(state)
+    ? "a card that adds Power, such as Worthy Opponent, while the Map stays in hand"
+    : !state.hangmansUnlocked
+      ? mapInHand(state) ? "useful crew while keeping the Map" : "cheaper crew and the Map"
+      : jrStrength(state) < 8
+        ? "cheaper crew"
+        : "the next card that serves the chain";
   return `${powerLine}${deadLine} Discard ${name} to dig toward ${goal}.`;
 }
 
@@ -511,6 +541,8 @@ function chooseMove(state: GameState): MoveChoice {
     if (state.power < 4) {
       const uncover = safe.find((id) => uncoverReason(state, id));
       if (uncover) return { dest: uncover, forcedBounce: false };
+      const dig = safe.find((id) => hasKind(state, id, "discard") && mapReserveNeedsDig(state));
+      if (dig) return { dest: dig, forcedBounce: false };
       const hold = safe.find((id) => hasKind(state, id, "fate") || hasKind(state, id, "discard"));
       if (hold) return { dest: hold, forcedBounce: false };
       if (safe[0]) return { dest: safe[0], forcedBounce: false };
@@ -757,6 +789,9 @@ function moveWhy(state: GameState, dest: LocationId): string {
   }
   if (playableMap(state) && hasKind(state, dest, "playCard")) {
     return "You are holding the Never Land Map with enough Power. After you land, click Play a Card, then the Map in your hand, then Choose this place where the captain stands. The Map unlocks Hangman’s Tree from that square.";
+  }
+  if (needPowerForMap(state) && safeUncoveredGains(state).length === 0 && hasKind(state, dest, "discard") && discardPicks(state)[0]) {
+    return `${discardWhy(state, discardPicks(state))} Safe Gains are covered. This Discard digs for Power without stepping onto Tick Tock, and the Map stays in hand.`;
   }
   if (needPowerForMap(state) && safeUncoveredGains(state).length === 0 && !hasKind(state, dest, "gainPower")) {
     return `Safe Gains are covered, and moving onto Tick Tock would discard the held Never Land Map. ${locName(dest)} keeps the Map. Uncover a Gain, or play a free card such as Worthy Opponent, before any optional purchase.`;
@@ -1018,20 +1053,21 @@ function endTurnWhy(state: GameState): string {
   const slots = availableActions(state);
   const idle: string[] = [];
   const playOpen = slots.some((action) => action.kind === "playCard" && !action.used && !action.covered);
+  const discardOpen = slots.some((action) => action.kind === "discard" && action.available);
   if (state.hand.length > 0 && playOpen && playableHandCards(state).length === 0) {
     idle.push("Play is uncovered, but nothing in hand can be paid right now.");
+  } else if (state.hand.length > 0 && playOpen && !usefulPlay(state) && needPowerForMap(state)) {
+    idle.push("Play is uncovered, but those cards would spend the Power saved for the Never Land Map.");
   }
-  if (
-    state.hand.length > 0 &&
-    slots.some((action) => action.kind === "discard" && action.available) &&
-    discardPicks(state).length === 0
-  ) {
+  if (state.hand.length > 0 && discardOpen && discardPicks(state).length === 0) {
     idle.push("Discard is uncovered, but every card in hand still serves the chain.");
+  } else if (discardOpen && mapReserveNeedsDig(state) && discardPicks(state)[0]) {
+    idle.push(`Discard is uncovered. Dig ${cardName(discardPicks(state)[0])} for Power before ending.`);
   }
   const base = idle.length ? idle.join(" ") : "No Discard, Gain, or Play is left uncovered here.";
   const reserve = needPowerForMap(state)
     ? safeUncoveredGains(state).length === 0
-      ? " Safe Gains are covered. Keep the held Map and do not step onto Tick Tock for a covered-path Gain — that discards the Map. A free hunt such as Worthy Opponent can still add Power."
+      ? " Safe Gains are covered. Keep the held Map and do not step onto Tick Tock — that discards the Map. Use an open Discard to dig for a card that adds Power, such as Worthy Opponent."
       : " Keep the held Map and save its 4 Power before optional purchases. Revisit a safe Gain next turn even if that means returning to the last shore."
     : "";
   return `${base} Ending refills the hand.${reserve}${crocLine} The next move should be a stop where one of those actions is usable, not a walk back to a clash you cannot start.`;
