@@ -19,8 +19,8 @@ Preconditions:
 - Doctor is ok and the browser is on the title screen.
 
 - **Deal.** Choose **Set Sail**. Click `[data-start]`. `[data-loc="jollyRoger"]` has `is-current`. The hand shows four cards.
-- **Stay put.** If `[data-end]` is visible, click it. The Jolly Roger stays `is-current` and no Fate dialog appears.
-- **Move.** Click `[data-move="skullRock"]` or `[data-move="mermaidLagoon"]`. That shore gains `is-current`.
+- **Stay put.** `[data-end]` is absent during the required move. That absence is the proof. Do not invent a click.
+- **Move.** Click the prompt button named `Move here: Skull Rock`, or `[data-loc="skullRock"] [data-move="skullRock"]`. That shore gains `is-current` and the Jolly Roger loses it. `[data-end]` is then visible.
 
 There is no `drive` subcommand for this feature yet. Follow the clicks above with the same Playwright page `launch` served. Save screenshots under `verification-evidence/set-sail/`.
 

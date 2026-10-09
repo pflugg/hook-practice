@@ -31,7 +31,7 @@ Doctor checks that the recorded pid is alive, the URL returns HTTP 200, and the 
 
 ## Drive
 
-Stable handles are `data-*` attributes in `src/ui/app.ts`. Several shores share the accessible name `Move here`, so a move click uses `[data-move="<locationId>"]`. Location ids are `jollyRoger`, `skullRock`, `mermaidLagoon`, and `hangmansTree`.
+Stable handles are `data-*` attributes in `src/ui/app.ts`. A shore button and the prompt button can share `data-move`. Click the prompt button by its accessible name, `Move here: Skull Rock`, or scope the shore button as `[data-loc="skullRock"] [data-move="skullRock"]`. Do not use a bare `[data-move="skullRock"]`. Location ids are `jollyRoger`, `skullRock`, `mermaidLagoon`, and `hangmansTree`.
 
 ```bash
 node scripts/verify.mjs drive tutorial-move
@@ -59,7 +59,7 @@ Exercise the click the player makes. Capture the screen before the click and aft
 node scripts/verify.mjs cleanup
 ```
 
-Cleanup sends `SIGTERM` to the pid in `server.json` and deletes that file. It does not kill other Node processes. It does not remove `verification-evidence/`.
+Cleanup sends `SIGTERM` to the process group of the pid in `server.json`, waits until that pid is gone, and fails if the URL still answers. It does not remove `verification-evidence/`. The dev server is `node node_modules/vite/bin/vite.js`, so the recorded pid is Vite.
 
 One command runs the whole check:
 

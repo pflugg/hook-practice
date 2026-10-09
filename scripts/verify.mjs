@@ -67,7 +67,8 @@ async function launch() {
   const port = await freePort();
   const logPath = path.join(runtimeDir, "vite.log");
   const logFd = openSync(logPath, "w");
-  const child = spawn("npx", ["vite", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
+  const viteBin = path.join(root, "node_modules/vite/bin/vite.js");
+  const child = spawn(process.execPath, [viteBin, "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
     cwd: root,
     detached: true,
     stdio: ["ignore", logFd, logFd],
@@ -79,7 +80,13 @@ async function launch() {
   try {
     await waitForUrl(url);
   } catch (error) {
-    if (processAlive(child.pid)) process.kill(child.pid, "SIGTERM");
+    if (child.pid && processAlive(child.pid)) {
+      try {
+        process.kill(-child.pid, "SIGTERM");
+      } catch {
+        process.kill(child.pid, "SIGTERM");
+      }
+    }
     throw error;
   }
   console.log(JSON.stringify(state));
@@ -102,6 +109,7 @@ async function driveTutorial() {
   const state = readState();
   if (!state) throw new Error("no server state. Run launch first.");
   const runDir = path.join(evidenceRoot, "tutorial-move");
+  rmSync(runDir, { recursive: true, force: true });
   mkdirSync(runDir, { recursive: true });
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -122,6 +130,7 @@ async function driveTutorial() {
       return Boolean(node && node.classList.contains("is-current"));
     }`);
     const after = await shore.getAttribute("class");
+    const shipAfter = await page.locator('[data-loc="jollyRoger"]').getAttribute("class");
     const prompt = await page.locator(".prompt").innerText();
     await page.screenshot({ path: path.join(runDir, "after-move.png"), fullPage: true });
     const proof = {
@@ -132,7 +141,8 @@ async function driveTutorial() {
       afterClass: after,
       prompt,
       captainAtSkullRock: after?.includes("is-current") === true,
-      leftTheShip: before?.includes("is-current") === true,
+      leftTheShip: shipAfter?.includes("is-current") !== true,
+      shipClassAfter: shipAfter,
     };
     writeFileSync(path.join(runDir, "proof.json"), `${JSON.stringify(proof, null, 2)}\n`);
     if (!proof.captainAtSkullRock || !proof.leftTheShip) {
@@ -144,15 +154,39 @@ async function driveTutorial() {
   }
 }
 
-function cleanup() {
+function stopRecorded(state) {
+  if (!state?.pid) return;
+  try {
+    process.kill(-state.pid, "SIGTERM");
+  } catch {
+    try {
+      process.kill(state.pid, "SIGTERM");
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
+async function cleanup() {
   const state = readState();
-  if (state && processAlive(state.pid)) {
-    process.kill(state.pid, "SIGTERM");
-    console.log(JSON.stringify({ stopped: state.pid, url: state.url }));
-  } else {
-    console.log(JSON.stringify({ stopped: null }));
+  stopRecorded(state);
+  if (state?.pid) {
+    for (let attempt = 0; attempt < 25 && processAlive(state.pid); attempt += 1) {
+      await delay(100);
+    }
+  }
+  let stillUp = false;
+  if (state?.url) {
+    try {
+      const response = await fetch(state.url);
+      stillUp = response.ok;
+    } catch {
+      stillUp = false;
+    }
   }
   if (existsSync(statePath)) rmSync(statePath);
+  if (stillUp) throw new Error(`vite still answering ${state.url} after cleanup`);
+  console.log(JSON.stringify({ stopped: state?.pid ?? null, url: state?.url ?? null, stillUp }));
 }
 
 const [command, feature] = process.argv.slice(2);
@@ -163,14 +197,14 @@ try {
   else if (command === "drive") {
     if (feature !== "tutorial-move") throw new Error("drive accepts tutorial-move");
     await driveTutorial();
-  } else if (command === "cleanup") cleanup();
+  }   else if (command === "cleanup") await cleanup();
   else if (command === "prove") {
-    cleanup();
+    await cleanup();
     await launch();
     await doctor();
     await driveTutorial();
     const proofPath = path.join(evidenceRoot, "tutorial-move", "proof.json");
-    cleanup();
+    await cleanup();
     if (!existsSync(proofPath)) throw new Error("cleanup removed the proof");
     console.log(JSON.stringify({ evidence: proofPath, survivedCleanup: true }));
   } else {
@@ -178,6 +212,6 @@ try {
   }
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
-  if (command === "prove") cleanup();
+  if (command === "prove") await cleanup();
   process.exitCode = 1;
 }

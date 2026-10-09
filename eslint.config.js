@@ -11,10 +11,12 @@ const datasetCasts = [
   ["LocationId", "parseLocationId"],
   ["Difficulty", "parseDifficulty"],
   ["TeachTab", "parseTeachTab"],
-].map(([typeName, parser]) => ({
-  selector: `TSAsExpression > TSTypeReference[typeName.name='${typeName}']`,
-  message: `Parse this value with ${parser} from src/ui/parse.ts. Do not cast a dataset string to ${typeName}.`,
-}));
+].flatMap(([typeName, parser]) =>
+  ["TSAsExpression", "TSTypeAssertion"].map((node) => ({
+    selector: `${node} TSTypeReference[typeName.name='${typeName}']`,
+    message: `Parse this value with ${parser} from src/ui/parse.ts. Do not cast a dataset string to ${typeName}.`,
+  })),
+);
 
 export default tseslint.config(
   { ignores: ["dist/**", "node_modules/**", "verification-evidence/**"] },
@@ -33,7 +35,6 @@ export default tseslint.config(
   },
   {
     files: ["src/ui/**/*.ts"],
-    ignores: ["src/ui/parse.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...datasetCasts],
     },

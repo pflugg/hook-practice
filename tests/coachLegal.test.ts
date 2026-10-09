@@ -51,13 +51,13 @@ function followCoach(seed: number, difficulty: Difficulty, steps: number): void 
     if (state.phase === "over" || state.won || state.lost) return;
     expectBoardHighlightsLegal(state);
     const key = advise(state).highlights[0];
+    expect(key, "Coach returned no highlight").toBeTruthy();
     if (!key) return;
     const input = inputForHighlight(key);
+    expect(input, `Coach highlight ${key} is not a click`).toBeTruthy();
     if (!input) return;
     const next = applyInput(state, input);
-    if (next === state || (next.phase === state.phase && next.pending === state.pending && next.turn === state.turn && next.log.length === state.log.length)) {
-      return;
-    }
+    expect(next, `Coach click ${key} did not change the voyage`).not.toEqual(state);
     state = next;
   }
 }

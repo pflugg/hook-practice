@@ -13,7 +13,7 @@ This directory is the source for verifying what a player can do in Never Land Du
 
 - Start every recipe from the title screen unless its preconditions say otherwise.
 - Prefer `data-tutorial`, `data-start`, `data-move`, `data-loc`, `data-act`, `data-card`, `data-end`, `data-ack`, and `data-pay-power`.
-- The accessible name `Move here` is shared by every legal shore. Click `[data-move="<locationId>"]`.
+- The accessible name `Move here` is shared by every legal shore. Click the prompt button `Move here: Skull Rock`, or `[data-loc="skullRock"] [data-move="skullRock"]`. A bare `[data-move="skullRock"]` matches both buttons.
 - Treat every command as literal.
 
 ## Proof and skip reporting

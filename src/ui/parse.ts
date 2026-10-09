@@ -2,21 +2,25 @@ import { LOCATION_IDS, type Difficulty, type LocationId } from "../engine/types"
 
 export type TeachTab = "brief" | "coach" | "reasons";
 
-const LOCATIONS: readonly string[] = LOCATION_IDS;
-const DIFFICULTIES: readonly string[] = ["easy", "normal"];
-const TEACH_TABS: readonly string[] = ["brief", "coach", "reasons"];
+const DIFFICULTIES = ["easy", "normal"] as const;
+const TEACH_TABS = ["brief", "coach", "reasons"] as const;
+
+function member<T extends string>(list: readonly T[], value: string | undefined): T | null {
+  if (value === undefined) return null;
+  for (const item of list) {
+    if (item === value) return item;
+  }
+  return null;
+}
 
 export function parseLocationId(value: string | undefined): LocationId | null {
-  if (value !== undefined && LOCATIONS.includes(value)) return value as LocationId;
-  return null;
+  return member(LOCATION_IDS, value);
 }
 
 export function parseDifficulty(value: string | undefined): Difficulty | null {
-  if (value !== undefined && DIFFICULTIES.includes(value)) return value as Difficulty;
-  return null;
+  return member(DIFFICULTIES, value);
 }
 
 export function parseTeachTab(value: string | undefined): TeachTab | null {
-  if (value !== undefined && TEACH_TABS.includes(value)) return value as TeachTab;
-  return null;
+  return member(TEACH_TABS, value);
 }

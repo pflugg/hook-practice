@@ -23,9 +23,10 @@ Preconditions:
 - The tutorial move in [Tutorial first move](./tutorial.md) is already done, and the Gain action has been taken. Power shows 4.
 
 - **Start the play.** Click the legal `[data-act]` whose text is `Play a Card`.
-- **Choose the Map.** Click the hand card whose accessible name starts with `Never Land Map`.
+- **Choose the Map.** Click the hand card whose accessible name starts with `Never Land Map`. The next step asks for a place. Payment is not open yet.
+- **Choose the shore.** Click the prompt button named `Choose this place: Skull Rock`, or `[data-loc="skullRock"] [data-move="skullRock"]`.
 - **Pay.** Click `[data-pay-power]`. The button text is `Pay 4 Power`.
-- **Proof.** `[data-loc="hangmansTree"]` no longer has class `is-locked`. The location shows the Map card.
+- **Proof.** The Map card is inside `[data-loc="skullRock"]`. `[data-loc="hangmansTree"]` no longer has class `is-locked`. The Map is not played onto the tree.
 
 There is no `drive` subcommand for this feature yet. Save the locked tree and the unlocked tree under `verification-evidence/pay-map/`.
 

@@ -17,6 +17,10 @@ describe("a dealt voyage", () => {
     expect(stayed.phase).toBe("move");
     expect(stayed.turn).toBe(1);
     expect(stayed.pending).toBeNull();
+    const acted = applyInput(dealt, { type: "selectAction", actionKey: "jr-gain" });
+    expect(acted.phase).toBe("move");
+    expect(acted.power).toBe(0);
+    expect(acted.villainLocation).toBe("jollyRoger");
   });
 
   it("lets the computer Fate the captain after the turn ends", () => {
@@ -31,6 +35,16 @@ describe("a dealt voyage", () => {
     if (fated.pending?.kind !== "fateReport") throw new Error("expected a Fate report");
     expect(fated.pending.drawn.length).toBeGreaterThan(0);
     expect(fated.pending.note.length).toBeGreaterThan(0);
+    const played = fated.pending.played;
+    expect(played, "the computer played one of the drawn Fate cards").toBeTruthy();
+    if (played) {
+      const seated = (["jollyRoger", "skullRock", "mermaidLagoon", "hangmansTree"] as const).some((id) =>
+        fated.locations[id].heroes.some((card) => card.instanceId === played.instanceId),
+      );
+      const attached = fated.attachments.some((row) => row.item.instanceId === played.instanceId);
+      const dropped = fated.fateDiscard.some((card) => card.instanceId === played.instanceId);
+      expect(seated || attached || dropped).toBe(true);
+    }
 
     const next = applyInput(fated, { type: "acknowledgeFate" });
     expect(next.pending).toBeNull();

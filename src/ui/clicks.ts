@@ -2,13 +2,6 @@ import { highlightSet } from "../engine/game";
 import type { GameState, Input } from "../engine/types";
 import { parseLocationId } from "./parse";
 
-/**
- * Route a click on the play board.
- * Legal location targets win over disabled/inert inner controls so move
- * (and drop-a-card) clicks work even when the pointer is over a dead action button.
- * During the required move, current-location action clicks are ignored — they
- * must not become selectAction or a stay-put location pick that rewrites Why.
- */
 export function resolveBoardClick(target: EventTarget | null, state: GameState): Input | null {
   if (!(target instanceof Element)) return null;
   const el = target as HTMLElement;
