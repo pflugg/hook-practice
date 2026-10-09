@@ -76,7 +76,9 @@ function esc(s: string): string {
 }
 
 function typeLabel(t: string): string {
-  return t[0].toUpperCase() + t.slice(1);
+  const head = t[0];
+  if (!head) return t;
+  return head.toUpperCase() + t.slice(1);
 }
 
 function renderCard(

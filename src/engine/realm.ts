@@ -72,8 +72,10 @@ export function locationIndex(id: LocationId): number {
 export function adjacentIds(id: LocationId): LocationId[] {
   const i = locationIndex(id);
   const next: LocationId[] = [];
-  if (i > 0) next.push(LOCATION_IDS[i - 1]);
-  if (i < LOCATION_IDS.length - 1) next.push(LOCATION_IDS[i + 1]);
+  const west = LOCATION_IDS[i - 1];
+  const east = LOCATION_IDS[i + 1];
+  if (i > 0 && west) next.push(west);
+  if (i < LOCATION_IDS.length - 1 && east) next.push(east);
   return next;
 }
 

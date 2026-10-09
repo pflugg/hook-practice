@@ -14,7 +14,7 @@ import {
 } from "../src/engine/scenes";
 import { liveMoveReason } from "../src/engine/moveReason";
 import { helpView, renderOverlay, renderPlay } from "../src/ui/app";
-import { barePlayState, give, inst, putAlly, putHero, putItem } from "./helpers";
+import { barePlayState, give, inst, pick, putAlly, putHero, putItem } from "./helpers";
 
 describe("teaching UI for Must fixes", () => {
   it("shows live Vanquish Strength and disables Confirm until the total is met", () => {
@@ -168,8 +168,8 @@ describe("teaching UI for Must fixes", () => {
     expect(next.pending?.kind).toBe("vanquishAllies");
     const crew = next.locations.mermaidLagoon.allies;
     expect(crew.length).toBeGreaterThanOrEqual(2);
-    next = applyInput(next, { type: "selectCard", instanceId: crew[0].instanceId });
-    next = applyInput(next, { type: "selectCard", instanceId: crew[1].instanceId });
+    next = applyInput(next, { type: "selectCard", instanceId: pick(crew[0], "first ally").instanceId });
+    next = applyInput(next, { type: "selectCard", instanceId: pick(crew[1], "second ally").instanceId });
     next = applyInput(next, { type: "confirm" });
     expect(next.lost).toBe(true);
     expect(next.won).toBe(false);
@@ -228,8 +228,8 @@ describe("teaching UI for Must fixes", () => {
       reasonsEnabled: false,
     });
     expect(local).toMatch(/captain's place|Boarding Party/);
-    const wendy = vanquishLocalScene().locations.mermaidLagoon.heroes[0];
-    const john = vanquishLocalScene().locations.jollyRoger.heroes[0];
+    const wendy = pick(vanquishLocalScene().locations.mermaidLagoon.heroes[0], "Wendy");
+    const john = pick(vanquishLocalScene().locations.jollyRoger.heroes[0], "John");
     expect(local).toMatch(new RegExp(`class="card[^"]*is-legal[^"]*"[^>]*data-card="${john.instanceId}"|data-card="${john.instanceId}"[^>]*is-legal`));
     const wendyBit = local.slice(
       local.indexOf(`data-card="${wendy.instanceId}"`) - 90,

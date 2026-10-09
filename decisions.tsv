@@ -1,0 +1,3 @@
+ts	phase	decision	why	evidence	result
+2026-10-09T19:17:36Z	frame	Counted about 17k lines of TypeScript, 246 passing tests, no CI and no eslint. Left game rules alone.	The repo already plays. The gap is proof, lint, and a way for the next agent to drive the app.	package.json, tests 246, tsc exit 0	baseline green
+2026-10-09T19:17:36Z	types	Turned on noUncheckedIndexedAccess and narrowed indexed reads. Skipped exactOptionalPropertyTypes.	Index checks catch empty-deck and empty-location mistakes. exactOptionalPropertyTypes would churn optional fields without making new states impossible.	tsconfig.json, npm test 246 passed	tests green

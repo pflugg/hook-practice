@@ -234,6 +234,7 @@ export function clashBesideCroc(state: GameState): {
     if (have < need) continue;
     if (hero.defId === "lostBoys" && pool.length < 2) continue;
     const best = [...pool].sort((a, b) => allyStrength(state, b.ally) - allyStrength(state, a.ally))[0];
+    if (!best) continue;
     return {
       location: crocAt,
       place: locName(crocAt),
