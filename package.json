@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "verify": "node scripts/verify.mjs prove",
+    "soak": "vite-node scripts/soak-games.ts -- --games 200 --out /tmp/hook-soak/summary.json",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

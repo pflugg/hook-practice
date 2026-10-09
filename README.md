@@ -43,6 +43,14 @@ npm run verify
 
 This starts the Vite dev server, opens the title screen, chooses **Tutorial**, moves the captain to Skull Rock, and writes screenshots plus `verification-evidence/tutorial-move/proof.json`. Cleanup stops that server and leaves the proof in place. The recipe for other paths is in `.cursor/skills/verify-hook-practice/`.
 
+## Soak
+
+```bash
+npm run soak
+```
+
+This plays 200 dealt games, seeds 1 through 200, alternating Easy and Normal Fate. The captain follows the hammer policy and a ship-closing line. Computer Fate answers each End turn. A game counts only when Peter is vanquished. The summary JSON lands in `/tmp/hook-soak/summary.json`.
+
 ## Build
 
 ```bash
