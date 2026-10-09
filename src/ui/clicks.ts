@@ -1,5 +1,6 @@
 import { highlightSet } from "../engine/game";
-import type { GameState, Input, LocationId } from "../engine/types";
+import type { GameState, Input } from "../engine/types";
+import { parseLocationId } from "./parse";
 
 /**
  * Route a click on the play board.
@@ -14,16 +15,18 @@ export function resolveBoardClick(target: EventTarget | null, state: GameState):
   const hi = highlightSet(state);
 
   const move = el.closest<HTMLElement>("[data-move]");
-  if (move?.dataset.move) {
-    return { type: "selectLocation", locationId: move.dataset.move as LocationId };
+  const moveId = parseLocationId(move?.dataset.move);
+  if (moveId) {
+    return { type: "selectLocation", locationId: moveId };
   }
 
   const requiredMove = state.phase === "move" && !state.pending;
   if (requiredMove) {
     if (el.closest<HTMLElement>("[data-card]")) return null;
     const dest = el.closest<HTMLElement>("[data-loc]");
-    if (dest && hi.has(`loc:${dest.dataset.loc}`)) {
-      return { type: "selectLocation", locationId: dest.dataset.loc as LocationId };
+    const destId = parseLocationId(dest?.dataset.loc);
+    if (destId && hi.has(`loc:${destId}`)) {
+      return { type: "selectLocation", locationId: destId };
     }
     return null;
   }
@@ -60,8 +63,9 @@ export function resolveBoardClick(target: EventTarget | null, state: GameState):
     return { type: "selectAction", actionKey: act!.dataset.act! };
   }
 
-  if (loc && hi.has(`loc:${loc.dataset.loc}`)) {
-    return { type: "selectLocation", locationId: loc.dataset.loc as LocationId };
+  const locId = parseLocationId(loc?.dataset.loc);
+  if (locId && hi.has(`loc:${locId}`)) {
+    return { type: "selectLocation", locationId: locId };
   }
 
   if (pickingCard && card) {

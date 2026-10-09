@@ -1062,7 +1062,7 @@ function expectMust(ok: boolean, id: string, summary: string, detail: string): v
   if (!ok) record("must", id, summary, detail);
 }
 
-function runScripted(deadline: number): void {
+function runScripted(_deadline: number): void {
   currentMode = "scripted";
   currentSeed = 0;
   coverage.sceneRuns += 1;

@@ -7,14 +7,21 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "verify": "node scripts/verify.mjs prove",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.2",
+    "eslint": "^10.12.0",
     "jsdom": "^26.1.0",
+    "playwright": "^1.64.0",
     "typescript": "^5.8.3",
+    "typescript-eslint": "^8.71.1",
     "vite": "^6.3.5",
     "vitest": "^3.2.4"
   }
