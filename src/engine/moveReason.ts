@@ -647,6 +647,7 @@ export function explainSelection(before: GameState, input: Input, after: GameSta
   }
 
   if (input.type === "endTurn") {
+    if (sameTable(before, after)) return null;
     const report = after.pending?.kind === "fateReport" ? after.pending : null;
     const played = report?.played;
     return pack(

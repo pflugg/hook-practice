@@ -900,7 +900,7 @@ export function applyInput(prev: GameState, input: Input): GameState {
       acknowledgeOpenFate(state);
       return state;
     }
-    if (state.phase === "actions" || (state.phase === "resolving" && !state.pending)) {
+    if ((state.phase === "actions" || state.phase === "resolving") && !state.pending) {
       refillHand(state);
       startComputerFate(state);
     }
