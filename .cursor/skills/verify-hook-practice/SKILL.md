@@ -19,7 +19,7 @@ node scripts/verify.mjs launch
 
 The command prints JSON with `url`, `pid`, and `port`. Ready means `GET` of that URL returns HTTP 200 and the HTML contains `id="app"` and `/src/main.ts`.
 
-The dev server is `npx vite --host 127.0.0.1 --port <free> --strictPort`. State lives in `/tmp/hook-practice-verify/server.json`. The Vite log is `/tmp/hook-practice-verify/vite.log`.
+The dev server is `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port <free> --strictPort`. State lives in `/tmp/hook-practice-verify/server.json`. The Vite log is `/tmp/hook-practice-verify/vite.log`.
 
 ## Doctor
 
