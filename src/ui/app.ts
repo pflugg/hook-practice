@@ -34,6 +34,7 @@ import {
 } from "../engine";
 import { advanceLesson, lessonOpening, lessonView, type LessonStep, type LessonView } from "../engine/lesson";
 import { RIVAL_LOSE_REASON, rivalGoal } from "../engine/rival";
+import { motionReduced, travelDelta, type Box } from "./motion";
 import { armSound, cueFromTransition, playCue, rivalInWarningBand, setSoundMuted, soundMuted } from "./sound";
 import { LOCATION_IDS } from "../engine/types";
 import {
@@ -79,6 +80,15 @@ function esc(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]!));
 }
 
+const NO_EXPANDED: ReadonlySet<string> = new Set();
+
+const SHORE_SHORT: Record<LocationId, string> = {
+  jollyRoger: "Ship",
+  skullRock: "Skull",
+  mermaidLagoon: "Lagoon",
+  hangmansTree: "Tree",
+};
+
 function soundToggle(): string {
   const on = !soundMuted();
   return `<button type="button" class="ctrl ${on ? "is-on" : ""}" data-sound-toggle aria-pressed="${on ? "true" : "false"}">${on ? "Sound on" : "Sound off"}</button>`;
@@ -100,6 +110,8 @@ function renderCard(
     dimmed?: boolean;
     coached?: boolean;
     inspectable?: boolean;
+    expandable?: boolean;
+    expanded?: boolean;
   },
 ): string {
   const d = def(card.defId);
@@ -121,12 +133,13 @@ function renderCard(
   const cardText = spentObsession
     ? "Peter is already in the realm. This hunt is spent — discard it if you want the slot."
     : d.text;
-  return `<button type="button" class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""} ${inspectable ? "is-inspectable" : ""} ${draggable ? "is-draggable" : ""} ${spentObsession ? "is-spent" : ""}" data-card="${card.instanceId}" ${spentObsession ? 'data-spent="obsession"' : ""} title="${esc(d.name)} — ${esc(cardText)}" aria-label="${esc(d.name)}. ${esc(cardText)}">
+  return `<button type="button" class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""} ${inspectable ? "is-inspectable" : ""} ${draggable ? "is-draggable" : ""} ${spentObsession ? "is-spent" : ""} ${opts.expanded ? "is-expanded" : ""}" data-card="${card.instanceId}" ${spentObsession ? 'data-spent="obsession"' : ""} title="${esc(d.name)} — ${esc(cardText)}" aria-label="${esc(d.name)}. ${esc(cardText)}">
     ${opts.legal && opts.size === "hand" && (state.pending?.kind === "playChooseCard" || state.pending?.kind === "cunningAlly") ? `<span class="playable-tag">Playable</span>` : ""}
     ${spentObsession ? `<span class="spent-tag">Spent</span>` : ""}
     ${typeBar}
     <h3>${esc(d.name)}</h3>
     <p class="text">${esc(cardText)}</p>
+    ${opts.expandable ? `<span class="rule-toggle" data-rule-toggle="${card.instanceId}">${opts.expanded ? "Less" : "More"}</span>` : ""}
     ${attachNote}
     ${d.type === "hero" || d.type === "ally" ? `<div class="str" title="Strength" aria-label="Strength ${str}">${str}</div>` : ""}
   </button>`;
@@ -196,7 +209,14 @@ function shouldRefuseCard(state: GameState, id: string): boolean {
   return kind === "vanquishHero" || kind === "vanquishAllies";
 }
 
-function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: Set<string>, coached: Set<string>): string {
+function renderLocation(
+  state: GameState,
+  id: LocationId,
+  hi: Set<string>,
+  sel: Set<string>,
+  coached: Set<string>,
+  expanded: ReadonlySet<string>,
+): string {
   const meta = REALM[id];
   const loc = state.locations[id];
   const locked = id === "hangmansTree" && !state.hangmansUnlocked;
@@ -235,6 +255,8 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
               dimmed: cardDimmed(state, c, hi),
               coached: coached.has(`card:${c.instanceId}`),
               inspectable: true,
+              expandable: true,
+              expanded: expanded.has(c.instanceId),
             });
             const extras = attachmentsOn(state, c.instanceId)
               .filter((a) => hi.has(`card:${a.instanceId}`))
@@ -245,6 +267,8 @@ function renderLocation(state: GameState, id: LocationId, hi: Set<string>, sel: 
                   selected: sel.has(a.instanceId),
                   coached: coached.has(`card:${a.instanceId}`),
                   inspectable: true,
+                  expandable: true,
+                  expanded: expanded.has(a.instanceId),
                 }),
               )
               .join("");
@@ -736,9 +760,12 @@ function coachPanel(advice: CoachAdvice): string {
       <button type="button" class="btn ghost pane-hide coach-hide" data-coach-toggle>Hide</button>
     </header>
     <div class="coach-copy">
-      <p class="coach-do">${esc(advice.do)}</p>
-      <p class="coach-why">${esc(advice.why)}</p>
-      ${advice.warning ? `<p class="coach-warn">${esc(advice.warning)}</p>` : ""}
+      <p class="coach-do" title="${esc(advice.do)}">${esc(advice.do)}</p>
+      <details class="coach-more">
+        <summary>Why</summary>
+        <p class="coach-why">${esc(advice.why)}</p>
+        ${advice.warning ? `<p class="coach-warn">${esc(advice.warning)}</p>` : ""}
+      </details>
     </div>
   </section>`;
 }
@@ -814,6 +841,7 @@ function playView(
   teachTab: TeachTab = "brief",
   sceneId: string | null = null,
   lesson: LessonView | null = null,
+  expanded: ReadonlySet<string> = NO_EXPANDED,
 ): string {
   const hi = highlightSet(state);
   const sel = selectedSet(state);
@@ -891,38 +919,43 @@ function playView(
           <div class="power is-loud" title="Power"><span>Power</span><b>${state.power}</b></div>
           <div class="chip chip-stat" title="Turn">Turn ${state.turn}</div>
           ${rivalMeter(state)}
-          <div class="chip chip-stat chip-piles" title="Hand, deck, and discard">Hand ${state.hand.length} · Deck ${state.villainDeck.length} · Discard ${state.villainDiscard.length}</div>
         </div>
         <div class="hud-toggles">
           ${sceneId ? `<div class="chip" data-scene-chip>Scene: ${esc(sceneId)}</div>` : ""}
           <div class="chip">${state.difficulty === "easy" ? "Easy Fate" : "Normal Fate"}</div>
           <button type="button" class="ctrl ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
-          <button type="button" class="ctrl ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
-          <button type="button" class="ctrl ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
-          ${soundToggle()}
-          <button type="button" class="ctrl" data-help>Help</button>
-          <button type="button" class="ctrl" data-resign ${resignBlocked(state) ? "disabled" : ""}>Resign</button>
+          <details class="hud-menu">
+            <summary class="ctrl" aria-label="More controls">Menu</summary>
+            <div class="hud-menu-panel">
+              <div class="chip chip-stat chip-piles" title="Hand, deck, and discard">Hand ${state.hand.length} · Deck ${state.villainDeck.length} · Discard ${state.villainDiscard.length}</div>
+              <button type="button" class="ctrl ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
+              <button type="button" class="ctrl ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
+              ${soundToggle()}
+              <button type="button" class="ctrl" data-help>Help</button>
+              <button type="button" class="ctrl" data-resign ${resignBlocked(state) ? "disabled" : ""}>Resign</button>
+            </div>
+          </details>
         </div>
       </div>
     </header>
-    <div class="prompt${clash ? " is-clash" : ""}" data-prompt>${clashMeter(clash)}<p>${esc(promptText(state))}</p><div class="prompt-actions">${promptButtons.join("")}${placeButtons.join("")}</div></div>
+    <div class="prompt${clash ? " is-clash" : ""}" data-prompt>${clashMeter(clash)}<p title="${esc(promptText(state))}">${esc(promptText(state))}</p><ol class="voyage-progress" aria-label="Objective progress">${[
+      { label: "Map", done: state.hangmansUnlocked },
+      { label: "Peter", done: state.peterPanRevealed },
+      { label: "Escort", done: state.peterPanLocation === "jollyRoger" || state.won },
+      { label: "Clash", done: state.won },
+    ].map((step, i) => `<li class="${step.done ? "is-done" : ""}"><span aria-hidden="true">${step.done ? "✓" : i + 1}</span>${step.label}</li>`).join("")}</ol><div class="prompt-actions">${promptButtons.join("")}${placeButtons.join("")}</div></div>
     ${
       lesson && !settled
         ? `<section class="lesson-banner" data-lesson-banner aria-live="polite"><strong>Lesson ${lesson.index} of ${lesson.total} · ${esc(lesson.title)}</strong><p>${esc(lesson.advice.do)}</p></section>`
         : ""
     }
     </div>
-    <ol class="voyage-progress" aria-label="Objective progress">${[
-      { label: "Map", done: state.hangmansUnlocked },
-      { label: "Peter", done: state.peterPanRevealed },
-      { label: "Escort", done: state.peterPanLocation === "jollyRoger" || state.won },
-      { label: "Clash", done: state.won },
-    ].map((step, i) => `<li class="${step.done ? "is-done" : ""}"><span aria-hidden="true">${step.done ? "✓" : i + 1}</span>${step.label}</li>`).join("")}</ol>
     <div class="play-scroll" data-play-scroll>
     <div class="stage">
       ${fateRail(state)}
-      <p class="shore-scroll-hint">Shores 1 → 2 → 3 → 4 stay in a row. Swipe, or focus the chart and use the arrow keys. Heroes move to neighboring shores.</p>
-      <div class="board-wrap realm-sheet" data-realm-map role="region" aria-label="Never Land shores, ordered from Jolly Roger to Hangman's Tree" tabindex="0"><div class="board">${TREASURE_MAP}${MAP_COMPASS}${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached)).join("")}${MAP_COAST}</div></div>
+      <p class="shore-scroll-hint">One shore at a time. Swipe, tap a shore, or focus the chart and use the arrow keys. Shores stay in order 1 → 2 → 3 → 4.</p>
+      <nav class="shore-tabs" aria-label="Shores">${LOCATION_IDS.map((id, i) => `<button type="button" class="shore-tab${state.villainLocation === id ? " is-here" : ""}" data-shore-tab="${id}" aria-label="${esc(REALM[id].name)}">${i + 1} ${SHORE_SHORT[id]}</button>`).join("")}</nav>
+      <div class="board-wrap realm-sheet" data-realm-map role="region" aria-label="Never Land shores, ordered from Jolly Roger to Hangman's Tree" tabindex="0"><div class="board">${TREASURE_MAP}${MAP_COMPASS}${LOCATION_IDS.map((id) => renderLocation(state, id, hi, sel, coached, expanded)).join("")}${MAP_COAST}</div></div>
     </div>
     <footer class="dock">
       <section class="hand ${state.pending?.kind === "playChooseCard" || state.pending?.kind === "discardSelect" ? "is-picking" : ""}">
@@ -971,6 +1004,7 @@ export function renderPlay(
     reason?: MoveReason | null;
     teachTab?: TeachTab;
     lesson?: LessonView | null;
+    expandedIds?: ReadonlySet<string>;
   } = {},
 ): string {
   const coachEnabled = flags.coachEnabled ?? true;
@@ -978,7 +1012,17 @@ export function renderPlay(
   const reasonsEnabled = flags.reasonsEnabled ?? true;
   const reason = reasonsEnabled ? (flags.reason ?? IDLE_MOVE_REASON) : null;
   const teachTab = flags.teachTab ?? "coach";
-  return playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, teachTab, null, flags.lesson ?? null);
+  return playView(
+    state,
+    coachEnabled,
+    briefEnabled,
+    reasonsEnabled,
+    reason,
+    teachTab,
+    null,
+    flags.lesson ?? null,
+    flags.expandedIds ?? NO_EXPANDED,
+  );
 }
 
 function readFlag(key: string, fallback = true): boolean {
@@ -1062,6 +1106,67 @@ function stagedScene(): GameState | null {
   return load();
 }
 
+function boxOf(el: HTMLElement): Box {
+  const rect = el.getBoundingClientRect();
+  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+}
+
+function snapshotMovers(root: HTMLElement): Map<string, Box> {
+  const map = new Map<string, Box>();
+  if (motionReduced()) return map;
+  const captain = root.querySelector<HTMLElement>(".captain-token");
+  if (captain) map.set("captain", boxOf(captain));
+  root.querySelectorAll<HTMLElement>("[data-realm-map] [data-card]").forEach((el) => {
+    const id = el.dataset.card;
+    if (id) map.set(id, boxOf(el));
+  });
+  return map;
+}
+
+function playTravel(root: HTMLElement, prev: Map<string, Box>): void {
+  if (prev.size === 0 || motionReduced()) return;
+  const fly = (el: HTMLElement, key: string) => {
+    const before = prev.get(key);
+    if (!before) return;
+    const next = boxOf(el);
+    const delta = travelDelta(before, next);
+    if (!delta) return;
+    const shore = el.closest<HTMLElement>(".location");
+    if (shore) shore.style.overflow = "visible";
+    el.classList.add("is-traveling");
+    el.style.position = "relative";
+    el.style.zIndex = "40";
+    el.getAnimations().forEach((anim) => anim.cancel());
+    el.style.transition = "none";
+    el.style.transform = `translate(${delta.dx}px, ${delta.dy}px)`;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      el.style.position = "";
+      el.style.zIndex = "";
+      el.style.transition = "";
+      el.style.transform = "";
+      el.classList.remove("is-traveling");
+      if (shore) shore.style.overflow = "";
+    };
+    void el.offsetWidth;
+    requestAnimationFrame(() => {
+      if (settled) return;
+      el.style.transition = "transform 280ms ease";
+      el.style.transform = "translate(0px, 0px)";
+    });
+    el.addEventListener("transitionend", settle, { once: true });
+    window.setTimeout(settle, 360);
+  };
+  const captain = root.querySelector<HTMLElement>(".captain-token");
+  if (captain) fly(captain, "captain");
+  root.querySelectorAll<HTMLElement>("[data-realm-map] [data-card]").forEach((el) => {
+    const id = el.dataset.card;
+    if (id) fly(el, id);
+  });
+}
+
 function bootState(): GameState {
   noteUnknownScene();
   const staged = stagedScene();
@@ -1081,11 +1186,13 @@ export function mount(root: HTMLElement): void {
   let inspectId: string | null = null;
   let lesson: LessonStep | null = null;
   let suppressClick = false;
+  const expandedCards = new Set<string>();
 
   const bindCardDrag = () => {
     root.querySelectorAll<HTMLElement>(".card.is-draggable").forEach((cardEl) => {
       cardEl.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) return;
+        if (event.target instanceof Element && event.target.closest("[data-rule-toggle]")) return;
         armSound();
         const fromId = cardEl.dataset.card;
         if (!fromId || !isDraggableCard(state, fromId)) return;
@@ -1223,8 +1330,48 @@ export function mount(root: HTMLElement): void {
     const realmRect = realm.getBoundingClientRect();
     if (locRect.width <= 0) return;
     if (locRect.left >= realmRect.left && locRect.right <= realmRect.right) return;
-    const left = realm.scrollLeft + (locRect.left - realmRect.left) - (realm.clientWidth - locRect.width) / 2;
+    const phoneShore = typeof window.matchMedia === "function" && window.matchMedia("(max-width: 760px)").matches;
+    const inset = phoneShore ? 0 : (realm.clientWidth - locRect.width) / 2;
+    const left = realm.scrollLeft + (locRect.left - realmRect.left) - inset;
     realm.scrollLeft = Math.max(0, left);
+  };
+
+  const markShown = (forced?: LocationId) => {
+    const realm = root.querySelector<HTMLElement>("[data-realm-map]");
+    if (!realm || realm.clientWidth <= 0) return;
+    const mid = realm.getBoundingClientRect().left + realm.clientWidth / 2;
+    let best: HTMLElement | null = null;
+    let bestDist = Infinity;
+    for (const loc of realm.querySelectorAll<HTMLElement>(".location")) {
+      const rect = loc.getBoundingClientRect();
+      if (rect.width <= 0) continue;
+      const dist = Math.abs(rect.left + rect.width / 2 - mid);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = loc;
+      }
+    }
+    const shown = forced ?? (best ? parseLocationId(best.dataset.loc) : null);
+    realm.querySelectorAll<HTMLElement>(".location").forEach((loc) => {
+      loc.classList.toggle("is-shown", shown !== null && loc.dataset.loc === shown);
+    });
+    root.querySelectorAll<HTMLElement>("[data-shore-tab]").forEach((tab) => {
+      const on = shown !== null && tab.dataset.shoreTab === shown;
+      tab.classList.toggle("is-shown", on);
+      if (on) tab.setAttribute("aria-current", "true");
+      else tab.removeAttribute("aria-current");
+    });
+  };
+
+  const showShore = (id: LocationId) => {
+    const realm = root.querySelector<HTMLElement>("[data-realm-map]");
+    const loc = root.querySelector<HTMLElement>(`[data-loc="${id}"]`);
+    if (!realm || !loc || realm.clientWidth <= 0) return;
+    const locRect = loc.getBoundingClientRect();
+    const realmRect = realm.getBoundingClientRect();
+    const left = realm.scrollLeft + (locRect.left - realmRect.left);
+    realm.scrollTo({ left: Math.max(0, left), behavior: motionReduced() ? "auto" : "smooth" });
+    markShown(id);
   };
 
   const focusSignature = (el: Element | null): string | null => {
@@ -1282,6 +1429,7 @@ export function mount(root: HTMLElement): void {
     savedFocus = priorFocus;
     if (!hadDialog) focusBeforeDialog = priorFocus;
     captureScroll();
+    const movers = snapshotMovers(root);
     const inspect = inspectId ? inspectOverlay(state, inspectId) : "";
     const reason = reasonsEnabled ? lastReason : null;
     const tab = activeTeachTab();
@@ -1292,19 +1440,23 @@ export function mount(root: HTMLElement): void {
       root.innerHTML =
         (state.phase === "title"
           ? titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled, sceneWarning)
-          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat)) +
+          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards)) +
         helpView(state.phase !== "title") +
         inspect;
-    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat) + inspect;
+    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards) + inspect;
     bindCardDrag();
+    root.querySelector<HTMLElement>("[data-realm-map]")?.addEventListener("scroll", () => markShown(), { passive: true });
     restoreScroll();
     bringHighlightIntoView();
     pinNextClick();
+    markShown();
     restoreFocus();
     requestAnimationFrame(() => {
       restoreScroll();
       bringHighlightIntoView();
       pinNextClick();
+      markShown();
+      playTravel(root, movers);
     });
   };
 
@@ -1345,6 +1497,23 @@ export function mount(root: HTMLElement): void {
       return;
     }
     const t = event.target as HTMLElement;
+    const rule = t.closest<HTMLElement>("[data-rule-toggle]");
+    if (rule?.dataset.ruleToggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      const id = rule.dataset.ruleToggle;
+      if (expandedCards.has(id)) expandedCards.delete(id);
+      else expandedCards.add(id);
+      render();
+      return;
+    }
+    const shore = t.closest<HTMLElement>("[data-shore-tab]");
+    if (shore?.dataset.shoreTab) {
+      event.preventDefault();
+      const id = parseLocationId(shore.dataset.shoreTab);
+      if (id) showShore(id);
+      return;
+    }
     const tabBtn = t.closest<HTMLElement>("[data-teach-tab]");
     if (tabBtn?.dataset.teachTab) {
       event.preventDefault();
@@ -1508,7 +1677,15 @@ export function mount(root: HTMLElement): void {
     if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && event.target instanceof HTMLElement) {
       const realm = event.target.closest<HTMLElement>("[data-realm-map]");
       if (realm && event.target === realm) {
-        realm.scrollBy({ left: event.key === "ArrowRight" ? 280 : -280 });
+        const phoneShore = typeof window.matchMedia === "function" && window.matchMedia("(max-width: 760px)").matches;
+        if (phoneShore) {
+          const shown = parseLocationId(realm.querySelector<HTMLElement>(".location.is-shown")?.dataset.loc);
+          const here = shown ?? state.villainLocation;
+          const idx = LOCATION_IDS.indexOf(here);
+          const next = event.key === "ArrowRight" ? Math.min(LOCATION_IDS.length - 1, idx + 1) : Math.max(0, idx - 1);
+          const id = LOCATION_IDS[next];
+          if (id) showShore(id);
+        } else realm.scrollBy({ left: event.key === "ArrowRight" ? 280 : -280 });
         event.preventDefault();
       }
     }
