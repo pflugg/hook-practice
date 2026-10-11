@@ -111,11 +111,13 @@ export function chooseAttachHero(
 ): CardInstance | null {
   const heroes = attachableHeroes(state, itemDefId);
   if (heroes.length === 0) return null;
-  if (preferPeter) {
+  const others = itemDefId === "taunt" ? heroes.filter((h) => h.defId !== "peterPan") : heroes;
+  const pool = others.length > 0 ? others : heroes;
+  if (itemDefId !== "taunt" && preferPeter) {
     const peter = heroes.find((h) => h.defId === "peterPan");
     if (peter) return peter;
   }
-  return heroes.slice().sort((a, b) => heroStrength(state, b) - heroStrength(state, a))[0] ?? null;
+  return pool.slice().sort((a, b) => heroStrength(state, b) - heroStrength(state, a))[0] ?? null;
 }
 
 export function chooseHeadacheItem(state: GameState): CardInstance | null {

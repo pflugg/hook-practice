@@ -8,6 +8,7 @@ const stalledDeals: { seed: number; label: string }[] = [
   { seed: 5, label: "the crew is stranded under a covered Mermaid Lagoon" },
   { seed: 56, label: "no Allies ashore and Peter is Strength 15" },
   { seed: 120, label: "the Map is in hand, the hideout is locked, and gains are covered" },
+  { seed: 106, label: "a Cutlass is playable only by discarding the Map" },
 ];
 
 function difficultyFor(seed: number): "easy" | "normal" {

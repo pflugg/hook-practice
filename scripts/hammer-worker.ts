@@ -95,7 +95,8 @@ interface Coverage {
 const args = process.argv.slice(2);
 function arg(name: string, fallback: string): string {
   const i = args.indexOf(`--${name}`);
-  return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
+  const value = i >= 0 ? args[i + 1] : undefined;
+  return value ? value : fallback;
 }
 
 const workerId = Number(arg("worker", "0"));
@@ -558,9 +559,12 @@ function legalInputs(state: GameState): Input[] {
   ];
   inputs.push(...buttons);
   if (state.pending?.kind === "scarePeek" && state.pending.cards.length >= 2) {
-    const [a, b] = state.pending.cards;
-    inputs.push({ type: "scareReturn", order: [a.instanceId, b.instanceId] });
-    inputs.push({ type: "scareReturn", order: [b.instanceId, a.instanceId] });
+    const a = state.pending.cards[0];
+    const b = state.pending.cards[1];
+    if (a && b) {
+      inputs.push({ type: "scareReturn", order: [a.instanceId, b.instanceId] });
+      inputs.push({ type: "scareReturn", order: [b.instanceId, a.instanceId] });
+    }
   }
   return inputs;
 }
@@ -626,7 +630,8 @@ function inputFromAdvice(state: GameState, advice: { highlights: string[] }): In
 
 function towardShip(id: LocationId): LocationId | null {
   const index = LOCATION_IDS.indexOf(id);
-  return index > 0 ? LOCATION_IDS[index - 1] : null;
+  if (index <= 0) return null;
+  return LOCATION_IDS[index - 1] ?? null;
 }
 
 function slot(state: GameState, kind: string) {
@@ -773,7 +778,8 @@ export function policyInput(state: GameState, rng: Rng): Input | null {
   if (pending?.kind === "movePieceSelect") {
     const pieces = movableAlliesAndItems(state);
     const ally = pieces.find((card) => def(card.defId).type === "ally");
-    return (ally ?? pieces[0]) ? { type: "selectCard", instanceId: (ally ?? pieces[0]).instanceId } : { type: "cancel" };
+    const pick = ally ?? pieces[0];
+    return pick ? { type: "selectCard", instanceId: pick.instanceId } : { type: "cancel" };
   }
   if (pending?.kind === "movePieceDest" || pending?.kind === "ayeAyeDest") {
     const id = pending.kind === "ayeAyeDest" ? pending.allyId : pending.pieceId;
@@ -826,8 +832,6 @@ export function policyInput(state: GameState, rng: Rng): Input | null {
     if (state.heldCard?.defId === "tickTock") return { type: "playOrDiscardHero", play: false };
     return { type: "playOrDiscardHero", play: false };
   }
-  if (pending?.kind === "starkeyDest") return { type: "cancel" };
-
   if (state.phase === "move" && !state.pending) {
     const legal = legalMoveLocations(state);
     const safe = legal.filter((id) => !(crocAt(state) === id && state.hand.length > 0));
