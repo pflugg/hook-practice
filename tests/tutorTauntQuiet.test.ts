@@ -67,6 +67,7 @@ describe("tutor Fate holds Taunt for one turn after a taunted Hero falls", () =>
     expect(playedDef(peterFate)).toBe("peterPan");
 
     const only = boardAfterTauntClear(true);
+    only.fateDiscard = [];
     only.fateDeck = [inst("taunt")];
     const onlyFate = applyInput(only, { type: "endTurn" });
     expect(playedDef(onlyFate)).toBe("taunt");
