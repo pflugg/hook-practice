@@ -33,6 +33,7 @@ import {
   type MoveReason,
 } from "../engine";
 import { advanceLesson, lessonOpening, lessonView, type LessonStep, type LessonView } from "../engine/lesson";
+import { coachPlan } from "../engine/coachPlan";
 import { RIVAL_LOSE_REASON, rivalGoal } from "../engine/rival";
 import { motionReduced, travelDelta, type Box } from "./motion";
 import { armSound, cueFromTransition, playCue, rivalInWarningBand, setSoundMuted, soundMuted } from "./sound";
@@ -112,6 +113,7 @@ function renderCard(
     inspectable?: boolean;
     expandable?: boolean;
     expanded?: boolean;
+    handRule?: boolean;
   },
 ): string {
   const d = def(card.defId);
@@ -139,6 +141,7 @@ function renderCard(
     ${typeBar}
     <h3>${esc(d.name)}</h3>
     <p class="text">${esc(cardText)}</p>
+    ${opts.handRule ? `<span class="hand-rule" data-hand-rule="${card.instanceId}">Rule</span>` : ""}
     ${opts.expandable ? `<span class="rule-toggle" data-rule-toggle="${card.instanceId}">${opts.expanded ? "Less" : "More"}</span>` : ""}
     ${attachNote}
     ${d.type === "hero" || d.type === "ally" ? `<div class="str" title="Strength" aria-label="Strength ${str}">${str}</div>` : ""}
@@ -161,7 +164,7 @@ function rivalMeter(state: GameState): string {
   const close = full || rivalInWarningBand(state);
   return `<div class="rival-meter${full ? " is-full" : ""}${close ? " is-close" : ""}" data-rival-meter role="meter" aria-label="Rival villain progress" aria-valuemin="0" aria-valuenow="${shown}" aria-valuemax="${goal}" title="If the rival reaches ${goal} before you vanquish Peter Pan at the Jolly Roger, you lose.">
     <span>Rival</span>
-    <span class="rival-track" aria-hidden="true"><i style="width:${pct}%"></i></span>
+    <span class="rival-track" aria-hidden="true"><i style="width:${pct}%"></i><span class="rival-token" style="left:${pct}%"></span></span>
     <b>${shown} / ${goal}</b>
   </div>`;
 }
@@ -750,8 +753,10 @@ function teachRailHtml(brief: string, coach: string, reasons: string, active: Te
   </aside>`;
 }
 
-function coachPanel(advice: CoachAdvice): string {
-  return `<section class="teach-pane coach-panel" data-teach-pane="coach" aria-live="polite">
+function coachPanel(state: GameState, advice: CoachAdvice): string {
+  const plan = coachPlan(state, advice);
+  const [why, ...rest] = plan.lines;
+  return `<section class="teach-pane coach-panel" data-teach-pane="coach" data-coach-plan aria-live="polite">
     <header class="teach-pane-head">
       <div class="pane-titles">
         <p class="coach-kicker">Coach</p>
@@ -761,11 +766,16 @@ function coachPanel(advice: CoachAdvice): string {
     </header>
     <div class="coach-copy">
       <p class="coach-do" title="${esc(advice.do)}">${esc(advice.do)}</p>
-      <details class="coach-more">
-        <summary>Why</summary>
-        <p class="coach-why">${esc(advice.why)}</p>
-        ${advice.warning ? `<p class="coach-warn">${esc(advice.warning)}</p>` : ""}
-      </details>
+      <ol class="plan-stages" aria-label="Plan">${plan.stages
+        .map(
+          (stage) =>
+            `<li class="is-${stage.mark}" data-plan-stage="${stage.id}" data-plan-mark="${stage.mark}">${esc(stage.label)}</li>`,
+        )
+        .join("")}</ol>
+      <div class="plan-lines">
+        <p class="coach-why">${esc(why ?? advice.why)}</p>
+        ${rest.map((line) => `<p class="plan-line">${esc(line)}</p>`).join("")}
+      </div>
     </div>
   </section>`;
 }
@@ -842,6 +852,7 @@ function playView(
   sceneId: string | null = null,
   lesson: LessonView | null = null,
   expanded: ReadonlySet<string> = NO_EXPANDED,
+  handRuleId: string | null = null,
 ): string {
   const hi = highlightSet(state);
   const sel = selectedSet(state);
@@ -890,7 +901,7 @@ function playView(
   }
 
   const briefHtml = briefEnabled && !settled ? strategySidebar(strategyBrief(state)) : "";
-  const coachHtml = advice ? coachPanel(advice) : "";
+  const coachHtml = advice ? coachPanel(state, advice) : "";
   const reasonHtml = reasonsEnabled && reason && !settled ? reasonDock(reason) : "";
   const teachOn = Boolean(briefHtml || coachHtml || reasonHtml);
   const activeTab = resolveTeachTab(teachTab, Boolean(briefHtml), Boolean(coachHtml), Boolean(reasonHtml));
@@ -964,16 +975,23 @@ function playView(
           ${
             state.hand.length
               ? state.hand
-                  .map((c) =>
-                    renderCard(state, c, {
+                  .map((c) => {
+                    const cardText = def(c.defId).text;
+                    const open = handRuleId === c.instanceId;
+                    const button = renderCard(state, c, {
                       size: "hand",
                       legal: hi.has(`card:${c.instanceId}`),
                       selected: sel.has(c.instanceId),
                       dimmed: cardDimmed(state, c, hi),
                       coached: coached.has(`card:${c.instanceId}`),
                       inspectable: true,
-                    }),
-                  )
+                      handRule: cardText.length > 80,
+                    });
+                    const pop = open
+                      ? `<div class="hand-popover" data-hand-popover role="note"><p class="hand-popover-title">${esc(def(c.defId).name)}</p><p>${esc(cardText)}</p><span class="hand-rule-close" data-hand-rule-close>Close</span></div>`
+                      : "";
+                    return `<div class="hand-slot${open ? " is-open" : ""}">${button}${pop}</div>`;
+                  })
                   .join("")
               : `<p class="empty">${esc(emptyHandCopy(state))}</p>`
           }
@@ -1005,6 +1023,7 @@ export function renderPlay(
     teachTab?: TeachTab;
     lesson?: LessonView | null;
     expandedIds?: ReadonlySet<string>;
+    handRuleId?: string | null;
   } = {},
 ): string {
   const coachEnabled = flags.coachEnabled ?? true;
@@ -1022,6 +1041,7 @@ export function renderPlay(
     null,
     flags.lesson ?? null,
     flags.expandedIds ?? NO_EXPANDED,
+    flags.handRuleId ?? null,
   );
 }
 
@@ -1187,12 +1207,13 @@ export function mount(root: HTMLElement): void {
   let lesson: LessonStep | null = null;
   let suppressClick = false;
   const expandedCards = new Set<string>();
+  let handRuleId: string | null = null;
 
   const bindCardDrag = () => {
     root.querySelectorAll<HTMLElement>(".card.is-draggable").forEach((cardEl) => {
       cardEl.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) return;
-        if (event.target instanceof Element && event.target.closest("[data-rule-toggle]")) return;
+        if (event.target instanceof Element && event.target.closest("[data-rule-toggle], [data-hand-rule]")) return;
         armSound();
         const fromId = cardEl.dataset.card;
         if (!fromId || !isDraggableCard(state, fromId)) return;
@@ -1440,10 +1461,10 @@ export function mount(root: HTMLElement): void {
       root.innerHTML =
         (state.phase === "title"
           ? titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled, sceneWarning)
-          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards)) +
+          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards, handRuleId)) +
         helpView(state.phase !== "title") +
         inspect;
-    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards) + inspect;
+    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards, handRuleId) + inspect;
     bindCardDrag();
     root.querySelector<HTMLElement>("[data-realm-map]")?.addEventListener("scroll", () => markShown(), { passive: true });
     restoreScroll();
@@ -1462,6 +1483,7 @@ export function mount(root: HTMLElement): void {
 
   const dispatch = (input: Input) => {
     inspectId = null;
+    handRuleId = null;
     const before = state;
     state.coachOn = coachEnabled;
     state = applyInput(state, input);
@@ -1497,6 +1519,20 @@ export function mount(root: HTMLElement): void {
       return;
     }
     const t = event.target as HTMLElement;
+    const handRule = t.closest<HTMLElement>("[data-hand-rule]");
+    if (handRule?.dataset.handRule) {
+      event.preventDefault();
+      event.stopPropagation();
+      handRuleId = handRuleId === handRule.dataset.handRule ? null : handRule.dataset.handRule;
+      render();
+      return;
+    }
+    if (t.closest("[data-hand-rule-close]")) {
+      event.preventDefault();
+      handRuleId = null;
+      render();
+      return;
+    }
     const rule = t.closest<HTMLElement>("[data-rule-toggle]");
     if (rule?.dataset.ruleToggle) {
       event.preventDefault();

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { renderPlay } from "../src/ui/app";
 import { travelDelta } from "../src/ui/motion";
-import { barePlayState, putHero } from "./helpers";
+import { barePlayState, give, putHero } from "./helpers";
 
 describe("board hero", () => {
   it("packs menu, status, shore tabs, and an expandable board rule into one chrome", () => {
@@ -37,6 +37,26 @@ describe("board hero", () => {
     expect(css).toContain(".card.mini.is-expanded .text");
     expect(css).toContain("hud-menu");
     expect(motion).toContain("prefers-reduced-motion");
+  });
+
+  it("shows the plan, a rival token, and a hand rule when the ability is long", () => {
+    const state = barePlayState();
+    const long = give(state, "obsession");
+    const html = renderPlay(state, {
+      handRuleId: long.instanceId,
+      briefEnabled: false,
+      reasonsEnabled: false,
+    });
+    expect(html).toContain("data-coach-plan");
+    expect(html).toContain('data-plan-stage="hideout"');
+    expect(html).toContain('data-plan-mark="now"');
+    expect(html).toContain("plan-line");
+    expect(html).toContain("rival-token");
+    expect(html).toContain(`data-hand-rule="${long.instanceId}"`);
+    expect(html).toContain("data-hand-popover");
+    expect(html).toContain("Hangman’s Tree");
+    const css = readFileSync(join(process.cwd(), "src/ui/styles.css"), "utf8");
+    expect(css).toContain(".prompt .prompt-place { display: none; }");
   });
 
   it("skips a travel that did not move and a box with no size", () => {
