@@ -619,7 +619,7 @@ function beginNextTurn(state: GameState, playedFateId?: string): void {
   const goal = rivalGoal(state.coachOn, state.difficulty);
   const gain = rivalGain(state.difficulty, playedFateId, state.coachOn);
   state.rivalProgress = Math.min(goal, state.rivalProgress + gain);
-  const push = fatePush(playedFateId);
+  const push = fatePush(playedFateId, state.coachOn);
   const playedName = playedFateId && push > 0 ? def(playedFateId).name : "";
   const hurry = playedName ? ` ${playedName} adds ${push}.` : "";
   log(state, `The rival villain advances to ${state.rivalProgress} of ${goal}.${hurry}`, "bad");
