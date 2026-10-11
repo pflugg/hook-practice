@@ -3,8 +3,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { advise } from "../src/engine/coach";
-import { highlightSet } from "../src/engine/game";
-import { barePlayState, give, putAlly, putHero } from "./helpers";
+import { applyInput, highlightSet } from "../src/engine/game";
+import { attachTo, barePlayState, give, putAlly, putHero } from "./helpers";
 
 const RIVAL_CLOSE =
   "The rival villain is at 140 of 154. Finish Peter Pan at the Jolly Roger before that track fills.";
@@ -73,5 +73,61 @@ describe("coach tempo", () => {
     const advice = advise(state);
     expect(advice.highlights).toEqual(["loc:jollyRoger"]);
     expect(highlightSet(state).has("loc:jollyRoger")).toBe(true);
+  });
+
+  it("slides Tick Tock off the ship before boarding to play crew", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.phase = "move";
+    state.villainLocation = "mermaidLagoon";
+    state.power = 4;
+    putHero(state, "peterPan", "jollyRoger");
+    const tick = putHero(state, "tickTock", "jollyRoger");
+    putAlly(state, "pirateBrute", "jollyRoger");
+    give(state, "swashbuckler");
+
+    const advice = advise(state);
+    expect(advice.highlights).toEqual(["loc:hangmansTree"]);
+    expect(advice.why).toContain("Tick Tock is on the Jolly Roger");
+    expect(highlightSet(state).has("loc:hangmansTree")).toBe(true);
+
+    state.phase = "actions";
+    state.villainLocation = "hangmansTree";
+    const slide = advise(state);
+    expect(slide.highlights).toEqual(["act:ht-moveHero"]);
+    expect(highlightSet(state).has("act:ht-moveHero")).toBe(true);
+
+    const choosing = applyInput(state, { type: "selectAction", actionKey: "ht-moveHero" });
+    const hero = advise(choosing);
+    expect(hero.highlights).toEqual([`card:${tick.instanceId}`]);
+    expect(highlightSet(choosing).has(`card:${tick.instanceId}`)).toBe(true);
+  });
+
+  it("walks a taunted Tick Tock toward the ship before playing another Item", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.phase = "move";
+    state.villainLocation = "mermaidLagoon";
+    state.power = 9;
+    putHero(state, "peterPan", "jollyRoger");
+    const tick = putHero(state, "tickTock", "hangmansTree");
+    attachTo(state, "taunt", tick.instanceId);
+    putAlly(state, "pirateBrute", "jollyRoger");
+    putAlly(state, "pirateBrute", "jollyRoger");
+    give(state, "neverLandMap");
+
+    const advice = advise(state);
+    expect(advice.highlights).toEqual(["loc:hangmansTree"]);
+    expect(advice.why).toContain("Taunt is on Tick Tock");
+    expect(highlightSet(state).has("loc:hangmansTree")).toBe(true);
+
+    state.phase = "actions";
+    state.villainLocation = "hangmansTree";
+    const walk = advise(state);
+    expect(walk.highlights).toEqual(["act:ht-moveHero"]);
+
+    const choosing = applyInput(state, { type: "selectAction", actionKey: "ht-moveHero" });
+    const hero = advise(choosing);
+    expect(hero.highlights).toEqual([`card:${tick.instanceId}`]);
   });
 });
