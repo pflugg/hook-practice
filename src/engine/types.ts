@@ -152,6 +152,8 @@ export interface GameState {
   usedActions: string[];
   tempStrength: Record<string, number>;
   defeatedHeroStrengthsThisTurn: number[];
+  tauntFateQuiet: boolean;
+  tauntFateSpent: boolean;
   log: LogEntry[];
   lastComputerFateNote: string;
   lastFateShow: FateShow | null;

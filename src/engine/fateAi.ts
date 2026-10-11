@@ -71,9 +71,12 @@ export function scoreFateCard(state: GameState, card: CardInstance): number {
 }
 
 function fatePlayPool(state: GameState, cards: CardInstance[]): CardInstance[] {
-  if (allLocationItems(state).length > 0) return cards;
-  const withoutHeadache = cards.filter((c) => c.defId !== "splittingHeadache");
-  return withoutHeadache.length > 0 ? withoutHeadache : cards;
+  const withItems = allLocationItems(state).length > 0;
+  const legal = withItems ? cards : cards.filter((c) => c.defId !== "splittingHeadache");
+  const pool = legal.length > 0 ? legal : cards;
+  if (!state.coachOn || !state.tauntFateQuiet) return pool;
+  const withoutTaunt = pool.filter((c) => c.defId !== "taunt");
+  return withoutTaunt.length > 0 ? withoutTaunt : pool;
 }
 
 export function chooseFateCard(

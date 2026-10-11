@@ -24,6 +24,7 @@ import {
   findCard,
   findCardLocation,
   heroStrength,
+  hasTaunt,
   isUnlocked,
   legalMoveLocations,
   legalPlayLocations,
@@ -112,6 +113,8 @@ export function titleState(): GameState {
     usedActions: [],
     tempStrength: {},
     defeatedHeroStrengthsThisTurn: [],
+    tauntFateQuiet: false,
+    tauntFateSpent: false,
     log: [],
     lastComputerFateNote: "",
     lastFateShow: null,
@@ -511,8 +514,14 @@ function finishVanquish(state: GameState, heroId: string, allyIds: string[]): vo
       discardVillainCard(state, ally);
     }
   }
+  const clearedTaunt =
+    state.coachOn &&
+    !state.tauntFateSpent &&
+    hasTaunt(state, heroId) &&
+    state.peterPanLocation === "jollyRoger";
   removeFromRealm(state, heroId);
   detachAll(state, heroId);
+  if (clearedTaunt) state.tauntFateQuiet = true;
   discardFateCard(state, hero);
   state.defeatedHeroStrengthsThisTurn.push(strength);
   log(state, `${def(hero.defId).name} is vanquished at ${locName(loc)}.`, "good");
@@ -538,6 +547,8 @@ function startComputerFate(state: GameState): void {
   state.defeatedHeroStrengthsThisTurn = [];
   const drawn = drawFate(state, 2);
   if (drawn.length === 0) {
+    if (state.tauntFateQuiet) state.tauntFateSpent = true;
+    state.tauntFateQuiet = false;
     noteFateDeckEmpty(state);
     beginNextTurn(state);
     return;
@@ -547,6 +558,8 @@ function startComputerFate(state: GameState): void {
   const play = choice.card;
   const discarded = drawn.filter((c) => c.instanceId !== play.instanceId);
   const choiceReason = explainFateChoice(state, drawn, play, state.difficulty);
+  if (state.tauntFateQuiet) state.tauntFateSpent = true;
+  state.tauntFateQuiet = false;
   if (play.defId === "peterPan") {
     const peterNote = "Fate plays Peter Pan. He is forced to Hangman's Tree.";
     revealPeter(state, play, discarded, peterNote);
