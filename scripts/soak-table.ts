@@ -16,6 +16,7 @@ interface Row {
   rivalProgress: number;
   deadTurns: number;
   forcedMoves: number;
+  idleActions: number;
   coachMissing: number;
   coachIllegal: number;
   coachFollowed: number;
@@ -65,6 +66,7 @@ function pack(rows: Row[], difficulty: Difficulty) {
     deadGames: deadGames.length,
     deadTurns: group.reduce((sum, row) => sum + row.deadTurns, 0),
     forcedMoves: group.reduce((sum, row) => sum + (row.forcedMoves ?? 0), 0),
+    idleActions: group.reduce((sum, row) => sum + (row.idleActions ?? 0), 0),
     coachMissing: group.reduce((sum, row) => sum + row.coachMissing, 0),
     coachIllegal: group.reduce((sum, row) => sum + row.coachIllegal, 0),
     coachFollowed: group.reduce((sum, row) => sum + row.coachFollowed, 0),

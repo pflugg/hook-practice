@@ -58,6 +58,7 @@ interface GameRow {
   rivalProgress: number;
   deadTurns: number;
   forcedMoves: number;
+  idleActions: number;
   coachMissing: number;
   coachIllegal: number;
   coachFollowed: number;
@@ -68,6 +69,7 @@ interface GameRow {
 interface PlayMark {
   deadTurns: number;
   forcedMoves: number;
+  idleActions: number;
   coachMissing: number;
   coachIllegal: number;
   coachFollowed: number;
@@ -76,7 +78,7 @@ interface PlayMark {
 }
 
 function emptyMark(): PlayMark {
-  return { deadTurns: 0, forcedMoves: 0, coachMissing: 0, coachIllegal: 0, coachFollowed: 0, coachFallback: 0, coachNotes: [] };
+  return { deadTurns: 0, forcedMoves: 0, idleActions: 0, coachMissing: 0, coachIllegal: 0, coachFollowed: 0, coachFallback: 0, coachNotes: [] };
 }
 
 function rememberCoach(mark: PlayMark, note: string): void {
@@ -108,6 +110,12 @@ function noteDeadTurn(state: GameState, seen: Set<number>, mark: PlayMark): void
   preview.usedActions = [];
   preview.pending = null;
   if (!availableActions(preview).some((action) => action.available)) mark.deadTurns += 1;
+}
+
+function noteIdleAction(state: GameState, seen: Set<number>, mark: PlayMark): void {
+  if (seen.has(state.turn) || state.phase !== "actions" || state.pending || state.usedActions.length > 0) return;
+  seen.add(state.turn);
+  if (!availableActions(state).some((action) => action.available)) mark.idleActions += 1;
 }
 
 function firstProgress(state: GameState): Input | null {
@@ -917,6 +925,7 @@ export function playSoakGame(seed: number, difficulty: Difficulty, mode: "captai
   const origin = new Set(cardIds(state));
   const probes: string[] = [];
   const seenDead = new Set<number>();
+  const seenIdle = new Set<number>();
   let offerProbed = false;
   let stepsThisTurn = 0;
   let turnWatch = state.turn;
@@ -952,6 +961,7 @@ export function playSoakGame(seed: number, difficulty: Difficulty, mode: "captai
       return row(seed, difficulty, "stall", state, step, started, `no turn advance in ${STEPS_PER_TURN_CAP} steps`, probes, mark);
     }
     noteDeadTurn(state, seenDead, mark);
+    noteIdleAction(state, seenIdle, mark);
     let input: Input | null;
     try {
       input = mode === "tutor" ? tutorInput(state, mark) : chooseInput(state, rng);
@@ -1010,6 +1020,7 @@ function row(
     rivalProgress: state?.rivalProgress ?? 0,
     deadTurns: mark.deadTurns,
     forcedMoves: mark.forcedMoves,
+    idleActions: mark.idleActions,
     coachMissing: mark.coachMissing,
     coachIllegal: mark.coachIllegal,
     coachFollowed: mark.coachFollowed,
