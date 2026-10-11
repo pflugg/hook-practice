@@ -15,6 +15,7 @@ function boardAfterTauntClear(coachOn: boolean): GameState {
   state.phase = "actions";
   const john = putHero(state, "john", "jollyRoger");
   attachTo(state, "taunt", john.instanceId);
+  putHero(state, "peterPan", "jollyRoger");
   putHero(state, "wendy", "skullRock");
   const brute = putAlly(state, "pirateBrute", "jollyRoger");
   let next = applyInput(state, { type: "selectAction", actionKey: "jr-vanquish" });
@@ -30,7 +31,7 @@ function fatePair(): GameState["fateDeck"] {
   return [inst("taunt"), inst("michael")];
 }
 
-describe("tutor Fate holds Taunt for one turn after a taunted Hero falls", () => {
+describe("tutor Fate holds Taunt once after a taunted Hero falls with Peter aboard", () => {
   it("plays the other legal card while the Coach is on", () => {
     const state = boardAfterTauntClear(true);
     state.fateDeck = fatePair();
@@ -46,6 +47,24 @@ describe("tutor Fate holds Taunt for one turn after a taunted Hero falls", () =>
     expect(playedDef(fated)).toBe("taunt");
   });
 
+  it("still plays Taunt when Peter is not aboard", () => {
+    const state = barePlayState();
+    state.coachOn = true;
+    state.villainLocation = "jollyRoger";
+    state.phase = "actions";
+    const john = putHero(state, "john", "jollyRoger");
+    attachTo(state, "taunt", john.instanceId);
+    putHero(state, "wendy", "skullRock");
+    const brute = putAlly(state, "pirateBrute", "jollyRoger");
+    let next = applyInput(state, { type: "selectAction", actionKey: "jr-vanquish" });
+    next = applyInput(next, { type: "selectCard", instanceId: john.instanceId });
+    next = applyInput(next, { type: "selectCard", instanceId: brute.instanceId });
+    next = applyInput(next, { type: "confirm" });
+    next.fateDeck = fatePair();
+    const fated = applyInput(next, { type: "endTurn" });
+    expect(playedDef(fated)).toBe("taunt");
+  });
+
   it("plays Taunt again on the following computer Fate", () => {
     const state = boardAfterTauntClear(true);
     state.fateDeck = fatePair();
@@ -55,6 +74,31 @@ describe("tutor Fate holds Taunt for one turn after a taunted Hero falls", () =>
     expect(next.phase).toBe("move");
     next = applyInput(next, { type: "selectLocation", locationId: "skullRock" });
     expect(next.phase).toBe("actions");
+    next.fateDeck = fatePair();
+    next = applyInput(next, { type: "endTurn" });
+    expect(playedDef(next)).toBe("taunt");
+  });
+
+  it("does not hold Taunt after a later clear", () => {
+    const state = boardAfterTauntClear(true);
+    state.fateDeck = fatePair();
+    let next = applyInput(state, { type: "endTurn" });
+    expect(playedDef(next)).toBe("michael");
+    next = applyInput(next, { type: "acknowledgeFate" });
+    next = applyInput(next, { type: "selectLocation", locationId: "skullRock" });
+    next = applyInput(next, { type: "endTurn" });
+    next = applyInput(next, { type: "acknowledgeFate" });
+    next = applyInput(next, { type: "selectLocation", locationId: "jollyRoger" });
+    expect(next.phase).toBe("actions");
+    expect(next.peterPanLocation).toBe("jollyRoger");
+    const again = putHero(next, "john", "jollyRoger");
+    attachTo(next, "taunt", again.instanceId);
+    const brute = putAlly(next, "pirateBrute", "jollyRoger");
+    next = applyInput(next, { type: "selectAction", actionKey: "jr-vanquish" });
+    next = applyInput(next, { type: "selectCard", instanceId: again.instanceId });
+    next = applyInput(next, { type: "selectCard", instanceId: brute.instanceId });
+    next = applyInput(next, { type: "confirm" });
+    expect(next.locations.jollyRoger.heroes.some((hero) => hero.instanceId === again.instanceId)).toBe(false);
     next.fateDeck = fatePair();
     next = applyInput(next, { type: "endTurn" });
     expect(playedDef(next)).toBe("taunt");
