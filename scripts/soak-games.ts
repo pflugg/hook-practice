@@ -2,8 +2,10 @@
  * Play complete Hook vs computer Fate games from the deal to a win or a loss.
  *
  *   npx vite-node scripts/soak-games.ts -- --games 200 --out /tmp/hook-soak/summary.json
+ *   npx vite-node scripts/soak-games.ts -- --games 200 --mode tutor --out /tmp/hook-soak/tutor.json
  *
  * Seeds are `seedStart + i` (default start 1). Even indexes play Easy, odd indexes play Normal.
+ * `--mode captain` (default) is the competent soak captain. `--mode tutor` clicks the Coach highlight.
  * The captain unlocks the hideout, then follows the hammer policy until Peter is aboard.
  * After that a closing plan stacks Strength on the ship and vanquishes him. Computer Fate answers each
  * End turn. A click that does not change the board is retried from the legal highlight set.
@@ -15,6 +17,7 @@ import { def } from "../src/engine/cards";
 import { applyInput, createGame, highlightSet } from "../src/engine/game";
 import { allyStrength, availableActions, canPlayCunning, hasTaunt, heroStrength, legalMoveLocations, mapInRealm, movableHeroes, playableHandCards, vanquishAllyPoolAt, vanquishableHeroes } from "../src/engine/queries";
 import { LOCATION_IDS, type CardInstance, type Difficulty, type GameState, type Input, type LocationId } from "../src/engine/types";
+import { coachChoice } from "./tutor-policy";
 
 interface Rng {
   next: () => number;
@@ -45,15 +48,99 @@ interface GameRow {
   seed: number;
   difficulty: Difficulty;
   result: "win" | "loss" | "crash" | "stall" | "invariant";
+  finish: "win" | "rival" | "offship" | "resign" | "other" | "stall" | "crash" | "invariant";
   turns: number;
   steps: number;
   ms: number;
   heapUsed: number;
   detail: string;
   probes: string[];
+  rivalProgress: number;
+  deadTurns: number;
+  forcedMoves: number;
+  coachMissing: number;
+  coachIllegal: number;
+  coachFollowed: number;
+  coachFallback: number;
+  coachNotes: string[];
+}
+
+interface PlayMark {
+  deadTurns: number;
+  forcedMoves: number;
+  coachMissing: number;
+  coachIllegal: number;
+  coachFollowed: number;
+  coachFallback: number;
+  coachNotes: string[];
+}
+
+function emptyMark(): PlayMark {
+  return { deadTurns: 0, forcedMoves: 0, coachMissing: 0, coachIllegal: 0, coachFollowed: 0, coachFallback: 0, coachNotes: [] };
+}
+
+function rememberCoach(mark: PlayMark, note: string): void {
+  const line = note.replace(/\s+/g, " ").trim().slice(0, 160);
+  if (!line || mark.coachNotes.includes(line) || mark.coachNotes.length >= 5) return;
+  mark.coachNotes.push(line);
+}
+
+function finishOf(result: GameRow["result"], state: GameState | null): GameRow["finish"] {
+  if (result === "stall" || result === "crash" || result === "invariant") return result;
+  if (state?.won || result === "win") return "win";
+  if (state && /rival villain/i.test(state.loseReason)) return "rival";
+  if (state && /away from the Jolly Roger/i.test(state.loseReason)) return "offship";
+  if (state && /struck the colors/i.test(state.loseReason)) return "resign";
+  return "other";
+}
+
+function noteDeadTurn(state: GameState, seen: Set<number>, mark: PlayMark): void {
+  if (seen.has(state.turn) || state.phase !== "move" || state.pending) return;
+  seen.add(state.turn);
+  const moves = legalMoveLocations(state);
+  if (moves.length !== 1) return;
+  mark.forcedMoves += 1;
+  const dest = moves[0];
+  if (!dest) return;
+  const preview = structuredClone(state);
+  preview.villainLocation = dest;
+  preview.phase = "actions";
+  preview.usedActions = [];
+  preview.pending = null;
+  if (!availableActions(preview).some((action) => action.available)) mark.deadTurns += 1;
+}
+
+function firstProgress(state: GameState): Input | null {
+  if (!progress) return null;
+  for (const input of progress(state)) {
+    if (fingerprint(applyInput(state, input)) !== fingerprint(state)) return input;
+  }
+  return null;
+}
+
+function tutorInput(state: GameState, mark: PlayMark): Input | null {
+  const choice = coachChoice(state);
+  const accepted =
+    choice.input && fingerprint(applyInput(state, choice.input)) !== fingerprint(state) ? choice.input : null;
+  if (choice.issue === "missing") {
+    mark.coachMissing += 1;
+    rememberCoach(mark, `missing: ${choice.note}`);
+  } else if (!accepted || choice.issue === "illegal") {
+    mark.coachIllegal += 1;
+    rememberCoach(mark, `illegal: ${choice.note}`);
+  }
+  if (accepted) {
+    mark.coachFollowed += 1;
+    return accepted;
+  }
+  const fallback = firstProgress(state);
+  if (!fallback) return null;
+  mark.coachFallback += 1;
+  return fallback;
 }
 
 interface SoakSummary {
+  mode: "captain" | "tutor";
   gamesRequested: number;
   finished: number;
   wins: number;
@@ -816,62 +903,45 @@ function chooseInput(state: GameState, rng: Rng): Input | null {
   return progress(state)[0] ?? null;
 }
 
-export function playSoakGame(seed: number, difficulty: Difficulty): GameRow {
+export function playSoakGame(seed: number, difficulty: Difficulty, mode: "captain" | "tutor" = "captain"): GameRow {
   const started = Date.now();
+  const mark = emptyMark();
   let state: GameState;
   try {
     state = createGame(difficulty, seed);
   } catch (error) {
-    return {
-      seed,
-      difficulty,
-      result: "crash",
-      turns: 0,
-      steps: 0,
-      ms: Date.now() - started,
-      heapUsed: process.memoryUsage().heapUsed,
-      detail: error instanceof Error ? error.message : String(error),
-      probes: [],
-    };
+    return row(seed, difficulty, "crash", null, 0, started, error instanceof Error ? error.message : String(error), [], mark);
   }
   if (!rngFor) throw new Error("hammer policy is not loaded");
   const rng = rngFor(seed);
   const origin = new Set(cardIds(state));
   const probes: string[] = [];
+  const seenDead = new Set<number>();
   let offerProbed = false;
   let stepsThisTurn = 0;
   let turnWatch = state.turn;
   const opening = invariants(state, origin);
   if (opening.length) {
-    return {
-      seed,
-      difficulty,
-      result: "invariant",
-      turns: state.turn,
-      steps: 0,
-      ms: Date.now() - started,
-      heapUsed: process.memoryUsage().heapUsed,
-      detail: opening.join("; "),
-      probes: opening,
-    };
+    return row(seed, difficulty, "invariant", state, 0, started, opening.join("; "), opening, mark);
   }
 
   for (let step = 1; step <= STEP_CAP; step += 1) {
     if (state.won || state.lost || state.phase === "over") {
-      return {
+      return row(
         seed,
         difficulty,
-        result: state.won ? "win" : "loss",
-        turns: state.turn,
-        steps: step - 1,
-        ms: Date.now() - started,
-        heapUsed: process.memoryUsage().heapUsed,
-        detail: state.won ? "win" : state.loseReason,
+        state.won ? "win" : "loss",
+        state,
+        step - 1,
+        started,
+        state.won ? "win" : state.loseReason,
         probes,
-      };
+        mark,
+        false,
+      );
     }
     if (state.turn > TURN_CAP) {
-      return row(seed, difficulty, "stall", state, step, started, `turn cap ${TURN_CAP}`, probes);
+      return row(seed, difficulty, "stall", state, step, started, `turn cap ${TURN_CAP}`, probes, mark);
     }
     if (state.turn !== turnWatch) {
       turnWatch = state.turn;
@@ -879,23 +949,24 @@ export function playSoakGame(seed: number, difficulty: Difficulty): GameRow {
     }
     stepsThisTurn += 1;
     if (stepsThisTurn > STEPS_PER_TURN_CAP) {
-      return row(seed, difficulty, "stall", state, step, started, `no turn advance in ${STEPS_PER_TURN_CAP} steps`, probes);
+      return row(seed, difficulty, "stall", state, step, started, `no turn advance in ${STEPS_PER_TURN_CAP} steps`, probes, mark);
     }
+    noteDeadTurn(state, seenDead, mark);
     let input: Input | null;
     try {
-      input = chooseInput(state, rng);
+      input = mode === "tutor" ? tutorInput(state, mark) : chooseInput(state, rng);
     } catch (error) {
-      return row(seed, difficulty, "crash", state, step, started, error instanceof Error ? error.message : String(error), probes);
+      return row(seed, difficulty, "crash", state, step, started, error instanceof Error ? error.message : String(error), probes, mark);
     }
-    if (!input) return row(seed, difficulty, "stall", state, step, started, "no legal input changes the board", probes);
+    if (!input) return row(seed, difficulty, "stall", state, step, started, "no legal input changes the board", probes, mark);
     let next: GameState;
     try {
       next = applyInput(state, input);
     } catch (error) {
-      return row(seed, difficulty, "crash", state, step, started, error instanceof Error ? error.message : String(error), probes);
+      return row(seed, difficulty, "crash", state, step, started, error instanceof Error ? error.message : String(error), probes, mark);
     }
     if (boardChangedIllegally(state, input, next)) {
-      return row(seed, difficulty, "invariant", state, step, started, `illegal ${input.type} changed the board`, probes);
+      return row(seed, difficulty, "invariant", state, step, started, `illegal ${input.type} changed the board`, probes, mark);
     }
     const problems = invariants(next, origin).filter((problem) => {
       if (problem !== "end-turn-during-condition-offer") return true;
@@ -905,33 +976,45 @@ export function playSoakGame(seed: number, difficulty: Difficulty): GameRow {
       return false;
     });
     if (problems.length) {
-      return row(seed, difficulty, "invariant", next, step, started, problems.join("; "), probes.concat(problems));
+      return row(seed, difficulty, "invariant", next, step, started, problems.join("; "), probes.concat(problems), mark);
     }
     state = next;
   }
-  return row(seed, difficulty, "stall", state, STEP_CAP, started, `step cap ${STEP_CAP}`, probes);
+  return row(seed, difficulty, "stall", state, STEP_CAP, started, `step cap ${STEP_CAP}`, probes, mark);
 }
 
 function row(
   seed: number,
   difficulty: Difficulty,
   result: GameRow["result"],
-  state: GameState,
+  state: GameState | null,
   steps: number,
   started: number,
   detail: string,
   probes: string[] = [],
+  mark: PlayMark = emptyMark(),
+  annotate = true,
 ): GameRow {
+  const phase = state ? ` phase ${state.phase} pending ${state.pending?.kind ?? "-"}` : "";
   return {
     seed,
     difficulty,
     result,
-    turns: state.turn,
+    finish: finishOf(result, state),
+    turns: state?.turn ?? 0,
     steps,
     ms: Date.now() - started,
     heapUsed: process.memoryUsage().heapUsed,
-    detail: `${detail} phase ${state.phase} pending ${state.pending?.kind ?? "-"}`,
+    detail: annotate ? `${detail}${phase}` : detail,
     probes,
+    rivalProgress: state?.rivalProgress ?? 0,
+    deadTurns: mark.deadTurns,
+    forcedMoves: mark.forcedMoves,
+    coachMissing: mark.coachMissing,
+    coachIllegal: mark.coachIllegal,
+    coachFollowed: mark.coachFollowed,
+    coachFallback: mark.coachFallback,
+    coachNotes: mark.coachNotes,
   };
 }
 
@@ -945,12 +1028,15 @@ async function main(): Promise<void> {
   const games = Number(arg("games", "200"));
   const seedStart = Number(arg("seed-start", "1"));
   const out = arg("out", "/tmp/hook-soak/summary.json");
+  const modeArg = arg("mode", "captain");
+  if (modeArg !== "captain" && modeArg !== "tutor") throw new Error(`unknown mode ${modeArg}`);
+  const mode = modeArg;
   const heapAtStart = process.memoryUsage().heapUsed;
   const rows: GameRow[] = [];
   for (let i = 0; i < games; i += 1) {
     const seed = seedStart + i;
     const difficulty: Difficulty = i % 2 === 0 ? "easy" : "normal";
-    const played = playSoakGame(seed, difficulty);
+    const played = playSoakGame(seed, difficulty, mode);
     rows.push(played);
     if (played.result !== "win" && played.result !== "loss") {
       console.error(`FAIL seed ${seed} ${difficulty} ${played.result} ${played.detail}`);
@@ -958,6 +1044,7 @@ async function main(): Promise<void> {
   }
   const finishedRows = rows.filter((played) => played.result === "win" || played.result === "loss");
   const summary: SoakSummary = {
+    mode,
     gamesRequested: games,
     finished: finishedRows.length,
     wins: rows.filter((played) => played.result === "win").length,
@@ -977,6 +1064,7 @@ async function main(): Promise<void> {
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(summary, null, 2));
   const line = {
+    mode: summary.mode,
     gamesRequested: summary.gamesRequested,
     finished: summary.finished,
     wins: summary.wins,
