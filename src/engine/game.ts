@@ -87,6 +87,7 @@ export function titleState(): GameState {
     instanceSeq: 1,
     logSeq: 1,
     turn: 1,
+    rivalProgress: 0,
     power: 0,
     handSize: 4,
     villainLocation: "jollyRoger",
