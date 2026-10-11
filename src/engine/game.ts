@@ -616,7 +616,7 @@ function resolveComputerFateCard(
 
 function beginNextTurn(state: GameState, playedFateId?: string): void {
   if (endIfOver(state)) return;
-  const goal = rivalGoal(state.coachOn);
+  const goal = rivalGoal(state.coachOn, state.difficulty);
   const gain = rivalGain(state.difficulty, playedFateId, state.coachOn);
   state.rivalProgress = Math.min(goal, state.rivalProgress + gain);
   const push = fatePush(playedFateId);

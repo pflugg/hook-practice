@@ -125,7 +125,7 @@ function affordableShipAlly(state: GameState): CardInstance | null {
 const RIVAL_CLOSE_TURNS = 16;
 
 function rivalWarning(state: GameState): string | undefined {
-  const goal = rivalGoal(state.coachOn);
+  const goal = rivalGoal(state.coachOn, state.difficulty);
   const remaining = goal - state.rivalProgress;
   if (remaining > rivalStep(state.difficulty, state.coachOn) * RIVAL_CLOSE_TURNS) return undefined;
   return `The rival villain is at ${state.rivalProgress} of ${goal}. Finish Peter Pan at the Jolly Roger before that track fills.`;
