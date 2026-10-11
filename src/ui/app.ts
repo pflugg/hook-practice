@@ -292,7 +292,7 @@ function renderLocation(
     <div class="loc-head">
       <div class="loc-art-slot" aria-hidden="true">${locationDecor(id)}</div>
       <div class="loc-title">
-        <div>
+        <div class="loc-name">
           <h2><span class="shore-number" aria-label="Shore ${LOCATION_IDS.indexOf(id) + 1}">${LOCATION_IDS.indexOf(id) + 1}</span> ${esc(meta.name)} ${locked ? `<span class="lock-badge">LOCKED</span>` : ""}</h2>
           <p>${esc(meta.subtitle)}</p>
           ${locked ? `<p class="lock-need">Need: Never Land Map</p>` : ""}
@@ -306,8 +306,8 @@ function renderLocation(
             : ""
         }
       </div>
-      <div class="location-choice">${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : `<span>${current ? "Captain here" : locked ? "Closed until the Map" : "Actions on arrival"}</span>`}</div>
     </div>
+    <div class="location-choice">${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : `<span>${current ? "Captain here" : locked ? "Closed until the Map" : "Actions on arrival"}</span>`}</div>
     <div class="row row-top">${top.map(actBtn).join("")}</div>
     ${zone("Heroes", cards("Clear — top actions are open.", loc.heroes), "heroes")}
     ${zone("Allies", cards("No crew stationed.", loc.allies), "allies")}
