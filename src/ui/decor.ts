@@ -18,8 +18,7 @@ export const CAPTAIN_TOKEN = `<svg class="captain-figure" viewBox="0 0 72 92" ar
 
 /** Thin original chart for the play topbar gap — not a realm map, no place labels. */
 export const TOPBAR_MAP = `<svg class="topbar-map" viewBox="0 0 1600 56" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-  <rect width="1600" height="56" fill="#f4e8c8"/>
-  <g fill="none" stroke="#fff6d2" stroke-width="1">
+  <g fill="none" stroke="#e8c36a" stroke-width="1">
     <path d="M0 18h1600M0 37h1600"/>
     <path d="M220 0v56M480 0v56M760 0v56M1040 0v56M1320 0v56"/>
   </g>

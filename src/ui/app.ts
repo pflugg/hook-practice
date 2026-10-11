@@ -187,8 +187,8 @@ function noItemDiscardBanner(): string {
   </aside>`;
 }
 
-function zone(title: string, body: string): string {
-  return `<div class="zone"><h3>${title}</h3>${body}</div>`;
+function zone(title: string, body: string, kind: string): string {
+  return `<div class="zone zone-${kind}"><h3>${title}</h3>${body}</div>`;
 }
 
 function cardDimmed(state: GameState, card: CardInstance, hi: Set<string>): boolean {
@@ -237,15 +237,19 @@ function renderLocation(
   const bottom = printed.filter((a) => a.row === "bottom");
   const showLegalActs = actionsAreLive(state) && state.villainLocation === id;
 
-  const actBtns = (list: typeof printed) =>
-    `<div class="row">${list
-      .map((a) => {
-        const legalAct = showLegalActs && !locked && hi.has(`act:${a.key}`);
-        const coachAct = legalAct && coached.has(`act:${a.key}`);
-        const inert = a.covered || a.used || !legalAct;
-        return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : "is-inert"} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${inert ? "disabled" : ""}>${esc(a.label)}</button>`;
-      })
-      .join("")}</div>`;
+  const actBtn = (a: (typeof printed)[number]) => {
+    const legalAct = showLegalActs && !locked && hi.has(`act:${a.key}`);
+    const coachAct = legalAct && coached.has(`act:${a.key}`);
+    const inert = a.covered || a.used || !legalAct;
+    return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : "is-inert"} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${inert ? "disabled" : ""}>${esc(a.label)}</button>`;
+  };
+  const extraBtns = extras
+    .map((a) => {
+      const extraLegal = showLegalActs && !locked && hi.has(`act:${a.key}`);
+      const extraInert = locked || a.used || !extraLegal;
+      return `<button class="action ${extraLegal ? "is-legal" : "is-inert"} ${extraLegal && coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}" ${extraInert ? "disabled" : ""}>${esc(a.label)}</button>`;
+    })
+    .join("");
 
   const cards = (empty: string, arr: CardInstance[]) =>
     arr.length
@@ -283,36 +287,32 @@ function renderLocation(
   const moveLabel = state.phase === "move" ? "Move here" : "Choose this place";
   const coachLoc = legal && coached.has(`loc:${id}`);
   return `<section class="location ${id} ${current ? "is-current" : ""} ${legal ? "is-legal" : ""} ${coachLoc ? "is-coached" : ""} ${locked ? "is-locked" : ""}" data-loc="${id}">
-    <div class="loc-vignette" aria-hidden="true">${locationDecor(id)}</div>
+    <div class="loc-vignette" aria-hidden="true"></div>
+    ${locked ? `<div class="lock-veil" aria-hidden="true"></div>` : ""}
     <div class="loc-head">
-      <div>
-        <h2><span class="shore-number" aria-label="Shore ${LOCATION_IDS.indexOf(id) + 1}">${LOCATION_IDS.indexOf(id) + 1}</span> ${esc(meta.name)} ${locked ? `<span class="lock-badge">LOCKED</span>` : ""}</h2>
-        <p>${esc(meta.subtitle)}</p>
-        ${locked ? `<p class="lock-need">Need: Never Land Map</p>` : ""}
+      <div class="loc-art-slot" aria-hidden="true">${locationDecor(id)}</div>
+      <div class="loc-title">
+        <div>
+          <h2><span class="shore-number" aria-label="Shore ${LOCATION_IDS.indexOf(id) + 1}">${LOCATION_IDS.indexOf(id) + 1}</span> ${esc(meta.name)} ${locked ? `<span class="lock-badge">LOCKED</span>` : ""}</h2>
+          <p>${esc(meta.subtitle)}</p>
+          ${locked ? `<p class="lock-need">Need: Never Land Map</p>` : ""}
+        </div>
+        ${
+          current
+            ? `<div class="captain-token" title="You — the captain">
+                ${CAPTAIN_TOKEN}
+                <span class="you-tag">You</span>
+              </div>`
+            : ""
+        }
       </div>
-      ${
-        current
-          ? `<div class="captain-token" title="You — the captain">
-              ${CAPTAIN_TOKEN}
-              <span class="you-tag">You</span>
-            </div>`
-          : ""
-      }
+      <div class="location-choice">${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : `<span>${current ? "Captain here" : locked ? "Closed until the Map" : "Actions on arrival"}</span>`}</div>
     </div>
-    <div class="location-choice">${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : `<span>${current ? "Captain here" : locked ? "Closed until the Map" : "Actions on arrival"}</span>`}</div>
-    <div class="loc-body">
-      ${locked ? `<div class="lock-veil" aria-hidden="true"></div>` : ""}
-      ${actBtns(top)}
-      ${zone("Heroes", cards("Clear — top actions are open.", loc.heroes))}
-      ${zone("Allies", cards("No crew stationed.", loc.allies))}
-      ${zone("Items", cards("No gear here.", loc.items))}
-      ${actBtns(bottom)}
-      ${extras.length ? `<div class="row">${extras.map((a) => {
-        const extraLegal = showLegalActs && !locked && hi.has(`act:${a.key}`);
-        const extraInert = locked || a.used || !extraLegal;
-        return `<button class="action ${extraLegal ? "is-legal" : "is-inert"} ${extraLegal && coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}" ${extraInert ? "disabled" : ""}>${esc(a.label)}</button>`;
-      }).join("")}</div>` : ""}
-    </div>
+    <div class="row row-top">${top.map(actBtn).join("")}</div>
+    ${zone("Heroes", cards("Clear — top actions are open.", loc.heroes), "heroes")}
+    ${zone("Allies", cards("No crew stationed.", loc.allies), "allies")}
+    ${zone("Items", cards("No gear here.", loc.items), "items")}
+    <div class="row row-bottom">${bottom.map(actBtn).join("")}${extraBtns}</div>
   </section>`;
 }
 
@@ -915,6 +915,14 @@ function playView(
   const fateLogTitle = fateEmpty
     ? `Log · Fate 0 · empty`
     : `Log · Fate ${state.fateDeck.length}`;
+  const fateShow = state.lastFateShow;
+  const fateLive = state.pending?.kind === "fateReport" && state.pending.resume === "nextTurn";
+  const fateOnTable = fateLive || fateShowStillInPlay(state, fateShow);
+  const fateLogNote = fateOnTable
+    ? ""
+    : fateShow
+      ? "That Fate is over. The card is no longer on the table."
+      : "No Fate card is across the table yet.";
 
   return `<div class="sky play-sky" aria-hidden="true"><div class="stars"></div><div class="fog fog-a"></div></div>
   <div class="grain"></div>
@@ -999,7 +1007,7 @@ function playView(
       </section>
       <aside class="log">
         <h2>${esc(fateLogTitle)}</h2>
-        <ol>${state.log.map((e) => `<li class="${e.tone}">${esc(e.text)}</li>`).join("")}</ol>
+        <ol>${fateLogNote ? `<li class="info">${esc(fateLogNote)}</li>` : ""}${state.log.map((e) => `<li class="${e.tone}">${esc(e.text)}</li>`).join("")}</ol>
       </aside>
     </footer>
     </div>
