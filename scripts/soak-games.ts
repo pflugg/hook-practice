@@ -917,6 +917,7 @@ export function playSoakGame(seed: number, difficulty: Difficulty, mode: "captai
   let state: GameState;
   try {
     state = createGame(difficulty, seed);
+    if (mode === "tutor") state.coachOn = true;
   } catch (error) {
     return row(seed, difficulty, "crash", null, 0, started, error instanceof Error ? error.message : String(error), [], mark);
   }

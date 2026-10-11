@@ -33,7 +33,7 @@ import {
   vanquishableHeroes,
 } from "./queries";
 import { highlightSet } from "./game";
-import { RIVAL_GOAL, RIVAL_STEP } from "./rival";
+import { rivalGoal, rivalStep } from "./rival";
 import { LOCATION_IDS, type ActionSlot, type CardInstance, type GameState, type LocationId } from "./types";
 
 export interface CoachAdvice {
@@ -125,9 +125,10 @@ function affordableShipAlly(state: GameState): CardInstance | null {
 const RIVAL_CLOSE_TURNS = 16;
 
 function rivalWarning(state: GameState): string | undefined {
-  const remaining = RIVAL_GOAL - state.rivalProgress;
-  if (remaining > RIVAL_STEP[state.difficulty] * RIVAL_CLOSE_TURNS) return undefined;
-  return `The rival villain is at ${state.rivalProgress} of ${RIVAL_GOAL}. Finish Peter Pan at the Jolly Roger before that track fills.`;
+  const goal = rivalGoal(state.coachOn);
+  const remaining = goal - state.rivalProgress;
+  if (remaining > rivalStep(state.difficulty, state.coachOn) * RIVAL_CLOSE_TURNS) return undefined;
+  return `The rival villain is at ${state.rivalProgress} of ${goal}. Finish Peter Pan at the Jolly Roger before that track fills.`;
 }
 
 function needPowerForMap(state: GameState): boolean {

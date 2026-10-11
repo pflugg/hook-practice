@@ -128,6 +128,7 @@ export interface GameState {
   logSeq: number;
   turn: number;
   rivalProgress: number;
+  coachOn: boolean;
   power: number;
   handSize: number;
   villainLocation: LocationId;

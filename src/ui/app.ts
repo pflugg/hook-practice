@@ -33,7 +33,7 @@ import {
   type MoveReason,
 } from "../engine";
 import { advanceLesson, lessonOpening, lessonView, type LessonStep, type LessonView } from "../engine/lesson";
-import { RIVAL_GOAL, RIVAL_LOSE_REASON } from "../engine/rival";
+import { RIVAL_LOSE_REASON, rivalGoal } from "../engine/rival";
 import { LOCATION_IDS } from "../engine/types";
 import {
   allAllies,
@@ -135,13 +135,14 @@ function abilityReadout(title: string, text: string): string {
 }
 
 function rivalMeter(state: GameState): string {
-  const shown = Math.min(RIVAL_GOAL, Math.max(0, state.rivalProgress));
-  const pct = Math.round((shown / RIVAL_GOAL) * 100);
-  const full = shown >= RIVAL_GOAL;
-  return `<div class="rival-meter${full ? " is-full" : ""}" data-rival-meter role="meter" aria-label="Rival villain progress" aria-valuemin="0" aria-valuenow="${shown}" aria-valuemax="${RIVAL_GOAL}" title="If the rival reaches ${RIVAL_GOAL} before you vanquish Peter Pan at the Jolly Roger, you lose.">
+  const goal = rivalGoal(state.coachOn);
+  const shown = Math.min(goal, Math.max(0, state.rivalProgress));
+  const pct = Math.round((shown / goal) * 100);
+  const full = shown >= goal;
+  return `<div class="rival-meter${full ? " is-full" : ""}" data-rival-meter role="meter" aria-label="Rival villain progress" aria-valuemin="0" aria-valuenow="${shown}" aria-valuemax="${goal}" title="If the rival reaches ${goal} before you vanquish Peter Pan at the Jolly Roger, you lose.">
     <span>Rival</span>
     <span class="rival-track" aria-hidden="true"><i style="width:${pct}%"></i></span>
-    <b>${shown} / ${RIVAL_GOAL}</b>
+    <b>${shown} / ${goal}</b>
   </div>`;
 }
 
@@ -343,7 +344,7 @@ export function helpView(fromPlay: boolean): string {
     <p><b>Move reasons:</b> a “Why this move” pane in that same right-hand stack. After each legal click it names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on and teaches move, Gain, the Map, Fate, one escort step, and the ship clash before a normal voyage. Below about 1100px the three panes tab under the board so type stays at the desktop floor.</p>
     <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it. The <b>Across the table</b> strip keeps the last revealed Fate play visible while that card is still on the table — never the face-down deck.</p>
     <p><b>Finding Peter:</b> At a table, Hook finds Peter with hunt cards (Worthy Opponent, Give Them a Scare, Obsession) and by being Fated. Your Fate action there hits another villain. This solo tool always Fates you after each turn, and your Fate action is a <b>practice self-Fate</b> — it flips Hook’s own Fate deck so you can practice the find without a second player.</p>
-    <p><b>Rival villain:</b> A track in the top bar fills after each of your turns. Normal fills faster than Easy. Taunt, Splitting Headache, and Pixie Dust add extra steps when the computer plays them. If the track fills before you vanquish Peter Pan at the Jolly Roger, you lose. Your own Fate action does not move the rival.</p>
+    <p><b>Rival villain:</b> A track in the top bar fills after each of your turns. Normal fills faster than Easy. Taunt, Splitting Headache, and Pixie Dust add extra steps when the computer plays them. If the track fills before you vanquish Peter Pan at the Jolly Roger, you lose. Your own Fate action does not move the rival. With the Coach on, the track runs to 222 and Normal adds 1. With the Coach off, the track runs to 154, Easy adds 1, and Normal adds 2.</p>
     <p><b>Printed Conditions:</b> Cunning and Obsession <b>are</b> printed two-player Conditions. At a table they wait for another player’s turn (a strong Ally in another realm; another player defeating a strong Hero). This tool rewrites those triggers so they can fire on your turn: Cunning if a Strength 4+ Hero is already ashore and you hold an Ally; Obsession if Peter is still hidden. A grey Condition is not ready yet.</p>
     <p><b>Drag:</b> When a card can move or be played onto a place, grab it and slide onto a glowing location (or Ally, for the Cutlass). Drop outside to cancel the slide; clicking still works.</p>
     <p><b>Play a Card:</b> An Ally or Item lands where the captain stands. It does not travel to another shore. Walk crew toward the ship afterward. Fate may still seat a Hero on any unlocked place.</p>
@@ -1234,6 +1235,7 @@ export function mount(root: HTMLElement): void {
   };
 
   const render = () => {
+    state.coachOn = coachEnabled;
     const hadDialog = Boolean(root.querySelector("[role=dialog]"));
     const priorFocus = focusSignature(document.activeElement);
     savedFocus = priorFocus;
@@ -1262,7 +1264,9 @@ export function mount(root: HTMLElement): void {
   const dispatch = (input: Input) => {
     inspectId = null;
     const before = state;
+    state.coachOn = coachEnabled;
     state = applyInput(state, input);
+    state.coachOn = coachEnabled;
     if (lesson) {
       const advanced = advanceLesson(lesson, before, state);
       const jumped = advanced.state !== state;

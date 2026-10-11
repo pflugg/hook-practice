@@ -36,6 +36,41 @@ describe("rival villain clock", () => {
     expect(html).toContain(`${RIVAL_STEP.easy} / ${RIVAL_GOAL}`);
   });
 
+  it("advances Normal more slowly while the Coach is on and keeps the game pace while it is off", () => {
+    const off = barePlayState();
+    off.difficulty = "normal";
+    off.coachOn = false;
+    quietFate(off);
+    const on = barePlayState();
+    on.difficulty = "normal";
+    on.coachOn = true;
+    quietFate(on);
+
+    const offNext = endComputerTurn(off);
+    const onNext = endComputerTurn(on);
+    expect(offNext.rivalProgress).toBe(2);
+    expect(onNext.rivalProgress).toBe(1);
+    expect(onNext.lost).toBe(false);
+
+    off.rivalProgress = 152;
+    on.rivalProgress = 152;
+    const offLate = endComputerTurn(off);
+    const onLate = endComputerTurn(on);
+    expect(offLate.lost).toBe(true);
+    expect(offLate.rivalProgress).toBe(154);
+    expect(offLate.loseReason).toBe(RIVAL_LOSE_REASON);
+    expect(onLate.lost).toBe(false);
+    expect(onLate.rivalProgress).toBe(153);
+    const html = renderPlay(onLate, { coachEnabled: true, briefEnabled: false, reasonsEnabled: false });
+    expect(html).toContain("153 / 222");
+
+    on.rivalProgress = 221;
+    const onEdge = endComputerTurn(on);
+    expect(onEdge.lost).toBe(true);
+    expect(onEdge.rivalProgress).toBe(222);
+    expect(onEdge.loseReason).toBe(RIVAL_LOSE_REASON);
+  });
+
   it("advances farther on Normal than on Easy", () => {
     const easy = barePlayState();
     easy.difficulty = "easy";

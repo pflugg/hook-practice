@@ -1,6 +1,6 @@
 import { def } from "./cards";
 import { createGame } from "./game";
-import { RIVAL_GOAL, RIVAL_STEP } from "./rival";
+import { TUTOR_RIVAL_GOAL, TUTOR_RIVAL_STEP } from "./rival";
 import type { CardInstance, GameState } from "./types";
 
 function inst(state: GameState, defId: string): CardInstance {
@@ -549,6 +549,6 @@ export function rivalLossScene(): GameState {
   state.phase = "actions";
   state.pending = null;
   state.villainLocation = "skullRock";
-  state.rivalProgress = RIVAL_GOAL - RIVAL_STEP.easy;
+  state.rivalProgress = TUTOR_RIVAL_GOAL - TUTOR_RIVAL_STEP.easy;
   return state;
 }
