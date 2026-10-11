@@ -6,7 +6,7 @@ import { advise } from "../src/engine/coach";
 import { applyInput, highlightSet } from "../src/engine/game";
 import { availableActions } from "../src/engine/queries";
 import type { GameState, LocationId } from "../src/engine/types";
-import { attachTo, barePlayState, give, putAlly, putHero } from "./helpers";
+import { attachTo, barePlayState, give, putAlly, putHero, putItem } from "./helpers";
 
 function landed(state: GameState, locationId: LocationId): GameState {
   let next = applyInput(state, { type: "selectLocation", locationId });
@@ -208,6 +208,53 @@ describe("coach tempo", () => {
     );
     expect(advice.warning).toBe(
       "Moving onto Tick Tock at Mermaid Lagoon discards your held Never Land Map with the whole hand. Seating or sliding the crocodile onto the captain does not empty the hand.",
+    );
+  });
+
+  it("vanquishes a taunted Tick Tock on the ship before playing another Ally", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.phase = "actions";
+    state.villainLocation = "jollyRoger";
+    state.power = 4;
+    state.rivalProgress = 140;
+    putHero(state, "peterPan", "jollyRoger");
+    const tick = putHero(state, "tickTock", "jollyRoger");
+    attachTo(state, "taunt", tick.instanceId);
+    putAlly(state, "pirateBrute", "jollyRoger");
+    putAlly(state, "pirateBrute", "jollyRoger");
+    give(state, "swashbuckler");
+
+    const advice = advise(state);
+    expect(advice.highlights).toEqual(["act:jr-vanquish"]);
+    expect(highlightSet(state).has("act:jr-vanquish")).toBe(true);
+    expect(advice.do).toContain("Tick Tock");
+    expect(advice.why).toBe(
+      "The rival track is close. Taunt is on Tick Tock at the Jolly Roger. Vanquish that Hero before Peter Pan. The clash spends Allies, and Peter cannot be finished while Taunt remains.",
+    );
+    expect(advice.warning).toContain("The rival villain is at 140 of 154.");
+  });
+
+  it("boards the ship to vanquish a taunted Tick Tock instead of sliding him away", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.phase = "move";
+    state.villainLocation = "skullRock";
+    state.power = 4;
+    state.rivalProgress = 140;
+    putHero(state, "peterPan", "jollyRoger");
+    const tick = putHero(state, "tickTock", "jollyRoger");
+    attachTo(state, "taunt", tick.instanceId);
+    putAlly(state, "pirateBrute", "jollyRoger");
+    putAlly(state, "pirateBrute", "jollyRoger");
+    putItem(state, "ingeniousDevice", "mermaidLagoon");
+    give(state, "swashbuckler");
+
+    const advice = advise(state);
+    expect(advice.highlights).toEqual(["loc:jollyRoger"]);
+    expect(highlightSet(state).has("loc:jollyRoger")).toBe(true);
+    expect(advice.why).toBe(
+      "The rival track is close. Taunt is on Tick Tock at the Jolly Roger. After you land, click Vanquish, then Tick Tock. Peter Pan cannot be finished while Taunt remains, so this clash comes before another Ally or another Gain. Tick Tock’s walk-on is this step: moving the captain onto the Jolly Roger discards every card in hand. The hand empties only when the captain moves onto that place — seating or sliding the crocodile onto the captain does not.",
     );
   });
 });

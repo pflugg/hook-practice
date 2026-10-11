@@ -127,6 +127,18 @@ describe("rival villain clock", () => {
     seated.fateDiscard = [];
     const afterWendy = endComputerTurn(seated);
     expect(afterWendy.rivalProgress).toBe(RIVAL_STEP.easy);
+
+    const tutorDust = barePlayState();
+    tutorDust.difficulty = "normal";
+    tutorDust.coachOn = true;
+    putHero(tutorDust, "john", "skullRock");
+    tutorDust.fateDeck = [inst("pixieDust")];
+    tutorDust.fateDiscard = [];
+    const afterTutorDust = endComputerTurn(tutorDust);
+    expect(afterTutorDust.rivalProgress).toBe(2);
+    expect(afterTutorDust.log.map((entry) => entry.text).join("\n")).toContain(
+      "The rival villain advances to 2 of 222. Pixie Dust adds 1.",
+    );
     expect(afterWendy.locations.skullRock.heroes.some((card) => card.defId === "wendy") ||
       afterWendy.locations.mermaidLagoon.heroes.some((card) => card.defId === "wendy") ||
       afterWendy.locations.jollyRoger.heroes.some((card) => card.defId === "wendy") ||
