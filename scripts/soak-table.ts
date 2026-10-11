@@ -4,7 +4,7 @@
  *   npx vite-node scripts/soak-table.ts -- /tmp/hook-soak/captain.json /tmp/hook-soak/tutor.json
  */
 import { readFileSync } from "node:fs";
-import { RIVAL_GOAL, RIVAL_STEP, TUTOR_RIVAL_GOAL, TUTOR_RIVAL_STEP } from "../src/engine/rival";
+import { EASY_RIVAL_GOAL, RIVAL_GOAL, RIVAL_STEP, TUTOR_RIVAL_GOAL, TUTOR_RIVAL_STEP } from "../src/engine/rival";
 import type { Difficulty } from "../src/engine/types";
 
 interface Row {
@@ -42,7 +42,7 @@ function pack(rows: Row[], difficulty: Difficulty, mode?: string) {
   const wins = group.filter((row) => row.result === "win");
   const rival = group.filter((row) => row.finish === "rival");
   const steps = mode === "tutor" ? TUTOR_RIVAL_STEP : RIVAL_STEP;
-  const goal = mode === "tutor" ? TUTOR_RIVAL_GOAL : RIVAL_GOAL;
+  const goal = mode === "tutor" ? TUTOR_RIVAL_GOAL : difficulty === "easy" ? EASY_RIVAL_GOAL : RIVAL_GOAL;
   const close = wins.filter((row) => goal - row.rivalProgress <= steps[difficulty] * 2);
   const blowout = wins.filter((row) => row.rivalProgress * 2 <= goal);
   const deadGames = group.filter((row) => row.deadTurns > 0);

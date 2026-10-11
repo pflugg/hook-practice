@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { applyInput } from "../src/engine/game";
 import { endgameRecap } from "../src/engine/recap";
-import { RIVAL_FATE_PUSH, RIVAL_GOAL, RIVAL_LOSE_REASON, RIVAL_STEP } from "../src/engine/rival";
+import { EASY_RIVAL_GOAL, RIVAL_GOAL, RIVAL_LOSE_REASON, RIVAL_STEP } from "../src/engine/rival";
 import { renderPlay } from "../src/ui/app";
-import { barePlayState, inst, putAlly, putHero } from "./helpers";
+import { barePlayState, inst, putAlly, putHero, putItem } from "./helpers";
 import type { GameState } from "../src/engine/types";
 
 function acknowledge(state: GameState): GameState {
@@ -33,7 +33,7 @@ describe("rival villain clock", () => {
     expect(next.turn).toBe(state.turn + 1);
     const html = renderPlay(next, { coachEnabled: false, briefEnabled: false, reasonsEnabled: false });
     expect(html).toContain("data-rival-meter");
-    expect(html).toContain(`${RIVAL_STEP.easy} / ${RIVAL_GOAL}`);
+    expect(html).toContain(`${RIVAL_STEP.easy} / ${EASY_RIVAL_GOAL}`);
   });
 
   it("advances Normal more slowly while the Coach is on and keeps the game pace while it is off", () => {
@@ -90,7 +90,33 @@ describe("rival villain clock", () => {
     taunted.fateDeck = [inst("taunt")];
     taunted.fateDiscard = [];
     const afterTaunt = endComputerTurn(taunted);
-    expect(afterTaunt.rivalProgress).toBe(RIVAL_STEP.easy + RIVAL_FATE_PUSH.taunt);
+    expect(afterTaunt.rivalProgress).toBe(2);
+
+    const dusted = barePlayState();
+    dusted.difficulty = "easy";
+    dusted.coachOn = false;
+    putHero(dusted, "wendy", "skullRock");
+    dusted.fateDeck = [inst("pixieDust")];
+    dusted.fateDiscard = [];
+    expect(endComputerTurn(dusted).rivalProgress).toBe(4);
+
+    const ache = barePlayState();
+    ache.difficulty = "normal";
+    ache.coachOn = false;
+    const cannon = putItem(ache, "cannon", "skullRock");
+    ache.fateDeck = [inst("splittingHeadache")];
+    ache.fateDiscard = [];
+    const afterAche = endComputerTurn(ache);
+    expect(afterAche.rivalProgress).toBe(2);
+    expect(afterAche.locations.skullRock.items.some((card) => card.instanceId === cannon.instanceId)).toBe(false);
+
+    const tutorTaunt = barePlayState();
+    tutorTaunt.difficulty = "easy";
+    tutorTaunt.coachOn = true;
+    putHero(tutorTaunt, "john", "mermaidLagoon");
+    tutorTaunt.fateDeck = [inst("taunt")];
+    tutorTaunt.fateDiscard = [];
+    expect(endComputerTurn(tutorTaunt).rivalProgress).toBe(2);
     expect(afterTaunt.attachments.some((row) => row.attachedTo === hero.instanceId && row.item.defId === "taunt")).toBe(
       true,
     );

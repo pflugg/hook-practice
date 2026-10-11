@@ -67,9 +67,9 @@ A common table clarification: the +2 Fate Item (Pixie Dust) does not attach to P
 ### Rival villain clock
 This clock is a practice rule. It is not a printed Villainous rule, and it is not a second villain board.
 
-The rival starts at 0. The goal is 154. The rival advances after your turn ends and the computer's Fate play is finished. Easy adds 1. Normal adds 2. When the computer plays Taunt, Splitting Headache, or Pixie Dust, that card adds 1 more. Other Fate cards add nothing. Your own Fate action does not move the rival. An empty Fate deck still advances by the difficulty step.
+The rival starts at 0. It advances after your turn ends and the computer's Fate play is finished. With the Coach off, Easy's track is 74 and Normal's track is 154. Easy adds 1. Normal adds 2. Pixie Dust adds 3. Taunt adds 1. Splitting Headache adds nothing. Other Fate cards add nothing. Your own Fate action does not move the rival. An empty Fate deck still advances by the difficulty step.
 
-While the Coach is on, the goal is 222 and Normal adds 1 instead of 2. Easy stays at 1. The Fate card pushes stay the same. Turning the Coach off returns the goal to 154 and Normal to 2 on the next tick. The top bar shows whichever goal is active.
+While the Coach is on, the goal is 222 and Normal adds 1 instead of 2. Easy stays at 1. Taunt, Splitting Headache, and Pixie Dust each add 1. Turning the Coach off returns Easy to 74, Normal to 154, and the game Fate pushes on the next tick. The top bar shows whichever goal is active.
 
 If the rival reaches 154 before you vanquish Peter Pan at the Jolly Roger, you lose. A clash that wins on the current turn still wins, because the clock moves only after the turn ends. The top bar shows the track. The loss screen names the rival and the missed ship objective.
 
