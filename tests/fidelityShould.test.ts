@@ -131,6 +131,22 @@ describe("Pixie Dust does not attach to Peter on the locked hideout", () => {
     expect(highlightSet(tauntPlay).has(`card:${peter2.instanceId}`)).toBe(true);
   });
 
+  it("Normal Fate puts Taunt on the strongest Hero who is not Peter", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    putHero(state, "peterPan", "jollyRoger");
+    putHero(state, "john", "skullRock");
+    const boys = putHero(state, "lostBoys", "mermaidLagoon");
+    expect(chooseAttachTarget(state, "normal", "taunt").hero?.instanceId).toBe(boys.instanceId);
+  });
+
+  it("Normal Fate still attaches Taunt to Peter when he is the only Hero", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    const peter = putHero(state, "peterPan", "jollyRoger");
+    expect(chooseAttachTarget(state, "normal", "taunt").hero?.instanceId).toBe(peter.instanceId);
+  });
+
   it("Pixie Dust may attach to Peter after the tree unlocks", () => {
     const state = barePlayState();
     state.hangmansUnlocked = true;
