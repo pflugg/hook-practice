@@ -161,7 +161,7 @@ describe("coach tempo", () => {
     expect(advice.highlights).toEqual(["loc:mermaidLagoon"]);
     expect(highlightSet(state).has("loc:mermaidLagoon")).toBe(true);
     expect(advice.why).toBe(
-      "Jolly Roger has no action you can take this turn. Mermaid Lagoon still has one.",
+      "Jolly Roger has no action you can take this turn. Mermaid Lagoon still has one. Tick Tock’s walk-on: skip Skull Rock. The hand empties only if the captain moves onto that place. Seating or sliding the crocodile onto the captain does not.",
     );
   });
 
@@ -182,10 +182,32 @@ describe("coach tempo", () => {
     expect(advice.highlights).toEqual(["loc:mermaidLagoon"]);
     expect(highlightSet(state).has("loc:mermaidLagoon")).toBe(true);
     expect(advice.why).toBe(
-      "Jolly Roger has no action you can take this turn. Mermaid Lagoon still has one. Moving there discards your hand, because Tick Tock is on that shore.",
+      "Jolly Roger has no action you can take this turn. Mermaid Lagoon still has one. Tick Tock’s walk-on is this step: moving the captain onto Mermaid Lagoon discards every card in hand. The hand empties only when the captain moves onto that place — seating or sliding the crocodile onto the captain does not.",
     );
     expect(advice.warning).toBe(
       "Every other shore has no action you can take this turn. This step lands on Tick Tock and discards the hand.",
+    );
+  });
+
+  it("keeps a held Never Land Map off Tick Tock when the ship has no action", () => {
+    const state = barePlayState();
+    state.phase = "move";
+    state.villainLocation = "skullRock";
+    state.departedFrom = "jollyRoger";
+    state.power = 0;
+    putHero(state, "john", "jollyRoger");
+    putHero(state, "tickTock", "mermaidLagoon");
+    give(state, "pirateBrute");
+    give(state, "neverLandMap");
+
+    const advice = advise(state);
+    expect(advice.highlights).toEqual(["loc:jollyRoger"]);
+    expect(highlightSet(state).has("loc:jollyRoger")).toBe(true);
+    expect(advice.why).toBe(
+      "Jolly Roger has no action you can take this turn. Mermaid Lagoon still has one, but Tick Tock’s walk-on would discard the held Never Land Map with the whole hand. The Map stays in hand until Hangman’s Tree is open.",
+    );
+    expect(advice.warning).toBe(
+      "Moving onto Tick Tock at Mermaid Lagoon discards your held Never Land Map with the whole hand. Seating or sliding the crocodile onto the captain does not empty the hand.",
     );
   });
 });
