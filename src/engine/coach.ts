@@ -24,6 +24,7 @@ import {
   movableHeroes,
   playableHandCards,
   anyTauntInRealm,
+  hasTaunt,
   clashAndCrocLine,
   cutlassStrapLine,
   preferredAttachAlly,
@@ -32,6 +33,7 @@ import {
   vanquishableHeroes,
 } from "./queries";
 import { highlightSet } from "./game";
+import { RIVAL_GOAL, RIVAL_STEP } from "./rival";
 import { LOCATION_IDS, type ActionSlot, type CardInstance, type GameState, type LocationId } from "./types";
 
 export interface CoachAdvice {
@@ -52,6 +54,16 @@ function tickTockAt(state: GameState): LocationId | null {
     if (state.locations[id].heroes.some((h) => h.defId === "tickTock")) return id;
   }
   return null;
+}
+
+function crocBlocksShip(state: GameState): boolean {
+  return tickTockAt(state) === "jollyRoger";
+}
+
+function tauntedOffShip(state: GameState): { hero: CardInstance; location: LocationId } | null {
+  if (!anyTauntInRealm(state) || peterReadyToFinish(state)) return null;
+  const found = allHeroes(state).find((hero) => hasTaunt(state, hero.hero.instanceId) && hero.location !== "jollyRoger");
+  return found ?? null;
 }
 
 function jrStrength(state: GameState): number {
@@ -90,9 +102,32 @@ function hasKind(state: GameState, id: LocationId, kind: ActionSlot["kind"]): Ac
 }
 
 function playableMap(state: GameState): CardInstance | null {
+  if (state.hangmansUnlocked) return null;
   const map = mapInHand(state);
   if (!map) return null;
   return playableHandCards(state).some((c) => c.instanceId === map.instanceId) ? map : null;
+}
+
+function crewShort(state: GameState): boolean {
+  if (!state.peterPanRevealed) return false;
+  const peter = peterCard(state);
+  const need = peter ? heroStrength(state, peter.hero) : 8;
+  return jrStrength(state) < need;
+}
+
+function affordableShipAlly(state: GameState): CardInstance | null {
+  const allies = state.hand
+    .filter((card) => def(card.defId).type === "ally" && canPayNow(state, card))
+    .sort((a, b) => def(b.defId).strength - def(a.defId).strength);
+  return allies[0] ?? null;
+}
+
+const RIVAL_CLOSE_TURNS = 16;
+
+function rivalWarning(state: GameState): string | undefined {
+  const remaining = RIVAL_GOAL - state.rivalProgress;
+  if (remaining > RIVAL_STEP[state.difficulty] * RIVAL_CLOSE_TURNS) return undefined;
+  return `The rival villain is at ${state.rivalProgress} of ${RIVAL_GOAL}. Finish Peter Pan at the Jolly Roger before that track fills.`;
 }
 
 function needPowerForMap(state: GameState): boolean {
@@ -374,7 +409,8 @@ function withReach(why: string, state: GameState, heroLoc: LocationId | null | u
 }
 
 function say(next: string, why: string, highlights: string[], state: GameState): CoachAdvice {
-  const warning = warningFor(state, highlights);
+  const parts = [warningFor(state, highlights), rivalWarning(state)].filter((part): part is string => Boolean(part));
+  const warning = parts.join(" ");
   return warning ? { do: next, why, highlights, warning } : { do: next, why, highlights };
 }
 
@@ -403,7 +439,7 @@ function scoreMove(state: GameState, id: LocationId): number {
   if (blocked && discard && gainAmt === 0) score += 220;
   if (!state.peterPanRevealed && fate && !blocked) score += state.hangmansUnlocked ? 360 : 40;
   if (jrStrength(state) < 8 && play && state.hand.some((c) => def(c.defId).type === "ally" && def(c.defId).cost <= state.power + gainAmt)) {
-    score += id === "jollyRoger" ? 280 : 120;
+    score += id === "jollyRoger" ? 500 : 40;
   }
   if (state.peterPanRevealed && state.hangmansUnlocked && peter?.location !== "jollyRoger") {
     const deviceHere = state.locations[id].items.some((c) => c.defId === "ingeniousDevice");
@@ -547,6 +583,29 @@ function chooseMove(state: GameState): MoveChoice {
       if (hold) return { dest: hold, forcedBounce: false };
       if (safe[0]) return { dest: safe[0], forcedBounce: false };
     }
+  }
+  const slideCroc = crocBlocksShip(state)
+    ? legal.find((id) => hasKind(state, id, "moveHero") && movableHeroes(relocated(state, id)).some((hero) => hero.defId === "tickTock"))
+    : undefined;
+  if (slideCroc && (crewShort(state) || affordableShipAlly(state))) {
+    return { dest: slideCroc, forcedBounce: false };
+  }
+  const taunted = tauntedOffShip(state);
+  if (taunted) {
+    const dest = legal.find(
+      (id) => hasKind(state, id, "moveHero") && movableHeroes(relocated(state, id)).some((hero) => hero.instanceId === taunted.hero.instanceId),
+    );
+    if (dest) return { dest, forcedBounce: false };
+  }
+  const walking = legal.some((id) => peterWalkReason(state, id));
+  if (
+    !walking &&
+    crewShort(state) &&
+    affordableShipAlly(state) &&
+    legal.includes("jollyRoger") &&
+    tickTockAt(state) !== "jollyRoger"
+  ) {
+    return { dest: "jollyRoger", forcedBounce: false };
   }
   const departed = state.departedFrom && legal.includes(state.departedFrom) ? state.departedFrom : null;
   const ranked = [...legal].sort((a, b) => scoreMove(state, b) - scoreMove(state, a));
@@ -781,6 +840,17 @@ function moveWhy(state: GameState, dest: LocationId): string {
   if (dest === "jollyRoger" && peterReadyToFinish(relocated(state, dest))) {
     return "Peter is already on the ship and your crew can finish the clash. Take the Vanquish action there — that is the only place the win counts.";
   }
+  const taunted = tauntedOffShip(state);
+  if (taunted && hasKind(state, dest, "moveHero")) {
+    return `Taunt is on ${cardName(taunted.hero)} at ${locName(taunted.location)}. After you land, click Move a Hero, then ${cardName(taunted.hero)}, and walk that Hero toward the Jolly Roger. Peter cannot be vanquished until the taunted Hero is.`;
+  }
+  if (crocBlocksShip(state) && hasKind(state, dest, "moveHero")) {
+    return "Tick Tock is on the Jolly Roger. After you land, click Move a Hero, then Tick Tock, then Skull Rock. Boarding the ship now would discard your hand.";
+  }
+  const boarding = dest === "jollyRoger" ? affordableShipAlly(state) : null;
+  if (boarding && crewShort(state)) {
+    return `Peter still needs Strength on the Jolly Roger. After you land, click Play a Card, then ${cardName(boarding)}. An Ally played on the ship counts toward his clash. Playing that Ally on another shore leaves it a walk away.`;
+  }
   if (peter && state.hangmansUnlocked && peter.location !== "jollyRoger" && hasKind(state, dest, "moveHero")) {
     const step = peterStep(state);
     return step
@@ -833,7 +903,7 @@ function adviseMove(state: GameState): CoachAdvice {
 
 function usefulPlay(state: GameState): CardInstance | null {
   const playable = coachPlayable(state);
-  const map = playable.find((c) => c.defId === "neverLandMap");
+  const map = playableMap(state);
   if (map) return map;
   if (needPowerForMap(state)) {
     const income = playable.find((c) => c.defId === "worthyOpponent");
@@ -884,6 +954,15 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
     const mh = find("moveHero");
     if (mh && mh.available && movableHeroes(state).some((h) => h.defId === "peterPan")) return mh;
   }
+  if (crocBlocksShip(state)) {
+    const mh = find("moveHero");
+    if (mh && mh.available && movableHeroes(state).some((h) => h.defId === "tickTock")) return mh;
+  }
+  const taunted = tauntedOffShip(state);
+  if (taunted) {
+    const mh = find("moveHero");
+    if (mh && mh.available && movableHeroes(state).some((h) => h.instanceId === taunted.hero.instanceId)) return mh;
+  }
 
   if (playableMap(state)) {
     const play = find("playCard");
@@ -898,7 +977,8 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
   }
 
   const card = usefulPlay(state);
-  if (card && canPayNow(state, card) && !attachBlocked(state, card) && find("playCard")) return find("playCard")!;
+  const allyOffShip = Boolean(card && crewShort(state) && def(card.defId).type === "ally" && state.villainLocation !== "jollyRoger");
+  if (card && !allyOffShip && canPayNow(state, card) && !attachBlocked(state, card) && find("playCard")) return find("playCard")!;
 
   const waitingAttach = blockedAttachInHand(state);
   if (waitingAttach && state.power < def(waitingAttach.defId).cost) {
@@ -912,7 +992,7 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
   if (!blocked && !state.peterPanRevealed && find("fate")) return find("fate")!;
 
   const tick = tickTockAt(state);
-  if (tick && find("vanquish") && vanquishableHeroes(state).some((h) => h.hero.defId === "tickTock")) {
+  if (!crewShort(state) && tick && find("vanquish") && vanquishableHeroes(state).some((h) => h.hero.defId === "tickTock")) {
     return find("vanquish")!;
   }
 
@@ -920,12 +1000,13 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
     return find("moveItemAlly")!;
   }
 
-  if (!blocked && card && canPayNow(state, card) && !attachBlocked(state, card) && find("playCard")) {
+  if (!blocked && card && !allyOffShip && canPayNow(state, card) && !attachBlocked(state, card) && find("playCard")) {
     return find("playCard")!;
   }
 
+  const saveTheTurn = Boolean(rivalWarning(state)) && !needPowerForMap(state);
   const leftoverGain = acts.filter((a) => a.kind === "gainPower").sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1))[0];
-  if (leftoverGain && state.power < 8) return leftoverGain;
+  if (leftoverGain && state.power < 8 && !saveTheTurn) return leftoverGain;
 
   if (find("discard") && wantsNamedDiscard(state)) return find("discard")!;
 
@@ -939,13 +1020,14 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
   const bank = bankableGain(state, acts);
   if (bank) return bank;
 
-  if (find("vanquish") && preferredVanquishTarget(state)) return find("vanquish")!;
+  if (!crewShort(state) && find("vanquish") && preferredVanquishTarget(state)) return find("vanquish")!;
 
   return "end";
 }
 
 function bankableGain(state: GameState, acts: ActionSlot[]): ActionSlot | undefined {
   if (state.power >= 12) return undefined;
+  if (rivalWarning(state) && !needPowerForMap(state)) return undefined;
   return [...acts.filter((a) => a.kind === "gainPower")].sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1))[0];
 }
 
@@ -1397,8 +1479,18 @@ function advisePending(state: GameState): CoachAdvice {
               return loc ? state.locations[loc].heroes : [];
             })()
           : movableHeroes(state);
+      const tauntedHero = legalHeroes.find((hero) => hasTaunt(state, hero.instanceId) && findCardLocation(state, hero.instanceId) !== "jollyRoger");
+      if (tauntedHero && !peterReadyToFinish(state)) {
+        return say(
+          `Move ${cardName(tauntedHero)} toward the Jolly Roger (click ${cardName(tauntedHero)}, then the glowing square toward the ship).`,
+          `Taunt is on ${cardName(tauntedHero)}. That Hero has to be vanquished before Peter Pan.`,
+          [`card:${tauntedHero.instanceId}`],
+          state,
+        );
+      }
       const peter = legalHeroes.find((h) => h.defId === "peterPan");
-      if (peter && (p.kind === "starkeyHero" || state.hangmansUnlocked)) {
+      const peterFrom = peter ? findCardLocation(state, peter.instanceId) : null;
+      if (peter && peterFrom && peterFrom !== "jollyRoger" && (p.kind === "starkeyHero" || state.hangmansUnlocked)) {
         const from = findCardLocation(state, peter.instanceId);
         const dest = from ? towardRoger(from) : null;
         const dests = from ? adjacentUnlocked(state, from) : [];
@@ -1429,7 +1521,7 @@ function advisePending(state: GameState): CoachAdvice {
       const from = findCardLocation(state, p.heroId);
       const hero = findCard(state, p.heroId);
       const dests = from ? adjacentUnlocked(state, from) : [];
-      const toward = from && hero?.defId === "peterPan" ? towardRoger(from) : null;
+      const toward = from && hero && (hero.defId === "peterPan" || hasTaunt(state, hero.instanceId)) ? towardRoger(from) : null;
       const awayFromCroc = dests.find((id) => tickTockAt(state) !== id);
       const dest =
         toward && dests.includes(toward)

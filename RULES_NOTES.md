@@ -71,6 +71,8 @@ The rival starts at 0. The goal is 154. The rival advances after your turn ends 
 
 If the rival reaches 154 before you vanquish Peter Pan at the Jolly Roger, you lose. A clash that wins on the current turn still wins, because the clock moves only after the turn ends. The top bar shows the track. The loss screen names the rival and the missed ship objective.
 
+The Coach reads that same track. When 16 difficulty-steps or fewer remain (16 on Easy, 32 on Normal), the Coach adds one plain sentence: the rival’s count, the goal 154, and that Peter must be finished at the Jolly Roger. A second Never Land Map is not part of the plan once the tree is open. Ship Allies are kept for Peter, not spent on other Heroes, and a payable Ally is played on the ship rather than on a discard shore. If Tick Tock or a taunted Hero is blocking that clash, the Coach slides that Hero toward the crew instead of pacing between Gain shores.
+
 ### Not modeled
 - Multi-villain boards, Activate actions, and other villains
 - Licensed art, logos, proprietary game fonts, or verbatim published card text
