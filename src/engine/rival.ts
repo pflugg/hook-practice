@@ -2,10 +2,25 @@ import type { Difficulty } from "./types";
 
 export const RIVAL_GOAL = 154;
 
+export const TUTOR_RIVAL_GOAL = 222;
+
 export const RIVAL_STEP: Record<Difficulty, number> = {
   easy: 1,
   normal: 2,
 };
+
+export const TUTOR_RIVAL_STEP: Record<Difficulty, number> = {
+  easy: 1,
+  normal: 1,
+};
+
+export function rivalStep(difficulty: Difficulty, coachOn: boolean): number {
+  return coachOn ? TUTOR_RIVAL_STEP[difficulty] : RIVAL_STEP[difficulty];
+}
+
+export function rivalGoal(coachOn: boolean): number {
+  return coachOn ? TUTOR_RIVAL_GOAL : RIVAL_GOAL;
+}
 
 export const RIVAL_FATE_PUSH = {
   taunt: 1,
@@ -23,6 +38,6 @@ export function fatePush(defId: string | undefined): number {
 export const RIVAL_LOSE_REASON =
   "The rival villain reached their objective before Captain Hook vanquished Peter Pan at the Jolly Roger.";
 
-export function rivalGain(difficulty: Difficulty, playedDefId: string | undefined): number {
-  return RIVAL_STEP[difficulty] + fatePush(playedDefId);
+export function rivalGain(difficulty: Difficulty, playedDefId: string | undefined, coachOn = false): number {
+  return rivalStep(difficulty, coachOn) + fatePush(playedDefId);
 }

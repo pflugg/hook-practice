@@ -61,6 +61,14 @@ describe("rival villain clock", () => {
     expect(offLate.loseReason).toBe(RIVAL_LOSE_REASON);
     expect(onLate.lost).toBe(false);
     expect(onLate.rivalProgress).toBe(153);
+    const html = renderPlay(onLate, { coachEnabled: true, briefEnabled: false, reasonsEnabled: false });
+    expect(html).toContain("153 / 222");
+
+    on.rivalProgress = 221;
+    const onEdge = endComputerTurn(on);
+    expect(onEdge.lost).toBe(true);
+    expect(onEdge.rivalProgress).toBe(222);
+    expect(onEdge.loseReason).toBe(RIVAL_LOSE_REASON);
   });
 
   it("advances farther on Normal than on Easy", () => {

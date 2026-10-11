@@ -1,5 +1,5 @@
 import { def, fateCardIds, villainCardIds } from "./cards";
-import { RIVAL_GOAL, RIVAL_LOSE_REASON, fatePush, rivalGain } from "./rival";
+import { RIVAL_LOSE_REASON, fatePush, rivalGain, rivalGoal } from "./rival";
 import {
   chooseAttachTarget,
   chooseFateCard,
@@ -616,13 +616,14 @@ function resolveComputerFateCard(
 
 function beginNextTurn(state: GameState, playedFateId?: string): void {
   if (endIfOver(state)) return;
-  const gain = rivalGain(state.difficulty, playedFateId);
-  state.rivalProgress = Math.min(RIVAL_GOAL, state.rivalProgress + gain);
+  const goal = rivalGoal(state.coachOn);
+  const gain = rivalGain(state.difficulty, playedFateId, state.coachOn);
+  state.rivalProgress = Math.min(goal, state.rivalProgress + gain);
   const push = fatePush(playedFateId);
   const playedName = playedFateId && push > 0 ? def(playedFateId).name : "";
   const hurry = playedName ? ` ${playedName} adds ${push}.` : "";
-  log(state, `The rival villain advances to ${state.rivalProgress} of ${RIVAL_GOAL}.${hurry}`, "bad");
-  if (state.rivalProgress >= RIVAL_GOAL) {
+  log(state, `The rival villain advances to ${state.rivalProgress} of ${goal}.${hurry}`, "bad");
+  if (state.rivalProgress >= goal) {
     state.lost = true;
     state.loseReason = RIVAL_LOSE_REASON;
     state.phase = "over";

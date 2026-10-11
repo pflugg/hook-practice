@@ -4,7 +4,7 @@
  *   npx vite-node scripts/soak-table.ts -- /tmp/hook-soak/captain.json /tmp/hook-soak/tutor.json
  */
 import { readFileSync } from "node:fs";
-import { RIVAL_GOAL, RIVAL_STEP } from "../src/engine/rival";
+import { RIVAL_GOAL, RIVAL_STEP, TUTOR_RIVAL_GOAL, TUTOR_RIVAL_STEP } from "../src/engine/rival";
 import type { Difficulty } from "../src/engine/types";
 
 interface Row {
@@ -35,14 +35,16 @@ function quantile(sorted: number[], p: number): number {
   return sorted[index] ?? 0;
 }
 
-function pack(rows: Row[], difficulty: Difficulty) {
+function pack(rows: Row[], difficulty: Difficulty, mode?: string) {
   const group = rows.filter((row) => row.difficulty === difficulty);
   const turns = group.map((row) => row.turns).sort((a, b) => a - b);
   const finished = group.filter((row) => row.result === "win" || row.result === "loss");
   const wins = group.filter((row) => row.result === "win");
   const rival = group.filter((row) => row.finish === "rival");
-  const close = wins.filter((row) => RIVAL_GOAL - row.rivalProgress <= RIVAL_STEP[difficulty] * 2);
-  const blowout = wins.filter((row) => row.rivalProgress * 2 <= RIVAL_GOAL);
+  const steps = mode === "tutor" ? TUTOR_RIVAL_STEP : RIVAL_STEP;
+  const goal = mode === "tutor" ? TUTOR_RIVAL_GOAL : RIVAL_GOAL;
+  const close = wins.filter((row) => goal - row.rivalProgress <= steps[difficulty] * 2);
+  const blowout = wins.filter((row) => row.rivalProgress * 2 <= goal);
   const deadGames = group.filter((row) => row.deadTurns > 0);
   const pure = group.filter((row) => row.coachFallback === 0 && row.result !== "crash");
   const pureWins = pure.filter((row) => row.result === "win");
@@ -85,6 +87,6 @@ for (const path of paths) {
   const summary = JSON.parse(readFileSync(path, "utf8")) as Summary;
   console.log(`\n${path} mode=${summary.mode ?? "?"}`);
   for (const difficulty of ["easy", "normal"] as const) {
-    console.log(difficulty, JSON.stringify(pack(summary.rows, difficulty)));
+    console.log(difficulty, JSON.stringify(pack(summary.rows, difficulty, summary.mode)));
   }
 }

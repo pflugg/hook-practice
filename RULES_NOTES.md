@@ -69,6 +69,8 @@ This clock is a practice rule. It is not a printed Villainous rule, and it is no
 
 The rival starts at 0. The goal is 154. The rival advances after your turn ends and the computer's Fate play is finished. Easy adds 1. Normal adds 2. When the computer plays Taunt, Splitting Headache, or Pixie Dust, that card adds 1 more. Other Fate cards add nothing. Your own Fate action does not move the rival. An empty Fate deck still advances by the difficulty step.
 
+While the Coach is on, the goal is 222 and Normal adds 1 instead of 2. Easy stays at 1. The Fate card pushes stay the same. Turning the Coach off returns the goal to 154 and Normal to 2 on the next tick. The top bar shows whichever goal is active.
+
 If the rival reaches 154 before you vanquish Peter Pan at the Jolly Roger, you lose. A clash that wins on the current turn still wins, because the clock moves only after the turn ends. The top bar shows the track. The loss screen names the rival and the missed ship objective.
 
 The Coach reads that same track. When 16 difficulty-steps or fewer remain (16 on Easy, 32 on Normal), the Coach adds one plain sentence: the rival’s count, the goal 154, and that Peter must be finished at the Jolly Roger. A second Never Land Map is not part of the plan once the tree is open. Ship Allies are kept for Peter, not spent on other Heroes, and a payable Ally is played on the ship rather than on a discard shore. If Tick Tock or a taunted Hero is blocking that clash, the Coach slides that Hero toward the crew instead of pacing between Gain shores.
