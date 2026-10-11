@@ -26,6 +26,9 @@ describe("teach-pane scroll across remounts", () => {
 
     mount(root);
     expect(root.querySelector("[data-teach-rail]")).toBeTruthy();
+    if (!root.querySelector('[data-teach-pane="brief"]')) {
+      root.querySelector<HTMLButtonElement>("[data-brief-toggle]")!.click();
+    }
 
     const brief = root.querySelector<HTMLElement>('[data-teach-pane="brief"]');
     expect(brief).toBeTruthy();

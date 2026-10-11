@@ -64,8 +64,8 @@ describe("staged first voyage", () => {
   it("starts from Tutorial and keeps the saved coach flags", () => {
     const source = readFileSync(join(process.cwd(), "src/ui/app.ts"), "utf8");
     expect(source).toContain('readFlag("nld-coach")');
-    expect(source).toContain('readFlag("nld-brief")');
-    expect(source).toContain('readFlag("nld-reasons")');
+    expect(source).toContain('readFlag("nld-brief", false)');
+    expect(source).toContain('readFlag("nld-reasons", false)');
     expect(source).not.toContain("localStorage");
 
     window.history.replaceState({}, "", "/");
