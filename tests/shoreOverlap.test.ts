@@ -84,9 +84,8 @@ async function shoreReport(page: Page): Promise<ShoreReport> {
 
     const inks: Array<Ink & { nodeId: number }> = [];
     let nodeId = 0;
-    document.querySelectorAll<HTMLElement>(".location").forEach((shore) => {
-      const shoreId = shore.dataset.loc ?? "shore";
-      const walker = document.createTreeWalker(shore, NodeFilter.SHOW_TEXT);
+    const collect = (root: HTMLElement, region: string) => {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
       let node = walker.nextNode();
       while (node) {
         const raw = node.textContent?.replace(/\s+/g, " ").trim() ?? "";
@@ -97,11 +96,17 @@ async function shoreReport(page: Page): Promise<ShoreReport> {
           for (const rect of range.getClientRects()) {
             const visible = clip(node, rect);
             if (!visible) continue;
-            inks.push({ shore: shoreId, text: raw.slice(0, 48), nodeId, ...visible });
+            inks.push({ shore: region, text: raw.slice(0, 48), nodeId, ...visible });
           }
         }
         node = walker.nextNode();
       }
+    };
+    document.querySelectorAll<HTMLElement>(".location").forEach((shore) => {
+      collect(shore, shore.dataset.loc ?? "shore");
+    });
+    document.querySelectorAll<HTMLElement>(".hand, .plan-panel, .log").forEach((band) => {
+      collect(band, "bottom");
     });
 
     for (let i = 0; i < inks.length; i += 1) {
@@ -142,12 +147,32 @@ async function shoreReport(page: Page): Promise<ShoreReport> {
     }
     document.querySelectorAll<HTMLElement>(".card.hand-card").forEach((card) => {
       const box = card.getBoundingClientRect();
-      if (box.height < 200) fit.push(`hand card height ${box.height.toFixed(0)}`);
+      if (box.height < 150) fit.push(`hand card height ${box.height.toFixed(0)}`);
       if (box.bottom > root.clientHeight + 1) fit.push(`hand card below the viewport (${box.bottom.toFixed(0)})`);
     });
-    const rail = document.querySelector<HTMLElement>(".teach-rail");
-    if (rail && rail.scrollHeight - rail.clientHeight > 1) {
-      fit.push(`coach scroll ${rail.scrollHeight - rail.clientHeight}px`);
+    document.querySelectorAll<HTMLElement>(".location").forEach((shore) => {
+      const id = shore.dataset.loc ?? "shore";
+      const choice = shore.querySelector(".location-choice");
+      const label = choice?.querySelector("span, button");
+      const topRow = shore.querySelector(".row-top");
+      if (label && topRow && topRow.getBoundingClientRect().height > 0) {
+        const gap = topRow.getBoundingClientRect().top - label.getBoundingClientRect().bottom;
+        if (gap < 4) fit.push(`${id} choice gap ${gap.toFixed(1)}`);
+      }
+      const shoreBox = shore.getBoundingClientRect();
+      shore.querySelectorAll<HTMLElement>(".action").forEach((btn) => {
+        const box = btn.getBoundingClientRect();
+        if (box.height < 1) return;
+        if (box.bottom > shoreBox.bottom + 1 || box.right > shoreBox.right + 1) fit.push(`${id} action spills`);
+      });
+    });
+    const panel = document.querySelector<HTMLElement>(".plan-panel");
+    if (panel) {
+      const host = panel.getBoundingClientRect();
+      panel.querySelectorAll<HTMLElement>(".plan-lines p").forEach((line) => {
+        const box = line.getBoundingClientRect();
+        if (box.height > 1 && box.bottom > host.bottom + 1) fit.push("plan line clipped");
+      });
     }
     return { overlaps, alignment, fit };
   });

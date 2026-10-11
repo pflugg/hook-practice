@@ -1,6 +1,6 @@
 import { def } from "./cards";
 import { createGame } from "./game";
-import { TUTOR_RIVAL_GOAL, TUTOR_RIVAL_STEP } from "./rival";
+import { RIVAL_LOSE_REASON, TUTOR_RIVAL_GOAL, TUTOR_RIVAL_STEP } from "./rival";
 import type { CardInstance, GameState } from "./types";
 
 function inst(state: GameState, defId: string): CardInstance {
@@ -537,6 +537,40 @@ export function hourPlaytestWhyScene(): GameState {
   state.pending = { kind: "playChooseCard" };
   state.phase = "resolving";
   state.actionKey = "jr-play";
+  return state;
+}
+
+/** Victory recap for `?scene=victory`. Peter has already fallen on the ship. */
+export function victoryScene(): GameState {
+  const state = nearWinScene();
+  state.phase = "over";
+  state.won = true;
+  state.lost = false;
+  state.pending = null;
+  state.villainLocation = "jollyRoger";
+  state.peterPanLocation = "jollyRoger";
+  state.voyage.lastClash = {
+    heroName: "Peter Pan",
+    place: "Jolly Roger",
+    locationId: "jollyRoger",
+    captainPlace: "Jolly Roger",
+    allyStrength: 8,
+    heroStrength: 8,
+    reach: "same-place",
+    onShip: true,
+  };
+  return state;
+}
+
+/** Rival-loss recap for `?scene=defeat`. The meter has reached the goal. */
+export function rivalDefeatScene(): GameState {
+  const state = nearWinScene();
+  state.phase = "over";
+  state.won = false;
+  state.lost = true;
+  state.pending = null;
+  state.loseReason = RIVAL_LOSE_REASON;
+  state.rivalProgress = TUTOR_RIVAL_GOAL;
   return state;
 }
 

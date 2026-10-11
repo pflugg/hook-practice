@@ -64,6 +64,8 @@ import {
   tickTockOntoCaptainScene,
   tickTockReportScene,
   hourEqualVanquishScene,
+  victoryScene,
+  rivalDefeatScene,
   hourPlaytestMoveScene,
   hourPlaytestTauntScene,
   hourPlaytestWhyScene,
@@ -756,7 +758,8 @@ function teachRailHtml(brief: string, coach: string, reasons: string, active: Te
 function coachPanel(state: GameState, advice: CoachAdvice): string {
   const plan = coachPlan(state, advice);
   const [why, ...rest] = plan.lines;
-  return `<section class="teach-pane coach-panel" data-teach-pane="coach" data-coach-plan aria-live="polite">
+  return `<p class="coach-do" title="${esc(advice.do)}">${esc(advice.do)}</p>
+  <section class="teach-pane coach-panel" data-teach-pane="coach" data-coach-plan aria-live="polite">
     <header class="teach-pane-head">
       <div class="pane-titles">
         <p class="coach-kicker">Coach</p>
@@ -764,8 +767,8 @@ function coachPanel(state: GameState, advice: CoachAdvice): string {
       </div>
       <button type="button" class="btn ghost pane-hide coach-hide" data-coach-toggle>Hide</button>
     </header>
-    <div class="coach-copy">
-      <p class="coach-do" title="${esc(advice.do)}">${esc(advice.do)}</p>
+    <div class="plan-panel">
+      <p class="coach-kicker">Why / Plan</p>
       <ol class="plan-stages" aria-label="Plan">${plan.stages
         .map(
           (stage) =>
@@ -1089,6 +1092,8 @@ const SCENE_LOADERS: Record<string, () => GameState> = {
   hourwhy: hourPlaytestWhyScene,
   hourequal: hourEqualVanquishScene,
   nearwin: nearWinScene,
+  victory: victoryScene,
+  defeat: rivalDefeatScene,
   rivalloss: rivalLossScene,
   mapreserve: mapReserveScene,
   worthy: worthySeatScene,
