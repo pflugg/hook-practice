@@ -1,4 +1,5 @@
 import { def, fateCardIds, villainCardIds } from "./cards";
+import { RIVAL_GOAL, RIVAL_LOSE_REASON, fatePush, rivalGain } from "./rival";
 import {
   chooseAttachTarget,
   chooseFateCard,
@@ -87,6 +88,7 @@ export function titleState(): GameState {
     instanceSeq: 1,
     logSeq: 1,
     turn: 1,
+    rivalProgress: 0,
     power: 0,
     handSize: 4,
     villainLocation: "jollyRoger",
@@ -327,7 +329,7 @@ function recoverEmptyHeadacheChoice(state: GameState): void {
 function acknowledgeOpenFate(state: GameState): void {
   if (state.pending?.kind === "fateReport") {
     if (state.pending.resume === "nextTurn") {
-      beginNextTurn(state);
+      beginNextTurn(state, state.pending.played?.defId);
     } else if (state.pending.markAction) {
       consumeCurrentAction(state);
     } else {
@@ -611,8 +613,22 @@ function resolveComputerFateCard(
   openFateReport(state, { drawn, played: card, discarded, note, choiceReason, resume: "nextTurn" });
 }
 
-function beginNextTurn(state: GameState): void {
+function beginNextTurn(state: GameState, playedFateId?: string): void {
   if (endIfOver(state)) return;
+  const gain = rivalGain(state.difficulty, playedFateId);
+  state.rivalProgress = Math.min(RIVAL_GOAL, state.rivalProgress + gain);
+  const push = fatePush(playedFateId);
+  const playedName = playedFateId && push > 0 ? def(playedFateId).name : "";
+  const hurry = playedName ? ` ${playedName} adds ${push}.` : "";
+  log(state, `The rival villain advances to ${state.rivalProgress} of ${RIVAL_GOAL}.${hurry}`, "bad");
+  if (state.rivalProgress >= RIVAL_GOAL) {
+    state.lost = true;
+    state.loseReason = RIVAL_LOSE_REASON;
+    state.phase = "over";
+    state.pending = null;
+    log(state, state.loseReason, "bad");
+    return;
+  }
   state.turn += 1;
   state.usedActions = [];
   state.tempStrength = {};

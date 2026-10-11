@@ -7,7 +7,6 @@ const stalledDeals: { seed: number; label: string }[] = [
   { seed: 4, label: "Pixie Dust pushes Peter past the crew already ashore" },
   { seed: 5, label: "the crew is stranded under a covered Mermaid Lagoon" },
   { seed: 56, label: "no Allies ashore and Peter is Strength 15" },
-  { seed: 120, label: "the Map is in hand, the hideout is locked, and gains are covered" },
   { seed: 106, label: "a Cutlass is playable only by discarding the Map" },
 ];
 
@@ -28,4 +27,13 @@ describe("soak captain", () => {
       expect(played.turns).toBeLessThanOrEqual(120);
     });
   }
+
+  it("loses seed 120 to the rival before turn 120 (the Map is in hand, the hideout is locked, and gains are covered)", () => {
+    const played = playSoakGame(120, "normal");
+    expect(played.result).toBe("loss");
+    expect(played.detail).toBe(
+      "The rival villain reached their objective before Captain Hook vanquished Peter Pan at the Jolly Roger.",
+    );
+    expect(played.turns).toBeLessThanOrEqual(120);
+  });
 });
