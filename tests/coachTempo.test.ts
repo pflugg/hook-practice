@@ -6,7 +6,7 @@ import { advise } from "../src/engine/coach";
 import { applyInput, highlightSet } from "../src/engine/game";
 import { availableActions } from "../src/engine/queries";
 import type { GameState, LocationId } from "../src/engine/types";
-import { attachTo, barePlayState, give, putAlly, putHero, putItem } from "./helpers";
+import { attachTo, barePlayState, give, inst, putAlly, putHero, putItem } from "./helpers";
 
 function landed(state: GameState, locationId: LocationId): GameState {
   let next = applyInput(state, { type: "selectLocation", locationId });
@@ -211,6 +211,27 @@ describe("coach tempo", () => {
     );
   });
 
+  it("discards an Ally to dig for the Map when Peter is on the locked tree", () => {
+    const state = barePlayState();
+    state.phase = "actions";
+    state.villainLocation = "skullRock";
+    state.power = 12;
+    state.peterPanRevealed = true;
+    state.peterPanLocation = "hangmansTree";
+    state.villainDeck = [inst("neverLandMap")];
+    putHero(state, "peterPan", "hangmansTree");
+    give(state, "boardingParty");
+    give(state, "smee");
+
+    const advice = advise(state);
+    expect(advice.highlights).toEqual(["act:sr-discard"]);
+    expect(highlightSet(state).has("act:sr-discard")).toBe(true);
+    expect(advice.do).toContain("Boarding Party");
+    expect(advice.why).toBe(
+      "The Never Land Map is still in the deck, and Peter is sitting on the locked tree. Discard Boarding Party to dig for the Map. The tree stays shut until the Map is played.",
+    );
+  });
+
   it("vanquishes a taunted Tick Tock on the ship before playing another Ally", () => {
     const state = barePlayState();
     state.hangmansUnlocked = true;
@@ -221,6 +242,8 @@ describe("coach tempo", () => {
     putHero(state, "peterPan", "jollyRoger");
     const tick = putHero(state, "tickTock", "jollyRoger");
     attachTo(state, "taunt", tick.instanceId);
+    putAlly(state, "pirateBrute", "jollyRoger");
+    putAlly(state, "pirateBrute", "jollyRoger");
     putAlly(state, "pirateBrute", "jollyRoger");
     putAlly(state, "pirateBrute", "jollyRoger");
     give(state, "swashbuckler");
@@ -245,6 +268,8 @@ describe("coach tempo", () => {
     putHero(state, "peterPan", "jollyRoger");
     const tick = putHero(state, "tickTock", "jollyRoger");
     attachTo(state, "taunt", tick.instanceId);
+    putAlly(state, "pirateBrute", "jollyRoger");
+    putAlly(state, "pirateBrute", "jollyRoger");
     putAlly(state, "pirateBrute", "jollyRoger");
     putAlly(state, "pirateBrute", "jollyRoger");
     putItem(state, "ingeniousDevice", "mermaidLagoon");

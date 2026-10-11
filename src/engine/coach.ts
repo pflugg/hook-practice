@@ -31,6 +31,7 @@ import {
   vanquishAllyPool,
   vanquishBlockedReason,
   vanquishableHeroes,
+  vanquishAllyPoolAt,
 } from "./queries";
 import { highlightSet } from "./game";
 import { rivalGoal, rivalStep } from "./rival";
@@ -64,6 +65,63 @@ function tauntedOffShip(state: GameState): { hero: CardInstance; location: Locat
   if (!anyTauntInRealm(state) || peterReadyToFinish(state)) return null;
   const found = allHeroes(state).find((hero) => hasTaunt(state, hero.hero.instanceId) && hero.location !== "jollyRoger");
   return found ?? null;
+}
+
+function cheapestSpend(strengths: number[], need: number, minCount: number): number | null {
+  const width = strengths.length;
+  if (width === 0 || width > 12) return null;
+  let best = Infinity;
+  const limit = 1 << width;
+  for (let mask = 0; mask < limit; mask += 1) {
+    let count = 0;
+    let sum = 0;
+    for (let i = 0; i < width; i += 1) {
+      if ((mask & (1 << i)) === 0) continue;
+      count += 1;
+      sum += strengths[i] ?? 0;
+    }
+    if (count < minCount || sum < need || sum >= best) continue;
+    best = sum;
+  }
+  return best === Infinity ? null : best;
+}
+
+function coversPeterAfterTaunt(state: GameState, clash: { hero: CardInstance; location: LocationId }): boolean {
+  const pool = vanquishAllyPoolAt(state, clash.location).map((row) => allyStrength(state, row.ally));
+  const minCount = clash.hero.defId === "lostBoys" ? 2 : 1;
+  const spent = cheapestSpend(pool, heroStrength(state, clash.hero), minCount);
+  if (spent === null) return false;
+  const peter = peterCard(state);
+  const need = peter ? heroStrength(state, peter.hero) : 8;
+  return pool.reduce((sum, value) => sum + value, 0) - spent >= need;
+}
+
+function tauntedVanquish(state: GameState): { hero: CardInstance; location: LocationId } | null {
+  if (peterReadyToFinish(state)) return null;
+  return (
+    vanquishableHeroes(state).find((row) => hasTaunt(state, row.hero.instanceId) && coversPeterAfterTaunt(state, row)) ??
+    null
+  );
+}
+
+function needsShipStrength(state: GameState): boolean {
+  if (!state.peterPanRevealed) return jrStrength(state) < 8;
+  if (crewShort(state)) return true;
+  return anyTauntInRealm(state) && !peterReadyToFinish(state) && !tauntedVanquish(state);
+}
+
+function spokenPlace(id: LocationId): string {
+  return id === "jollyRoger" ? "the Jolly Roger" : locName(id);
+}
+
+function tauntClashWhy(state: GameState, clash: { hero: CardInstance; location: LocationId }, afterLanding: boolean): string {
+  const urgent = rivalWarning(state) ? "The rival track is close. " : "";
+  const name = cardName(clash.hero);
+  const place = spokenPlace(clash.location);
+  if (afterLanding) {
+    return `${urgent}Taunt is on ${name} at ${place}. After you land, click Vanquish, then ${name}. Peter Pan cannot be finished while Taunt remains, so this clash comes before another Ally or another Gain.`;
+  }
+  return `${urgent}Taunt is on ${name} at ${place}. Vanquish that Hero before Peter Pan. The clash spends Allies, and Peter cannot be finished while Taunt remains.`;
 }
 
 function jrStrength(state: GameState): number {
@@ -252,7 +310,7 @@ function discardRank(state: GameState, card: CardInstance): number {
   ) {
     return canPayNow(state, card) ? 5_500 : 280;
   }
-  if (d.type === "ally" && jrStrength(state) < 8 && canPayNow(state, card)) return 5_000 + d.strength;
+  if (d.type === "ally" && needsShipStrength(state) && canPayNow(state, card)) return 5_000 + d.strength;
   if (d.type === "ally" && cannotPay(state, card)) return 100 + d.strength;
   if (cannotPay(state, card)) return 80 + d.cost;
   return 400 + d.cost;
@@ -263,7 +321,12 @@ function discardPicks(state: GameState, skip: string[] = []): CardInstance[] {
     .filter((card) => !skip.includes(card.instanceId))
     .sort((a, b) => discardRank(state, a) - discardRank(state, b) || cardName(a).localeCompare(cardName(b)));
   const pick = ranked.find((card) => discardRank(state, card) < DISCARD_KEEP);
-  return pick ? [pick] : [];
+  if (pick) return [pick];
+  if (!state.peterPanRevealed || state.hangmansUnlocked || mapInHand(state)) return [];
+  if (!state.villainDeck.some((card) => card.defId === "neverLandMap")) return [];
+  const allies = ranked.filter((card) => def(card.defId).type === "ally");
+  allies.sort((a, b) => def(a.defId).strength - def(b.defId).strength || cardName(a).localeCompare(cardName(b)));
+  return allies[0] ? [allies[0]] : [];
 }
 
 /** A Gain that is uncovered on a fresh visit, even if this turn already used it. */
@@ -291,7 +354,7 @@ function wantsNamedDiscard(state: GameState): boolean {
   if (handHasOnlyUnaffordablePays(state) || diggingForMap(state) || mapReserveNeedsDig(state)) return true;
   if (state.hand.some((card) => isDeadCondition(state, card))) return true;
   if (blockedAttachInHand(state)) return true;
-  return jrStrength(state) < 8 && state.hand.some((card) => def(card.defId).type === "ally" && cannotPay(state, card));
+  return needsShipStrength(state) && state.hand.some((card) => def(card.defId).type === "ally" && cannotPay(state, card));
 }
 
 /** Headline always names the card and the reason. Null when nothing in hand should be tossed. */
@@ -305,6 +368,15 @@ function discardDo(state: GameState, where: string): string | null {
 
 function discardWhy(state: GameState, picks: CardInstance[]): string {
   const name = picks.map((card) => cardName(card)).join(" and ");
+  if (
+    state.peterPanRevealed &&
+    !state.hangmansUnlocked &&
+    !mapInHand(state) &&
+    state.villainDeck.some((card) => card.defId === "neverLandMap") &&
+    picks.every((card) => def(card.defId).type === "ally")
+  ) {
+    return `The Never Land Map is still in the deck, and Peter is sitting on the locked tree. Discard ${name} to dig for the Map. The tree stays shut until the Map is played.`;
+  }
   const blockedAttach = picks.find((card) => attachBlocked(state, card));
   if (blockedAttach && picks.length === 1) {
     const d = def(blockedAttach.defId);
@@ -320,7 +392,7 @@ function discardWhy(state: GameState, picks: CardInstance[]): string {
     const where = peter?.location === "jollyRoger" ? "Peter is already on the Jolly Roger." : "Peter is already in the realm.";
     const taunt = anyTauntInRealm(state) ? " Taunt means he must be vanquished first." : "";
     const dig =
-      jrStrength(state) < 8
+      needsShipStrength(state)
         ? " Discard Obsession to dig for Allies and crew the ship before that clash."
         : " Discard Obsession to dig toward the next card that serves the chain.";
     return `Obsession is spent. ${where}${taunt}${dig}`;
@@ -334,7 +406,7 @@ function discardWhy(state: GameState, picks: CardInstance[]): string {
     ? "a card that adds Power, such as Worthy Opponent, while the Map stays in hand"
     : !state.hangmansUnlocked
       ? mapInHand(state) ? "useful crew while keeping the Map" : "cheaper crew and the Map"
-      : jrStrength(state) < 8
+      : needsShipStrength(state)
         ? "cheaper crew"
         : "the next card that serves the chain";
   return `${powerLine}${deadLine} Discard ${name} to dig toward ${goal}.`;
@@ -392,7 +464,7 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
       notes.push("Crew at the Jolly Roger is still light. Keep stacking Allies so the clash is ready when he arrives.");
     }
   }
-  if (highlights.some((h) => croc && h === `loc:${croc}`)) {
+  if (croc && highlights.some((h) => h === `loc:${croc}`)) {
     const safeLive = legalMoveLocations(state).some((id) => tickTockAt(state) !== id && liveSlots(state, id).length > 0);
     notes.unshift(
       !safeLive
@@ -403,6 +475,13 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
           ? "That step lands on Tick Tock and discards your held Never Land Map with the whole hand. Keep the Map by choosing a safe shore if one is available."
           : "That recommended step lands on Tick Tock. Only go if you accept an empty hand.",
     );
+    const landed = relocated(state, croc);
+    const clash = tauntedVanquish(state.villainLocation === croc ? landed : { ...landed, hand: [] });
+    if (clash) {
+      notes.unshift(
+        `This step lands on Tick Tock and discards the hand. Vanquish ${cardName(clash.hero)} after you land. Peter Pan cannot be finished while Taunt remains.`,
+      );
+    }
   }
   return notes[0];
 }
@@ -446,7 +525,7 @@ function scoreMove(state: GameState, id: LocationId): number {
   }
   if (blocked && discard && gainAmt === 0) score += 220;
   if (!state.peterPanRevealed && fate && !blocked) score += state.hangmansUnlocked ? 360 : 40;
-  if (jrStrength(state) < 8 && play && state.hand.some((c) => def(c.defId).type === "ally" && def(c.defId).cost <= state.power + gainAmt)) {
+  if (needsShipStrength(state) && play && state.hand.some((c) => def(c.defId).type === "ally" && def(c.defId).cost <= state.power + gainAmt)) {
     score += id === "jollyRoger" ? 500 : 40;
   }
   if (state.peterPanRevealed && state.hangmansUnlocked && peter?.location !== "jollyRoger") {
@@ -594,12 +673,21 @@ function winningShipMove(state: GameState, legal: LocationId[]): MoveChoice | nu
   return { dest: "jollyRoger", forcedBounce: false };
 }
 
+function tauntClashBoard(state: GameState, legal: LocationId[]): MoveChoice | null {
+  if (!legal.includes("jollyRoger")) return null;
+  const boardingCroc = tickTockAt(state) === "jollyRoger" && state.villainLocation !== "jollyRoger";
+  if (boardingCroc && !state.hangmansUnlocked && mapInHand(state)) return null;
+  const boarding = relocated(state, "jollyRoger");
+  const preview = boardingCroc ? { ...boarding, hand: [] } : boarding;
+  const clash = tauntedVanquish(preview);
+  if (!clash || !hasKind(state, "jollyRoger", "vanquish")) return null;
+  return { dest: "jollyRoger", forcedBounce: false };
+}
+
 function rankMove(state: GameState): MoveChoice {
   const legal = legalMoveLocations(state);
   const winning = winningShipMove(state, legal);
   if (winning) return winning;
-  // A held Map is a concrete reason to revisit safe income. Do not spend its
-  // reserve on optional crew or lose it by entering Tick Tock's shore.
   if (!state.hangmansUnlocked && mapInHand(state)) {
     const safe = legal.filter((id) => tickTockAt(state) !== id);
     const ready = state.power >= 4 ? safe.find((id) => hasKind(state, id, "playCard")) : undefined;
@@ -607,7 +695,6 @@ function rankMove(state: GameState): MoveChoice {
     const income = safe.map((id) => ({ id, amount: liveSlots(state, id).filter((a) => a.kind === "gainPower").reduce((n, a) => n + (a.amount ?? 1), 0) }))
       .filter((stop) => stop.amount > 0).sort((a, b) => b.amount - a.amount)[0];
     if (income) return { dest: income.id, forcedBounce: false };
-    // Covered Gains are not a reason to board Tick Tock. Uncover a Gain, or hold the Map on a safe shore.
     if (state.power < 4) {
       const uncover = safe.find((id) => uncoverReason(state, id));
       if (uncover) return { dest: uncover, forcedBounce: false };
@@ -618,6 +705,8 @@ function rankMove(state: GameState): MoveChoice {
       if (safe[0]) return { dest: safe[0], forcedBounce: false };
     }
   }
+  const clashBoard = tauntClashBoard(state, legal);
+  if (clashBoard) return clashBoard;
   const slideCroc = crocBlocksShip(state)
     ? legal.find((id) => hasKind(state, id, "moveHero") && movableHeroes(relocated(state, id)).some((hero) => hero.defId === "tickTock"))
     : undefined;
@@ -634,7 +723,8 @@ function rankMove(state: GameState): MoveChoice {
   const walking = legal.some((id) => peterWalkReason(state, id));
   if (
     !walking &&
-    crewShort(state) &&
+    state.peterPanRevealed &&
+    needsShipStrength(state) &&
     affordableShipAlly(state) &&
     legal.includes("jollyRoger") &&
     tickTockAt(state) !== "jollyRoger"
@@ -880,6 +970,12 @@ function moveWhy(state: GameState, dest: LocationId): string {
   if (dest === "jollyRoger" && peterReadyToFinish(relocated(state, dest))) {
     return "Peter is already on the ship and your crew can finish the clash. Take the Vanquish action there — that is the only place the win counts.";
   }
+  if (dest === "jollyRoger") {
+    const boardingCroc = tickTockAt(state) === "jollyRoger" && state.villainLocation !== "jollyRoger";
+    const landed = relocated(state, dest);
+    const clash = tauntedVanquish(boardingCroc ? { ...landed, hand: [] } : landed);
+    if (clash) return tauntClashWhy(state, clash, true);
+  }
   const taunted = tauntedOffShip(state);
   if (taunted && hasKind(state, dest, "moveHero")) {
     return `Taunt is on ${cardName(taunted.hero)} at ${locName(taunted.location)}. After you land, click Move a Hero, then ${cardName(taunted.hero)}, and walk that Hero toward the Jolly Roger. Peter cannot be vanquished until the taunted Hero is.`;
@@ -957,7 +1053,7 @@ function usefulPlay(state: GameState): CardInstance | null {
     const escort = playable.find((c) => c.defId === "ingeniousDevice" || c.defId === "mrStarkey" || c.defId === "ayeAyeSir");
     if (escort) return escort;
   }
-  if (jrStrength(state) < 8) {
+  if (needsShipStrength(state)) {
     const allies = playable
       .filter((c) => def(c.defId).type === "ally")
       .sort((a, b) => def(b.defId).strength - def(a.defId).strength);
@@ -982,6 +1078,9 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
     const v = find("vanquish");
     if (v) return v;
   }
+
+  const tauntClash = tauntedVanquish(state);
+  if (tauntClash && find("vanquish")) return find("vanquish")!;
 
   const peter = peterCard(state);
   if (peter && peter.location === "jollyRoger" && anyTauntInRealm(state) && !peterReadyToFinish(state)) {
@@ -1017,7 +1116,13 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
   }
 
   const card = usefulPlay(state);
-  const allyOffShip = Boolean(card && crewShort(state) && def(card.defId).type === "ally" && state.villainLocation !== "jollyRoger");
+  const allyOffShip = Boolean(
+    card &&
+    state.peterPanRevealed &&
+    needsShipStrength(state) &&
+    def(card.defId).type === "ally" &&
+    state.villainLocation !== "jollyRoger",
+  );
   if (card && !allyOffShip && canPayNow(state, card) && !attachBlocked(state, card) && find("playCard")) return find("playCard")!;
 
   const waitingAttach = blockedAttachInHand(state);
@@ -1028,7 +1133,6 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
 
   if (find("discard") && wantsNamedDiscard(state)) return find("discard")!;
 
-  // Fate is a hunt for Peter, not a stand-in for a card the captain cannot pay.
   if (!blocked && !state.peterPanRevealed && find("fate")) return find("fate")!;
 
   const tick = tickTockAt(state);
@@ -1036,7 +1140,7 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
     return find("vanquish")!;
   }
 
-  if (jrStrength(state) < 8 && find("moveItemAlly") && movableAlliesAndItems(state).some((c) => def(c.defId).type === "ally" && findCardLocation(state, c.instanceId) !== "jollyRoger")) {
+  if (needsShipStrength(state) && find("moveItemAlly") && movableAlliesAndItems(state).some((c) => def(c.defId).type === "ally" && findCardLocation(state, c.instanceId) !== "jollyRoger")) {
     return find("moveItemAlly")!;
   }
 
@@ -1056,7 +1160,6 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
     if (!(blocked && (gainOpen || discardDigs))) return find("fate")!;
   }
 
-  // Ending while Gain or a real clash is still open is what paced the ship and Skull Rock.
   const bank = bankableGain(state, acts);
   if (bank) return bank;
 
@@ -1078,6 +1181,10 @@ function actionWhy(state: GameState, slot: ActionSlot): string {
       state,
       peterCard(state)?.location,
     );
+  }
+  if (slot.kind === "vanquish") {
+    const clash = tauntedVanquish(state);
+    if (clash) return tauntClashWhy(state, clash, false);
   }
   if (slot.kind === "vanquish" && anyTauntInRealm(state) && vanquishableHeroes(state).length === 0) {
     return vanquishBlockedReason(state);
@@ -2090,7 +2197,7 @@ function withWalkOnWhy(state: GameState, advice: CoachAdvice): CoachAdvice {
   const dest = destKey?.slice(4) as LocationId | undefined;
   const clause =
     dest === croc
-      ? `Tick Tock’s walk-on is this step: moving the captain onto ${locName(croc)} discards every card in hand. The hand empties only when the captain moves onto that place — seating or sliding the crocodile onto the captain does not.`
+      ? `Tick Tock’s walk-on is this step: moving the captain onto ${spokenPlace(croc)} discards every card in hand. The hand empties only when the captain moves onto that place — seating or sliding the crocodile onto the captain does not.`
       : `Tick Tock’s walk-on: skip ${locName(croc)}. The hand empties only if the captain moves onto that place. Seating or sliding the crocodile onto the captain does not.`;
   return { ...advice, why: `${advice.why} ${clause}` };
 }
