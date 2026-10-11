@@ -34,6 +34,7 @@ import {
 } from "../engine";
 import { advanceLesson, lessonOpening, lessonView, type LessonStep, type LessonView } from "../engine/lesson";
 import { RIVAL_LOSE_REASON, rivalGoal } from "../engine/rival";
+import { armSound, cueFromTransition, playCue, rivalInWarningBand, setSoundMuted, soundMuted } from "./sound";
 import { LOCATION_IDS } from "../engine/types";
 import {
   allAllies,
@@ -76,6 +77,11 @@ import "./styles.css";
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]!));
+}
+
+function soundToggle(): string {
+  const on = !soundMuted();
+  return `<button type="button" class="ctrl ${on ? "is-on" : ""}" data-sound-toggle aria-pressed="${on ? "true" : "false"}">${on ? "Sound on" : "Sound off"}</button>`;
 }
 
 function typeLabel(t: string): string {
@@ -139,7 +145,8 @@ function rivalMeter(state: GameState): string {
   const shown = Math.min(goal, Math.max(0, state.rivalProgress));
   const pct = Math.round((shown / goal) * 100);
   const full = shown >= goal;
-  return `<div class="rival-meter${full ? " is-full" : ""}" data-rival-meter role="meter" aria-label="Rival villain progress" aria-valuemin="0" aria-valuenow="${shown}" aria-valuemax="${goal}" title="If the rival reaches ${goal} before you vanquish Peter Pan at the Jolly Roger, you lose.">
+  const close = full || rivalInWarningBand(state);
+  return `<div class="rival-meter${full ? " is-full" : ""}${close ? " is-close" : ""}" data-rival-meter role="meter" aria-label="Rival villain progress" aria-valuemin="0" aria-valuenow="${shown}" aria-valuemax="${goal}" title="If the rival reaches ${goal} before you vanquish Peter Pan at the Jolly Roger, you lose.">
     <span>Rival</span>
     <span class="rival-track" aria-hidden="true"><i style="width:${pct}%"></i></span>
     <b>${shown} / ${goal}</b>
@@ -320,6 +327,7 @@ function titleView(
         <button type="button" class="ctrl ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
         <button type="button" class="ctrl ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
         <button type="button" class="ctrl ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
+        ${soundToggle()}
         <button type="button" class="ctrl" data-help>How to play</button>
       </div>
       <p class="coach-lede">Coach names the next click. Coach, <b>Why this move</b>, and the Strategy brief stack in the right teaching rail — each pane scrolls on its own. Move reasons names what you picked, why it helps the chain, and what to watch. Tutorial starts all three on. Hide any during play.</p>
@@ -346,6 +354,7 @@ export function helpView(fromPlay: boolean): string {
     <p><b>Finding Peter:</b> At a table, Hook finds Peter with hunt cards (Worthy Opponent, Give Them a Scare, Obsession) and by being Fated. Your Fate action there hits another villain. This solo tool always Fates you after each turn, and your Fate action is a <b>practice self-Fate</b> — it flips Hook’s own Fate deck so you can practice the find without a second player.</p>
     <p><b>Rival villain:</b> A track in the top bar fills after each of your turns. Normal adds more than Easy. Pixie Dust adds the most when the computer plays it. Taunt adds a smaller step. Splitting Headache adds nothing in a regular game. If the track fills before you vanquish Peter Pan at the Jolly Roger, you lose. Your own Fate action does not move the rival. With the Coach off, Easy runs to 74 and Normal runs to 154. With the Coach on, the track runs to 222, Normal adds 1, and those three Fate cards each add 1.</p>
     <p><b>Printed Conditions:</b> Cunning and Obsession <b>are</b> printed two-player Conditions. At a table they wait for another player’s turn (a strong Ally in another realm; another player defeating a strong Hero). This tool rewrites those triggers so they can fire on your turn: Cunning if a Strength 4+ Hero is already ashore and you hold an Ally; Obsession if Peter is still hidden. A grey Condition is not ready yet.</p>
+    <p><b>Sound:</b> quiet cues for a card play, a move, a vanquish, the computer’s Fate, the rival nearing the end of the track, a win, and a loss. Nothing plays until you click, press a key, or drag a card. The Sound button remembers your choice on this browser.</p>
     <p><b>Drag:</b> When a card can move or be played onto a place, grab it and slide onto a glowing location (or Ally, for the Cutlass). Drop outside to cancel the slide; clicking still works.</p>
     <p><b>Play a Card:</b> An Ally or Item lands where the captain stands. It does not travel to another shore. Walk crew toward the ship afterward. Fate may still seat a Hero on any unlocked place.</p>
     <p><b>Practice tips:</b> Discard aggressively for the Map. Hunt cards (Worthy Opponent, Give Them a Scare) are how Hook finds Peter at a table — plus being Fated. Station strength at the ship before walking Peter across. Beware Tick Tock (hand empties only if the captain moves onto him) and Splitting Headache.</p>
@@ -389,6 +398,7 @@ function overlayFor(
         <button type="button" class="btn ghost" data-home>Return to title</button>`;
     return `<div class="overlay" data-overlay="blocking"><div class="modal wood endgame ${state.won ? "win celebrate" : "lose"}" data-recap ${namedDialog("recap-title")}>
       <p class="eyebrow">${state.won ? "Captain Hook wins" : "Voyage recap"}</p>
+      <p class="outcome-mark" data-outcome>${state.won ? "Victory" : "Defeat"}</p>
       <h2 id="recap-title">${esc(recap.headline)}</h2>
       ${state.loseReason === RIVAL_LOSE_REASON ? rivalMeter(state) : ""}
       <p class="recap-lead">${esc(recap.lead)}</p>
@@ -869,6 +879,7 @@ function playView(
 
   return `<div class="sky play-sky" aria-hidden="true"><div class="stars"></div><div class="fog fog-a"></div></div>
   <div class="grain"></div>
+  ${advice ? `<div class="quick-coach"><span>Next click</span><p>${esc(advice.do)}</p></div>` : ""}
   <div class="play ${coachEnabled ? "has-coach" : ""} ${briefEnabled ? "has-brief" : ""} ${reasonsEnabled ? "has-reasons" : ""} ${teachOn ? "has-teach" : ""}">
     <div class="play-main" data-play-main>
     <div class="play-chrome">
@@ -888,6 +899,7 @@ function playView(
           <button type="button" class="ctrl ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
           <button type="button" class="ctrl ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
           <button type="button" class="ctrl ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
+          ${soundToggle()}
           <button type="button" class="ctrl" data-help>Help</button>
           <button type="button" class="ctrl" data-resign ${resignBlocked(state) ? "disabled" : ""}>Resign</button>
         </div>
@@ -900,7 +912,6 @@ function playView(
         : ""
     }
     </div>
-    ${advice ? `<div class="quick-coach"><span>Next click</span><p>${esc(advice.do)}</p></div>` : ""}
     <ol class="voyage-progress" aria-label="Objective progress">${[
       { label: "Map", done: state.hangmansUnlocked },
       { label: "Peter", done: state.peterPanRevealed },
@@ -1063,8 +1074,8 @@ export function mount(root: HTMLElement): void {
   let state: GameState = bootState();
   let difficulty: Difficulty = "normal";
   let coachEnabled = readFlag("nld-coach");
-  let briefEnabled = readFlag("nld-brief");
-  let reasonsEnabled = readFlag("nld-reasons");
+  let briefEnabled = readFlag("nld-brief", false);
+  let reasonsEnabled = readFlag("nld-reasons", false);
   let lastReason: MoveReason = IDLE_MOVE_REASON;
   let teachTab: TeachTab = "coach";
   let inspectId: string | null = null;
@@ -1075,6 +1086,7 @@ export function mount(root: HTMLElement): void {
     root.querySelectorAll<HTMLElement>(".card.is-draggable").forEach((cardEl) => {
       cardEl.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) return;
+        armSound();
         const fromId = cardEl.dataset.card;
         if (!fromId || !isDraggableCard(state, fromId)) return;
         cardEl.setPointerCapture?.(event.pointerId);
@@ -1155,6 +1167,7 @@ export function mount(root: HTMLElement): void {
   const paneScroll: Record<TeachTab, number> = { brief: 0, coach: 0, reasons: 0 };
   let pageScrollX = 0;
   let pageScrollY = 0;
+  let rootScroll = 0;
   let mainScroll = 0;
   let realmScroll = 0;
   let handScroll = 0;
@@ -1162,6 +1175,7 @@ export function mount(root: HTMLElement): void {
   const captureScroll = () => {
     pageScrollX = window.scrollX;
     pageScrollY = window.scrollY;
+    rootScroll = root.scrollTop;
     const scroller = root.querySelector<HTMLElement>("[data-play-scroll]") ?? root.querySelector<HTMLElement>("[data-play-main]");
     if (scroller) mainScroll = scroller.scrollTop;
     realmScroll = root.querySelector<HTMLElement>("[data-realm-map]")?.scrollLeft ?? 0;
@@ -1184,6 +1198,33 @@ export function mount(root: HTMLElement): void {
     const hand = root.querySelector<HTMLElement>(".hand-row");
     if (hand) hand.scrollLeft = handScroll;
     window.scrollTo(pageScrollX, pageScrollY);
+    root.scrollTop = rootScroll;
+  };
+
+  const pinNextClick = () => {
+    const play = root.querySelector<HTMLElement>(".play");
+    const bar = root.querySelector<HTMLElement>(".quick-coach");
+    if (!play) return;
+    const narrow = typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1100px)").matches;
+    play.style.paddingTop = narrow && bar ? `${bar.offsetHeight}px` : "";
+  };
+
+  const bringHighlightIntoView = () => {
+    const media = typeof window.matchMedia === "function" ? window.matchMedia("(max-width: 1100px)") : null;
+    if (!media?.matches) return;
+    if (root.querySelector(".overlay:not(.pass-through)")) return;
+    const realm = root.querySelector<HTMLElement>("[data-realm-map]");
+    const nested = root.querySelector<HTMLElement>(".location.is-coached, .location .is-coached");
+    const fromBoard = nested?.closest<HTMLElement>(".location") ?? null;
+    const prompted = parseLocationId(root.querySelector<HTMLElement>("[data-move].is-coached")?.dataset.move);
+    const loc = fromBoard ?? (prompted ? root.querySelector<HTMLElement>(`[data-loc="${prompted}"]`) : null);
+    if (!loc || !realm || !realm.contains(loc) || realm.clientWidth <= 0) return;
+    const locRect = loc.getBoundingClientRect();
+    const realmRect = realm.getBoundingClientRect();
+    if (locRect.width <= 0) return;
+    if (locRect.left >= realmRect.left && locRect.right <= realmRect.right) return;
+    const left = realm.scrollLeft + (locRect.left - realmRect.left) - (realm.clientWidth - locRect.width) / 2;
+    realm.scrollLeft = Math.max(0, left);
   };
 
   const focusSignature = (el: Element | null): string | null => {
@@ -1257,8 +1298,14 @@ export function mount(root: HTMLElement): void {
     } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat) + inspect;
     bindCardDrag();
     restoreScroll();
+    bringHighlightIntoView();
+    pinNextClick();
     restoreFocus();
-    requestAnimationFrame(restoreScroll);
+    requestAnimationFrame(() => {
+      restoreScroll();
+      bringHighlightIntoView();
+      pinNextClick();
+    });
   };
 
   const dispatch = (input: Input) => {
@@ -1282,6 +1329,8 @@ export function mount(root: HTMLElement): void {
         return;
       }
     }
+    const cue = cueFromTransition(before, state);
+    if (cue) playCue(cue);
     const explained = explainSelection(before, input, state);
     if (explained) lastReason = explained;
     lastReason = liveMoveReason(state, lastReason);
@@ -1289,6 +1338,7 @@ export function mount(root: HTMLElement): void {
   };
 
   root.addEventListener("click", (event) => {
+    armSound();
     if (suppressClick) {
       event.preventDefault();
       event.stopPropagation();
@@ -1306,6 +1356,13 @@ export function mount(root: HTMLElement): void {
       render();
       window.scrollTo(pageScrollX, pageScrollY);
       requestAnimationFrame(() => window.scrollTo(pageScrollX, pageScrollY));
+      return;
+    }
+    if (t.closest("[data-sound-toggle]")) {
+      const muted = !soundMuted();
+      setSoundMuted(muted);
+      if (!muted) playCue("move");
+      render();
       return;
     }
     if (t.closest("[data-coach-toggle]")) {
@@ -1447,6 +1504,7 @@ export function mount(root: HTMLElement): void {
   });
 
   root.addEventListener("keydown", (event) => {
+    armSound();
     if ((event.key === "ArrowLeft" || event.key === "ArrowRight") && event.target instanceof HTMLElement) {
       const realm = event.target.closest<HTMLElement>("[data-realm-map]");
       if (realm && event.target === realm) {

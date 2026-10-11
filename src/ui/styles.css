@@ -480,18 +480,23 @@ button:focus-visible,
 .rival-meter b { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rival-track {
   position: relative;
-  width: 72px;
-  height: 8px;
-  flex: 0 0 72px;
-  background: rgba(255, 246, 210, 0.12);
+  width: 96px;
+  height: 12px;
+  flex: 0 0 96px;
+  background: #2a1214;
+  border: 1px solid rgba(255, 180, 170, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
 .rival-track i {
   display: block;
   height: 100%;
-  background: #d45a58;
+  background: linear-gradient(90deg, #8e2428, #ff6b6b);
+  box-shadow: 0 0 8px rgba(255, 90, 80, 0.55);
 }
-.rival-meter.is-full { border-color: rgba(212, 90, 88, 0.9); }
+.rival-meter.is-full,
+.rival-meter.is-close { border-color: rgba(255, 107, 107, 0.95); }
+.rival-meter.is-close .rival-track i { animation: rival-pulse 1s ease-in-out infinite; }
 .endgame .rival-meter { margin: 0 0 12px; }
 .chip-piles { letter-spacing: 0.01em; white-space: nowrap; }
 .chip.is-on {
@@ -1611,6 +1616,25 @@ button:focus-visible,
   color: var(--gold);
 }
 .modal.win .recap-lead { color: #fff4d4; font-size: 18px; }
+.modal.win {
+  border-color: rgba(232, 195, 106, 0.95);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55), 0 0 42px rgba(232, 195, 106, 0.32);
+}
+.modal.lose {
+  border-color: rgba(212, 90, 88, 0.95);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55), 0 0 42px rgba(180, 48, 52, 0.34);
+}
+.modal p.outcome-mark {
+  margin: 0 0 2px;
+  font-family: var(--ornate);
+  font-size: 28px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+.modal.win p.outcome-mark { color: var(--gold); }
+.modal.lose p.outcome-mark { color: #f0b3b7; }
+.overlay.fate-in .modal { animation: fate-rise 0.34s ease; }
 .recap-block {
   border: 1px solid rgba(232, 195, 106, 0.28);
   background: rgba(8, 8, 10, 0.35);
@@ -1648,8 +1672,20 @@ button:focus-visible,
   50% { box-shadow: 0 0 0 4px rgba(244, 180, 90, 0.5); }
 }
 @keyframes coach-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(243, 215, 144, 0.45), 0 0 16px rgba(232, 195, 106, 0.3); }
-  50% { box-shadow: 0 0 0 4px rgba(243, 215, 144, 0.8), 0 0 28px rgba(232, 195, 106, 0.52); }
+  0%, 100% { box-shadow: 0 0 0 3px rgba(243, 215, 144, 0.72), 0 0 22px rgba(232, 195, 106, 0.48); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 236, 180, 0.95), 0 0 36px rgba(232, 195, 106, 0.72); }
+}
+@keyframes rival-pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.55); }
+}
+@keyframes fate-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes log-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes shine {
   0% { box-shadow: 0 0 12px rgba(244, 180, 90, 0.25); }
@@ -1849,8 +1885,8 @@ button:focus-visible,
   background: linear-gradient(135deg, #fffbef, #ebd9ab);
 }
 .card.mini .meta { font-size: 11px; }
-.card.mini h3 { font-size: 14px; line-height: 1.25; margin-top: 7px; }
-.card.mini .text { font-size: 14px; line-height: 1.4; -webkit-line-clamp: 2; }
+.card.mini h3 { font-size: 15px; line-height: 1.25; margin-top: 7px; }
+.card.mini .text { font-size: 14px; line-height: 1.4; -webkit-line-clamp: 4; }
 .card .str { width: 28px; height: 28px; font-size: 15px; border-radius: 50%; background: #f5dc94; }
 .card.hand-card { width: 174px; min-width: 174px; min-height: 206px; border-radius: 6px; box-shadow: 0 3px 8px #0004; }
 .card.hand-card h3 { font-size: 16px; line-height: 1.3; }
@@ -1868,7 +1904,27 @@ button:focus-visible,
 .placement-choices .btn { min-height: 48px; font-size: 15px; }
 
 @media (max-width: 1100px) {
-  .quick-coach { display: flex; flex-direction: column; gap: 4px; padding: 10px 14px; background: #19352f; border-bottom: 1px solid #81b19b; color: #fff4d6; }
+  html, body, #app {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .location.is-coached { scroll-margin-top: 96px; }
+  .quick-coach {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 14px;
+    background: #19352f;
+    border-bottom: 1px solid #81b19b;
+    color: #fff4d6;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 8;
+  }
   .quick-coach > span { font: 700 11px var(--display); letter-spacing: .12em; text-transform: uppercase; color: #bcdfcd; }
   .quick-coach p { margin: 0; font-size: 15px; line-height: 1.4; }
   .loc-head h2 { font-size: 15px; }
@@ -1932,6 +1988,8 @@ button:focus-visible,
   line-height: 1.35;
   font-weight: 700;
 }
+.location.is-current .captain-token { animation: swell 2.4s ease-in-out infinite; }
+.log li:first-child { animation: log-in 0.35s ease; }
 .card .str {
   width: 36px;
   height: 36px;
