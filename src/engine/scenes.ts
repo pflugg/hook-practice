@@ -1,5 +1,6 @@
 import { def } from "./cards";
 import { createGame } from "./game";
+import { RIVAL_GOAL, RIVAL_STEP } from "./rival";
 import type { CardInstance, GameState } from "./types";
 
 function inst(state: GameState, defId: string): CardInstance {
@@ -536,5 +537,18 @@ export function hourPlaytestWhyScene(): GameState {
   state.pending = { kind: "playChooseCard" };
   state.phase = "resolving";
   state.actionKey = "jr-play";
+  return state;
+}
+
+export function rivalLossScene(): GameState {
+  const state = createGame("easy", 3);
+  emptyRealm(state);
+  state.difficulty = "easy";
+  state.turn = 12;
+  state.power = 2;
+  state.phase = "actions";
+  state.pending = null;
+  state.villainLocation = "skullRock";
+  state.rivalProgress = RIVAL_GOAL - RIVAL_STEP.easy;
   return state;
 }

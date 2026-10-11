@@ -56,13 +56,20 @@ If the Never Land Map is in the realm, playing another Item offers a choice: pay
 The captain starts at the Jolly Roger with 0 Power and a 4-card hand, then must move to a different unlocked location.
 
 ### Deck recycling
-Empty villain or Fate decks reshuffle their discard piles. There is no turn limit. Resign is the explicit concede.
+Empty villain or Fate decks reshuffle their discard piles. Resign is the explicit concede. The rival clock below can end the voyage before Hook wins. There is no separate turn cap.
 
 ### Splitting Headache and attachments
 Headache can discard an Item in the realm, including Items attached to a character (Cutlass, Fate attachments). Discarded Fate attachments return to the Fate discard.
 
 ### Fate attachments while the hideout is locked
 A common table clarification: the +2 Fate Item (Pixie Dust) does not attach to Peter while he sits on the still-locked hideout. Taunt may still cling.
+
+### Rival villain clock
+This clock is a practice rule. It is not a printed Villainous rule, and it is not a second villain board.
+
+The rival starts at 0. The goal is 154. The rival advances after your turn ends and the computer's Fate play is finished. Easy adds 1. Normal adds 2. When the computer plays Taunt, Splitting Headache, or Pixie Dust, that card adds 1 more. Other Fate cards add nothing. Your own Fate action does not move the rival. An empty Fate deck still advances by the difficulty step.
+
+If the rival reaches 154 before you vanquish Peter Pan at the Jolly Roger, you lose. A clash that wins on the current turn still wins, because the clock moves only after the turn ends. The top bar shows the track. The loss screen names the rival and the missed ship objective.
 
 ### Not modeled
 - Multi-villain boards, Activate actions, and other villains

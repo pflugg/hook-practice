@@ -33,6 +33,7 @@ import {
   type MoveReason,
 } from "../engine";
 import { advanceLesson, lessonOpening, lessonView, type LessonStep, type LessonView } from "../engine/lesson";
+import { RIVAL_GOAL, RIVAL_LOSE_REASON } from "../engine/rival";
 import { LOCATION_IDS } from "../engine/types";
 import {
   allAllies,
@@ -52,6 +53,7 @@ import {
   lagoonCoverScene,
   mapReserveScene,
   nearWinScene,
+  rivalLossScene,
   obsessionDecideScene,
   tauntDigScene,
   payNoMapScene,
@@ -129,6 +131,17 @@ function abilityReadout(title: string, text: string): string {
   return `<div class="ability-readout">
     <h3>${esc(title)}</h3>
     <p>${esc(text)}</p>
+  </div>`;
+}
+
+function rivalMeter(state: GameState): string {
+  const shown = Math.min(RIVAL_GOAL, Math.max(0, state.rivalProgress));
+  const pct = Math.round((shown / RIVAL_GOAL) * 100);
+  const full = shown >= RIVAL_GOAL;
+  return `<div class="rival-meter${full ? " is-full" : ""}" data-rival-meter role="meter" aria-label="Rival villain progress" aria-valuemin="0" aria-valuenow="${shown}" aria-valuemax="${RIVAL_GOAL}" title="If the rival reaches ${RIVAL_GOAL} before you vanquish Peter Pan at the Jolly Roger, you lose.">
+    <span>Rival</span>
+    <span class="rival-track" aria-hidden="true"><i style="width:${pct}%"></i></span>
+    <b>${shown} / ${RIVAL_GOAL}</b>
   </div>`;
 }
 
@@ -330,6 +343,7 @@ export function helpView(fromPlay: boolean): string {
     <p><b>Move reasons:</b> a “Why this move” pane in that same right-hand stack. After each legal click it names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on and teaches move, Gain, the Map, Fate, one escort step, and the ship clash before a normal voyage. Below about 1100px the three panes tab under the board so type stays at the desktop floor.</p>
     <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it. The <b>Across the table</b> strip keeps the last revealed Fate play visible while that card is still on the table — never the face-down deck.</p>
     <p><b>Finding Peter:</b> At a table, Hook finds Peter with hunt cards (Worthy Opponent, Give Them a Scare, Obsession) and by being Fated. Your Fate action there hits another villain. This solo tool always Fates you after each turn, and your Fate action is a <b>practice self-Fate</b> — it flips Hook’s own Fate deck so you can practice the find without a second player.</p>
+    <p><b>Rival villain:</b> A track in the top bar fills after each of your turns. Normal fills faster than Easy. Taunt, Splitting Headache, and Pixie Dust add extra steps when the computer plays them. If the track fills before you vanquish Peter Pan at the Jolly Roger, you lose. Your own Fate action does not move the rival.</p>
     <p><b>Printed Conditions:</b> Cunning and Obsession <b>are</b> printed two-player Conditions. At a table they wait for another player’s turn (a strong Ally in another realm; another player defeating a strong Hero). This tool rewrites those triggers so they can fire on your turn: Cunning if a Strength 4+ Hero is already ashore and you hold an Ally; Obsession if Peter is still hidden. A grey Condition is not ready yet.</p>
     <p><b>Drag:</b> When a card can move or be played onto a place, grab it and slide onto a glowing location (or Ally, for the Cutlass). Drop outside to cancel the slide; clicking still works.</p>
     <p><b>Play a Card:</b> An Ally or Item lands where the captain stands. It does not travel to another shore. Walk crew toward the ship afterward. Fate may still seat a Hero on any unlocked place.</p>
@@ -375,6 +389,7 @@ function overlayFor(
     return `<div class="overlay" data-overlay="blocking"><div class="modal wood endgame ${state.won ? "win celebrate" : "lose"}" data-recap ${namedDialog("recap-title")}>
       <p class="eyebrow">${state.won ? "Captain Hook wins" : "Voyage recap"}</p>
       <h2 id="recap-title">${esc(recap.headline)}</h2>
+      ${state.loseReason === RIVAL_LOSE_REASON ? rivalMeter(state) : ""}
       <p class="recap-lead">${esc(recap.lead)}</p>
       <section class="recap-block" data-recap-steps>
         <h3>The objective</h3>
@@ -863,6 +878,7 @@ function playView(
         <div class="hud-core" aria-label="Voyage meters">
           <div class="power is-loud" title="Power"><span>Power</span><b>${state.power}</b></div>
           <div class="chip chip-stat" title="Turn">Turn ${state.turn}</div>
+          ${rivalMeter(state)}
           <div class="chip chip-stat chip-piles" title="Hand, deck, and discard">Hand ${state.hand.length} · Deck ${state.villainDeck.length} · Discard ${state.villainDiscard.length}</div>
         </div>
         <div class="hud-toggles">
@@ -989,6 +1005,7 @@ const SCENE_LOADERS: Record<string, () => GameState> = {
   hourwhy: hourPlaytestWhyScene,
   hourequal: hourEqualVanquishScene,
   nearwin: nearWinScene,
+  rivalloss: rivalLossScene,
   mapreserve: mapReserveScene,
   worthy: worthySeatScene,
   bounceloop: bounceLoopScene,

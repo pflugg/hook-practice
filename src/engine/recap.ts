@@ -1,3 +1,4 @@
+import { RIVAL_LOSE_REASON } from "./rival";
 import type { GameState } from "./types";
 
 export interface EndgameRecap {
@@ -104,13 +105,16 @@ export function endgameRecap(state: GameState): EndgameRecap {
   }
   const resigned = /struck the colors/i.test(state.loseReason);
   const offShip = /away from the Jolly Roger/i.test(state.loseReason);
+  const rival = state.loseReason === RIVAL_LOSE_REASON;
   const lead = resigned
     ? "You struck the colors before the chain was finished. Here is how far the voyage got, so the next one can pick up the lesson."
     : offShip
       ? "This loss is the lesson. Beating Peter away from the Jolly Roger does not finish the objective, even when the Strength is legal."
-      : state.loseReason || "The tide turned before the chain was finished.";
+      : rival
+        ? RIVAL_LOSE_REASON
+        : state.loseReason || "The tide turned before the chain was finished.";
   return {
-    headline: "The tide turns",
+    headline: rival ? "The rival finishes first" : "The tide turns",
     lead,
     steps: stepsRecap(state),
     clash: clashRecap(state),

@@ -137,6 +137,7 @@ function fingerprint(state: GameState): string {
     state.hand.map((card) => card.instanceId).join(","),
     state.usedActions.join(","),
     state.turn,
+    state.rivalProgress,
     state.won ? 1 : 0,
     state.lost ? 1 : 0,
     state.hangmansUnlocked ? 1 : 0,
@@ -156,7 +157,9 @@ function invariants(state: GameState, origin: Set<string>): string[] {
     const clash = state.voyage.lastClash;
     if (!clash || clash.heroName !== "Peter Pan" || !clash.onShip) problems.push("win-off-ship");
   }
-  if (state.lost && !/Jolly Roger/i.test(state.loseReason)) problems.push(`loss-reason:${state.loseReason || "empty"}`);
+  if (state.lost && !/Jolly Roger|rival villain/i.test(state.loseReason)) {
+    problems.push(`loss-reason:${state.loseReason || "empty"}`);
+  }
   if (state.peterPanLocation) {
     const at = state.locations[state.peterPanLocation].heroes.some((hero) => hero.defId === "peterPan");
     if (!at) problems.push("peter-desync");
