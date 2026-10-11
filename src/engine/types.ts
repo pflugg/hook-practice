@@ -128,6 +128,8 @@ export interface GameState {
   logSeq: number;
   turn: number;
   rivalProgress: number;
+  /** True while the Coach panel is on. The tutor rival pace reads this. */
+  coachOn: boolean;
   power: number;
   handSize: number;
   villainLocation: LocationId;

@@ -89,6 +89,7 @@ export function titleState(): GameState {
     logSeq: 1,
     turn: 1,
     rivalProgress: 0,
+    coachOn: false,
     power: 0,
     handSize: 4,
     villainLocation: "jollyRoger",
