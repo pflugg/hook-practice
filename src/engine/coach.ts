@@ -393,9 +393,16 @@ function warningFor(state: GameState, highlights: string[]): string | undefined 
     }
   }
   if (highlights.some((h) => croc && h === `loc:${croc}`)) {
-    notes.unshift(mapInHand(state)
-      ? "That step lands on Tick Tock and discards your held Never Land Map with the whole hand. Keep the Map by choosing a safe shore if one is available."
-      : "That recommended step lands on Tick Tock. Only go if you accept an empty hand.");
+    const safeLive = legalMoveLocations(state).some((id) => tickTockAt(state) !== id && liveSlots(state, id).length > 0);
+    notes.unshift(
+      !safeLive
+        ? mapInHand(state)
+          ? "Every other shore has no action you can take this turn. This step lands on Tick Tock and discards your held Never Land Map with the whole hand."
+          : "Every other shore has no action you can take this turn. This step lands on Tick Tock and discards the hand."
+        : mapInHand(state)
+          ? "That step lands on Tick Tock and discards your held Never Land Map with the whole hand. Keep the Map by choosing a safe shore if one is available."
+          : "That recommended step lands on Tick Tock. Only go if you accept an empty hand.",
+    );
   }
   return notes[0];
 }
@@ -550,21 +557,47 @@ interface MoveChoice {
   forcedBounce: boolean;
   skipped?: LocationId;
   avoidedShip?: boolean;
+  avoidedIdle?: LocationId;
+  keptMap?: boolean;
 }
 
-/**
- * Do not walk straight back to last turn's stop unless a clash, an uncover,
- * a play that exists nowhere else, or Peter's walk requires it.
- * If every other step is Tick Tock, returning is allowed and must be explained.
- */
-function chooseMove(state: GameState): MoveChoice {
-  const legal = legalMoveLocations(state);
-  // Evaluate the board after the required move, not from the current shore.
-  // A legal winning clash takes priority over Power, backtracking, or a hand wipe.
-  if (legal.includes("jollyRoger") && hasKind(state, "jollyRoger", "vanquish") &&
-      peterReadyToFinish(relocated(state, "jollyRoger"))) {
-    return { dest: "jollyRoger", forcedBounce: false };
+function preferLiveShore(state: GameState, choice: MoveChoice): MoveChoice {
+  if (liveSlots(state, choice.dest).length > 0) return choice;
+  const live = legalMoveLocations(state).filter((id) => liveSlots(state, id).length > 0);
+  const safe = live.filter((id) => tickTockAt(state) !== id);
+  const mapWouldBeLost = !state.hangmansUnlocked && Boolean(mapInHand(state));
+  const pool = safe.length > 0 ? safe : mapWouldBeLost ? [] : live;
+  if (pool.length === 0) {
+    if (mapWouldBeLost && live.length > 0) return { ...choice, keptMap: true };
+    return choice;
   }
+  const ranked = [...pool].sort((a, b) => scoreMove(state, b) - scoreMove(state, a));
+  const dest = ranked[0];
+  if (!dest || dest === choice.dest) return choice;
+  return { dest, forcedBounce: false, avoidedIdle: choice.dest };
+}
+
+function idleRedirectWhy(choice: MoveChoice): string {
+  if (!choice.avoidedIdle) return "";
+  return `${locName(choice.avoidedIdle)} has no action you can take this turn. ${locName(choice.dest)} still has one.`;
+}
+
+function mapHoldWhy(state: GameState, choice: MoveChoice): string {
+  const croc = tickTockAt(state);
+  const shore = croc ? locName(croc) : "The other shore";
+  return `${locName(choice.dest)} has no action you can take this turn. ${shore} still has one, but Tick Tock’s walk-on would discard the held Never Land Map with the whole hand. The Map stays in hand until Hangman’s Tree is open.`;
+}
+
+function winningShipMove(state: GameState, legal: LocationId[]): MoveChoice | null {
+  if (!legal.includes("jollyRoger") || !hasKind(state, "jollyRoger", "vanquish")) return null;
+  if (!peterReadyToFinish(relocated(state, "jollyRoger"))) return null;
+  return { dest: "jollyRoger", forcedBounce: false };
+}
+
+function rankMove(state: GameState): MoveChoice {
+  const legal = legalMoveLocations(state);
+  const winning = winningShipMove(state, legal);
+  if (winning) return winning;
   // A held Map is a concrete reason to revisit safe income. Do not spend its
   // reserve on optional crew or lose it by entering Tick Tock's shore.
   if (!state.hangmansUnlocked && mapInHand(state)) {
@@ -627,6 +660,10 @@ function chooseMove(state: GameState): MoveChoice {
   return { dest: best, forcedBounce: false };
 }
 
+function chooseMove(state: GameState): MoveChoice {
+  return preferLiveShore(state, rankMove(state));
+}
+
 function tickTockStayLine(state: GameState): string | null {
   const croc = tickTockAt(state);
   if (!croc || !state.departedFrom || state.departedFrom === state.villainLocation) return null;
@@ -644,6 +681,8 @@ function forcedBounceLead(state: GameState, dest: LocationId): string {
 }
 
 function withBounceWhy(state: GameState, choice: MoveChoice, why: string): string {
+  if (choice.keptMap) return mapHoldWhy(state, choice);
+  if (choice.avoidedIdle) return idleRedirectWhy(choice);
   let text = why;
   if (choice.forcedBounce) text = `${forcedBounceLead(state, choice.dest)} ${text}`;
   if (choice.avoidedShip) {
