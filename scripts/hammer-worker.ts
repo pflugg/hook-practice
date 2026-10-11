@@ -100,8 +100,8 @@ function arg(name: string, fallback: string): string {
 
 const workerId = Number(arg("worker", "0"));
 const budgetMs = Number(arg("ms", "3600000"));
-const outDir = arg("out", "/tmp/hammer");
-mkdirSync(outDir, { recursive: true });
+const outDir = process.env.HAMMER_AS_LIB === "1" ? "/tmp/hammer-lib" : arg("out", "/tmp/hammer");
+if (process.env.HAMMER_AS_LIB !== "1") mkdirSync(outDir, { recursive: true });
 
 const findings = new Map<string, Finding>();
 const coverage: Coverage = {
@@ -565,7 +565,7 @@ function legalInputs(state: GameState): Input[] {
   return inputs;
 }
 
-function progressing(state: GameState): Input[] {
+export function progressing(state: GameState): Input[] {
   const before = fingerprint(state);
   const outs: Input[] = [];
   for (const input of legalInputs(state)) {
@@ -584,7 +584,7 @@ interface Rng {
   pick: <T>(items: T[]) => T;
 }
 
-function makeRng(seed: number): Rng {
+export function makeRng(seed: number): Rng {
   let s = seed >>> 0 || 1;
   const next = () => {
     s = (Math.imul(1664525, s) + 1013904223) >>> 0;
@@ -686,7 +686,7 @@ function bestPlay(state: GameState): CardInstance | null {
   return cards.find((card) => def(card.defId).cost <= state.power) ?? null;
 }
 
-function policyInput(state: GameState, rng: Rng): Input | null {
+export function policyInput(state: GameState, rng: Rng): Input | null {
   if (state.phase === "over" || state.won || state.lost) return null;
   if (state.pending?.kind === "fateReport") return { type: "acknowledgeFate" };
   const pending = state.pending;
@@ -1063,6 +1063,7 @@ function expectMust(ok: boolean, id: string, summary: string, detail: string): v
 }
 
 function runScripted(deadline: number): void {
+  if (Date.now() >= deadline) return;
   currentMode = "scripted";
   currentSeed = 0;
   coverage.sceneRuns += 1;
@@ -1335,10 +1336,12 @@ process.on("SIGTERM", () => {
   process.exit(0);
 });
 
-try {
-  main();
-} catch (error) {
-  record("must", "worker-fatal", "Worker fatal", error instanceof Error ? error.stack ?? error.message : String(error));
-  flush();
-  process.exit(1);
+if (process.env.HAMMER_AS_LIB !== "1") {
+  try {
+    main();
+  } catch (error) {
+    record("must", "worker-fatal", "Worker fatal", error instanceof Error ? error.stack ?? error.message : String(error));
+    flush();
+    process.exit(1);
+  }
 }

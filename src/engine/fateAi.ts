@@ -33,7 +33,9 @@ export function scoreHeroPlacement(state: GameState, hero: CardInstance, id: Loc
 
 export function bestHeroLocation(state: GameState, hero: CardInstance): LocationId {
   const spots = LOCATION_IDS.filter((id) => isUnlocked(state, id));
-  let best = spots[0];
+  const first = spots[0];
+  if (!first) throw new Error("No unlocked location for a Hero");
+  let best = first;
   let bestScore = -Infinity;
   for (const id of spots) {
     const s = scoreHeroPlacement(state, hero, id);
@@ -84,9 +86,13 @@ export function chooseFateCard(
   const pool = fatePlayPool(state, cards);
   if (difficulty === "easy") {
     const pick = pickIndex(pool.length, state.rng);
-    return { card: pool[pick.index], rng: pick.rng };
+    const card = pool[pick.index];
+    if (!card) throw new Error("Fate drew no card");
+    return { card, rng: pick.rng };
   }
-  let best = pool[0];
+  const first = pool[0];
+  if (!first) throw new Error("Fate drew no card");
+  let best = first;
   let bestScore = -Infinity;
   for (const card of pool) {
     const s = scoreFateCard(state, card);
@@ -109,7 +115,7 @@ export function chooseAttachHero(
     const peter = heroes.find((h) => h.defId === "peterPan");
     if (peter) return peter;
   }
-  return heroes.slice().sort((a, b) => heroStrength(state, b) - heroStrength(state, a))[0];
+  return heroes.slice().sort((a, b) => heroStrength(state, b) - heroStrength(state, a))[0] ?? null;
 }
 
 export function chooseHeadacheItem(state: GameState): CardInstance | null {
@@ -117,19 +123,21 @@ export function chooseHeadacheItem(state: GameState): CardInstance | null {
   if (items.length === 0) return null;
   const rank = (id: string) =>
     id === "ingeniousDevice" ? 5 : id === "neverLandMap" ? 4 : id === "cannon" ? 3 : id === "hooksCase" ? 2 : 1;
-  return items.slice().sort((a, b) => rank(b.item.defId) - rank(a.item.defId))[0].item;
+  return items.slice().sort((a, b) => rank(b.item.defId) - rank(a.item.defId))[0]?.item ?? null;
 }
 
 export function chooseTinkerAlly(state: GameState, locationId: LocationId): CardInstance | null {
   const allies = state.locations[locationId].allies;
   if (allies.length === 0) return null;
-  return allies.slice().sort((a, b) => allyStrength(state, b) - allyStrength(state, a))[0];
+  return allies.slice().sort((a, b) => allyStrength(state, b) - allyStrength(state, a))[0] ?? null;
 }
 
 export function randomUnlocked(state: GameState): { id: LocationId; rng: number } {
   const spots = LOCATION_IDS.filter((id) => isUnlocked(state, id));
   const pick = pickIndex(spots.length, state.rng);
-  return { id: spots[pick.index], rng: pick.rng };
+  const id = spots[pick.index];
+  if (!id) throw new Error("No unlocked location");
+  return { id, rng: pick.rng };
 }
 
 export function chooseHeroLocation(
@@ -150,7 +158,9 @@ export function chooseAttachTarget(
   if (heroes.length === 0) return { hero: null, rng: state.rng };
   if (difficulty === "easy") {
     const pick = pickIndex(heroes.length, state.rng);
-    return { hero: heroes[pick.index], rng: pick.rng };
+    const hero = heroes[pick.index];
+    if (!hero) throw new Error("No Hero to attach");
+    return { hero, rng: pick.rng };
   }
   return { hero: chooseAttachHero(state, true, itemDefId), rng: state.rng };
 }

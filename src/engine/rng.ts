@@ -14,7 +14,13 @@ export function shuffle<T>(items: T[], rng: number): { items: T[]; rng: number }
     const roll = nextRng(state);
     state = roll.rng;
     const j = Math.floor(roll.value * (i + 1));
-    [next[i], next[j]] = [next[j], next[i]];
+    const left = next[i];
+    const right = next[j];
+    if (left === undefined || right === undefined) {
+      throw new Error("shuffle index out of range");
+    }
+    next[i] = right;
+    next[j] = left;
   }
   return { items: next, rng: state };
 }

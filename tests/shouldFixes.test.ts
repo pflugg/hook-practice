@@ -145,6 +145,21 @@ describe("Cunning Accept, Cancel, and Escape", () => {
     expect(reason?.why).toMatch(/does not return/);
   });
 
+  it("keeps the Condition offer open when End turn arrives early", () => {
+    const { state, cunning, brute } = cunningReady();
+    const offered = applyInput(state, { type: "selectCard", instanceId: cunning.instanceId });
+    expect(offered.pending?.kind).toBe("conditionOffer");
+    const ended = applyInput(offered, { type: "endTurn" });
+    expect(ended.pending?.kind).toBe("conditionOffer");
+    expect(ended.phase).toBe("actions");
+    expect(ended.turn).toBe(offered.turn);
+    expect(ended.hand.map((card) => card.instanceId)).toEqual(offered.hand.map((card) => card.instanceId));
+    expect(ended.hand.some((card) => card.instanceId === cunning.instanceId)).toBe(true);
+    expect(ended.hand.some((card) => card.instanceId === brute.instanceId)).toBe(true);
+    expect(ended.villainDiscard.some((card) => card.instanceId === cunning.instanceId)).toBe(false);
+    expect(explainSelection(offered, { type: "endTurn" }, ended)).toBeNull();
+  });
+
   it("treats Cancel during the offer like Not now and leaves the Condition in hand", () => {
     const { state, cunning } = cunningReady();
     const offered = applyInput(state, { type: "selectCard", instanceId: cunning.instanceId });

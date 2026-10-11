@@ -24,7 +24,32 @@ Open the URL Vite prints (usually `http://localhost:5173`).
 npm test
 ```
 
-Unit tests cover the objective chain: unlocking Hangman’s Tree, Peter Pan’s forced reveal placement, moving a Hero to the Jolly Roger, the vanquish win/loss check, and locked-location restrictions.
+Unit tests cover the objective chain. They also deal a voyage, require the opening move, end the turn, and check that the computer opens a Fate report. `tests/coachLegal.test.ts` follows Coach through dealt games and checks that each board highlight is a legal target.
+
+## Check
+
+```bash
+npm run typecheck
+npm run lint
+```
+
+`npm run build` runs the typecheck and then the Vite build. GitHub Actions runs typecheck, lint, and tests.
+
+## Verify
+
+```bash
+npm run verify
+```
+
+This starts the Vite dev server, opens the title screen, chooses **Tutorial**, moves the captain to Skull Rock, and writes screenshots plus `verification-evidence/tutorial-move/proof.json`. Cleanup stops that server and leaves the proof in place. The recipe for other paths is in `.cursor/skills/verify-hook-practice/`.
+
+## Soak
+
+```bash
+npm run soak
+```
+
+This plays 200 dealt games, seeds 1 through 200, alternating Easy and Normal Fate. The captain follows the hammer policy and a ship-closing line. Computer Fate answers each End turn. A game counts only when Peter is vanquished. The summary JSON lands in `/tmp/hook-soak/summary.json`.
 
 ## Build
 
@@ -129,14 +154,15 @@ While a Play, Move a Hero, Move Ally/Item, Aye Aye, or Cutlass attach is open, g
 - Do not vanquish Peter anywhere except the Jolly Roger — that loses the duel.
 - Tick Tock discards your whole hand only if the captain **moves onto** his location. Seating or sliding the crocodile onto the captain does not snap.
 
-## Project layout
+## Code map
 
-- `src/engine/` — pure rules engine (cards, realm, queries, Fate AI, heuristic Coach, strategy brief, post-selection move reasons, reducer)
-- `src/ui/` — original CSS/SVG interface
-- `tests/` — Vitest coverage for the objective chain
-- `RULES_NOTES.md` — intentional simplifications versus a full table game
-- `FIDELITY_AUDIT.md` — engine + teaching-copy compared to table Hook (base game)
-- `LEGAL.md` — unofficial-practice disclaimer
+`src/engine/game.ts` is the reducer. `src/engine/queries.ts` reads a state. `src/engine/fateAi.ts` chooses the computer Fate play. `src/ui/app.ts` renders. The explanation of that split is in [docs/architecture.md](docs/architecture.md).
+
+- `tests/` holds Vitest checks for the rules and the rendered board.
+- `RULES_NOTES.md` records intentional simplifications versus a full table game.
+- `FIDELITY_AUDIT.md` compares the engine and the teaching copy with table Hook.
+- `LEGAL.md` is the unofficial-practice disclaimer.
+- `AGENTS.md` lists recurring mistakes and the check that blocks each one.
 
 ## Controls
 

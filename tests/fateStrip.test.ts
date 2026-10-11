@@ -4,7 +4,7 @@ import { fateShowStillInPlay } from "../src/engine/queries";
 import { tickTockReportScene } from "../src/engine/scenes";
 import { CAPTAIN_TOKEN } from "../src/ui/decor";
 import { renderOverlay, renderPlay } from "../src/ui/app";
-import { barePlayState, inst, putAlly, putHero } from "./helpers";
+import { barePlayState, inst, pick, putAlly, putHero } from "./helpers";
 
 describe("Fate adversary memory", () => {
   it("keeps the last computer Fate reveal after Continue", () => {
@@ -63,7 +63,7 @@ describe("Fate strip clears when the subject leaves", () => {
 
     let next = applyInput(state, { type: "selectAction", actionKey: "jr-vanquish" });
     next = applyInput(next, { type: "selectCard", instanceId: tinker.instanceId });
-    const ally = next.locations.jollyRoger.allies[0];
+    const ally = pick(next.locations.jollyRoger.allies[0], "boarding ally");
     next = applyInput(next, { type: "selectCard", instanceId: ally.instanceId });
     next = applyInput(next, { type: "confirm" });
 

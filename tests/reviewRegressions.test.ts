@@ -7,7 +7,7 @@ import { mapReserveScene } from "../src/engine/scenes";
 import type { Input, LocationId } from "../src/engine/types";
 import { mount, renderPlay } from "../src/ui/app";
 import { resolveBoardClick } from "../src/ui/clicks";
-import { barePlayState, inst, putAlly, putHero, attachTo, give } from "./helpers";
+import { barePlayState, inst, pick, putAlly, putHero, attachTo, give } from "./helpers";
 
 function readyShipMove() {
   const state = barePlayState();
@@ -26,7 +26,7 @@ describe("review regression cases", () => {
     let state = mapReserveScene();
     const spent: string[] = [];
     for (let i = 0; i < 50 && !state.hangmansUnlocked; i++) {
-      const key = advise(state).highlights[0];
+      const key = pick(advise(state).highlights[0], "coach highlight");
       let input: Input;
       if (key.startsWith("act:")) input = { type: "selectAction", actionKey: key.slice(4) };
       else if (key.startsWith("loc:")) input = { type: "selectLocation", locationId: key.slice(4) as LocationId };
@@ -104,7 +104,7 @@ describe("review regression cases", () => {
     let next = applyInput(state, { type: "selectLocation", locationId: "jollyRoger" });
     expect(advise(next).highlights).toContain("act:jr-vanquish");
     next = applyInput(next, { type: "selectAction", actionKey: "jr-vanquish" });
-    next = applyInput(next, { type: "selectCard", instanceId: next.locations.jollyRoger.heroes[0].instanceId });
+    next = applyInput(next, { type: "selectCard", instanceId: pick(next.locations.jollyRoger.heroes[0], "ship hero").instanceId });
     for (const ally of next.locations.jollyRoger.allies) {
       next = applyInput(next, { type: "selectCard", instanceId: ally.instanceId });
     }
@@ -142,7 +142,7 @@ describe("review regression cases", () => {
       const choices = [...panel!.querySelectorAll<HTMLButtonElement>("button[data-move]")];
       expect(choices.map((b) => b.dataset.move)).toEqual(["jollyRoger", "skullRock", "mermaidLagoon"]);
       expect(root.querySelector('.prompt button[data-move]')).toBeNull();
-      const input = resolveBoardClick(choices[0], state);
+      const input = resolveBoardClick(pick(choices[0], "move button"), state);
       expect(input).toBeTruthy();
       const next = applyInput(state, input!);
       expect(next.locations.jollyRoger.heroes.some((h) => h.instanceId === hero.instanceId)).toBe(true);
@@ -240,8 +240,8 @@ describe("review regression cases", () => {
       else if (key === "btn:discard-hero") input = { type: "playOrDiscardHero", play: false };
       else if (key === "btn:scare-discard") input = { type: "scareDiscardBoth" };
       else if (key?.startsWith("btn:scare-order:")) {
-        const [a, b] = key.slice("btn:scare-order:".length).split(",");
-        input = { type: "scareReturn", order: [a, b] };
+        const parts = key.slice("btn:scare-order:".length).split(",");
+        input = { type: "scareReturn", order: [pick(parts[0], "scare top"), pick(parts[1], "scare bottom")] };
       }
       expect(input, key).toBeTruthy();
       state = applyInput(state, input!);

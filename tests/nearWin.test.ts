@@ -5,7 +5,7 @@ import { nearWinScene } from "../src/engine/scenes";
 import { availableActions } from "../src/engine/queries";
 import type { GameState, LocationId } from "../src/engine/types";
 import { renderPlay } from "../src/ui/app";
-import { barePlayState, give, putAlly, putHero, putItem } from "./helpers";
+import { barePlayState, give, pick, putAlly, putHero, putItem } from "./helpers";
 
 function acknowledge(state: GameState): GameState {
   if (state.pending?.kind === "fateReport") return applyInput(state, { type: "acknowledgeFate" });
@@ -50,12 +50,12 @@ function finishNearWin(start: GameState): GameState {
 
   next = applyInput(next, { type: "selectAction", actionKey: "jr-vanquish" });
   next = applyInput(next, { type: "selectCard", instanceId: hero!.instanceId });
-  next = applyInput(next, { type: "selectCard", instanceId: brutes[0].instanceId });
+  next = applyInput(next, { type: "selectCard", instanceId: pick(brutes[0], "first brute").instanceId });
   next = applyInput(next, { type: "confirm" });
   expect(next.won).toBe(false);
   expect(next.phase).not.toBe("over");
 
-  next = applyInput(next, { type: "selectCard", instanceId: brutes[1].instanceId });
+  next = applyInput(next, { type: "selectCard", instanceId: pick(brutes[1], "second brute").instanceId });
   next = applyInput(next, { type: "confirm" });
   return next;
 }
@@ -123,12 +123,12 @@ describe("full objective win", () => {
     const brutes = next.locations.jollyRoger.allies.filter((card) => card.defId === "pirateBrute");
     next = applyInput(next, { type: "selectAction", actionKey: "jr-vanquish" });
     next = applyInput(next, { type: "selectCard", instanceId: hero!.instanceId });
-    next = applyInput(next, { type: "selectCard", instanceId: brutes[0].instanceId });
+    next = applyInput(next, { type: "selectCard", instanceId: pick(brutes[0], "first brute").instanceId });
     next = applyInput(next, { type: "confirm" });
     expect(next.won).toBe(false);
     expect(next.log.some((entry) => /Not enough Strength/i.test(entry.text))).toBe(true);
 
-    next = applyInput(next, { type: "selectCard", instanceId: brutes[1].instanceId });
+    next = applyInput(next, { type: "selectCard", instanceId: pick(brutes[1], "second brute").instanceId });
     next = applyInput(next, { type: "confirm" });
 
     expect(next.won).toBe(true);

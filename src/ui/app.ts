@@ -67,6 +67,7 @@ import {
   worthySeatScene,
 } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
+import { parseDifficulty, parseLocationId, parseTeachTab, type TeachTab } from "./parse";
 import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
 import { CAPTAIN_TOKEN, CREST, locationDecor, MAP_COAST, MAP_COMPASS, TITLE_SCENE, TOPBAR_MAP, TREASURE_MAP } from "./decor";
 import "./styles.css";
@@ -76,7 +77,9 @@ function esc(s: string): string {
 }
 
 function typeLabel(t: string): string {
-  return t[0].toUpperCase() + t.slice(1);
+  const head = t[0];
+  if (!head) return t;
+  return head.toUpperCase() + t.slice(1);
 }
 
 function renderCard(
@@ -659,8 +662,6 @@ function inspectOverlay(state: GameState, instanceId: string): string {
   </div></div>`;
 }
 
-export type TeachTab = "brief" | "coach" | "reasons";
-
 function resolveTeachTab(
   requested: TeachTab,
   briefOn: boolean,
@@ -1067,8 +1068,8 @@ export function mount(root: HTMLElement): void {
 
         const paintZones = (overLoc?: string, overCard?: string) => {
           root.querySelectorAll("[data-loc]").forEach((node) => {
-            const id = (node as HTMLElement).dataset.loc;
-            node.classList.toggle("is-drop-target", Boolean(id && targets.locations.includes(id as LocationId)));
+            const id = node instanceof HTMLElement ? parseLocationId(node.dataset.loc) : null;
+            node.classList.toggle("is-drop-target", Boolean(id && targets.locations.includes(id)));
             node.classList.toggle("is-drop-over", id === overLoc);
           });
           root.querySelectorAll("[data-card]").forEach((node) => {
@@ -1113,7 +1114,7 @@ export function mount(root: HTMLElement): void {
             node.classList.remove("is-drop-target", "is-drop-over");
           });
           if (!started) return;
-          const locationId = hit?.closest<HTMLElement>("[data-loc]")?.dataset.loc as LocationId | undefined;
+          const locationId = parseLocationId(hit?.closest<HTMLElement>("[data-loc]")?.dataset.loc) ?? undefined;
           const cardId = hit?.closest<HTMLElement>("[data-card]")?.dataset.card;
           const dest = {
             locationId: locationId && targets.locations.includes(locationId) ? locationId : undefined,
@@ -1148,15 +1149,15 @@ export function mount(root: HTMLElement): void {
     realmScroll = root.querySelector<HTMLElement>("[data-realm-map]")?.scrollLeft ?? 0;
     handScroll = root.querySelector<HTMLElement>(".hand-row")?.scrollLeft ?? 0;
     root.querySelectorAll<HTMLElement>("[data-teach-pane]").forEach((pane) => {
-      const key = pane.dataset.teachPane as TeachTab | undefined;
-      if (key && key in paneScroll) paneScroll[key] = pane.scrollTop;
+      const key = parseTeachTab(pane.dataset.teachPane);
+      if (key) paneScroll[key] = pane.scrollTop;
     });
   };
 
   const restoreScroll = () => {
     root.querySelectorAll<HTMLElement>("[data-teach-pane]").forEach((pane) => {
-      const key = pane.dataset.teachPane as TeachTab | undefined;
-      if (key && key in paneScroll) pane.scrollTop = paneScroll[key];
+      const key = parseTeachTab(pane.dataset.teachPane);
+      if (key) pane.scrollTop = paneScroll[key];
     });
     const scroller = root.querySelector<HTMLElement>("[data-play-scroll]") ?? root.querySelector<HTMLElement>("[data-play-main]");
     if (scroller) scroller.scrollTop = mainScroll;
@@ -1278,7 +1279,9 @@ export function mount(root: HTMLElement): void {
       event.preventDefault();
       pageScrollX = window.scrollX;
       pageScrollY = window.scrollY;
-      teachTab = tabBtn.dataset.teachTab as TeachTab;
+      const nextTab = parseTeachTab(tabBtn.dataset.teachTab);
+      if (!nextTab) return;
+      teachTab = nextTab;
       render();
       window.scrollTo(pageScrollX, pageScrollY);
       requestAnimationFrame(() => window.scrollTo(pageScrollX, pageScrollY));
@@ -1333,7 +1336,9 @@ export function mount(root: HTMLElement): void {
     }
     const diff = t.closest<HTMLElement>("[data-diff]");
     if (diff) {
-      difficulty = diff.dataset.diff as Difficulty;
+      const nextDifficulty = parseDifficulty(diff.dataset.diff);
+      if (!nextDifficulty) return;
+      difficulty = nextDifficulty;
       render();
       return;
     }

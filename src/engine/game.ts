@@ -184,7 +184,7 @@ function drawFate(state: GameState, n: number): CardInstance[] {
 function takeFromHand(state: GameState, instanceId: string): CardInstance | null {
   const i = state.hand.findIndex((c) => c.instanceId === instanceId);
   if (i < 0) return null;
-  return state.hand.splice(i, 1)[0];
+  return state.hand.splice(i, 1)[0] ?? null;
 }
 
 function discardVillainCard(state: GameState, card: CardInstance): void {
@@ -219,15 +219,15 @@ function removeFromRealm(state: GameState, instanceId: string): CardInstance | n
     for (const key of ["heroes", "allies", "items"] as const) {
       const i = loc[key].findIndex((c) => c.instanceId === instanceId);
       if (i >= 0) {
-        const [card] = loc[key].splice(i, 1);
-        return card;
+        const card = loc[key].splice(i, 1)[0];
+        if (card) return card;
       }
     }
   }
   const att = state.attachments.findIndex((a) => a.item.instanceId === instanceId);
   if (att >= 0) {
-    const [row] = state.attachments.splice(att, 1);
-    return row.item;
+    const row = state.attachments.splice(att, 1)[0];
+    if (row) return row.item;
   }
   return takeFromHand(state, instanceId);
 }
@@ -900,7 +900,7 @@ export function applyInput(prev: GameState, input: Input): GameState {
       acknowledgeOpenFate(state);
       return state;
     }
-    if (state.phase === "actions" || (state.phase === "resolving" && !state.pending)) {
+    if ((state.phase === "actions" || state.phase === "resolving") && !state.pending) {
       refillHand(state);
       startComputerFate(state);
     }

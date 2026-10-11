@@ -43,7 +43,7 @@ describe("Peter Pan reveal placement", () => {
       { instanceId: "wendy-1", defId: "wendy" },
     ];
 
-    let next = applyInput(state, { type: "selectAction", actionKey: "sr-fate" });
+    const next = applyInput(state, { type: "selectAction", actionKey: "sr-fate" });
     expect(next.peterPanRevealed).toBe(true);
     expect(next.peterPanLocation).toBe("hangmansTree");
     expect(next.locations.hangmansTree.heroes.some((h) => h.defId === "peterPan")).toBe(true);

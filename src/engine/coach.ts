@@ -44,7 +44,7 @@ export interface CoachAdvice {
 function towardRoger(from: LocationId): LocationId | null {
   const i = LOCATION_IDS.indexOf(from);
   if (i <= 0) return null;
-  return LOCATION_IDS[i - 1];
+  return LOCATION_IDS[i - 1] ?? null;
 }
 
 function tickTockAt(state: GameState): LocationId | null {
@@ -1061,8 +1061,9 @@ function endTurnWhy(state: GameState): string {
   }
   if (state.hand.length > 0 && discardOpen && discardPicks(state).length === 0) {
     idle.push("Discard is uncovered, but every card in hand still serves the chain.");
-  } else if (discardOpen && mapReserveNeedsDig(state) && discardPicks(state)[0]) {
-    idle.push(`Discard is uncovered. Dig ${cardName(discardPicks(state)[0])} for Power before ending.`);
+  } else if (discardOpen && mapReserveNeedsDig(state)) {
+    const dig = discardPicks(state)[0];
+    if (dig) idle.push(`Discard is uncovered. Dig ${cardName(dig)} for Power before ending.`);
   }
   const base = idle.length ? idle.join(" ") : "No Discard, Gain, or Play is left uncovered here.";
   const reserve = needPowerForMap(state)

@@ -3,6 +3,11 @@ import type { CardInstance, GameState, LocationId } from "../src/engine/types";
 
 let seq = 9000;
 
+export function pick<T>(value: T | undefined, label: string): T {
+  if (value === undefined) throw new Error(`missing ${label}`);
+  return value;
+}
+
 export function inst(defId: string): CardInstance {
   return { instanceId: `${defId}-t${seq++}`, defId };
 }
