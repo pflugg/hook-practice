@@ -33,6 +33,7 @@ import {
   type MoveReason,
 } from "../engine";
 import { advanceLesson, lessonOpening, lessonView, type LessonStep, type LessonView } from "../engine/lesson";
+import { coachPlan, type PlanStage } from "../engine/coachPlan";
 import { RIVAL_LOSE_REASON, rivalGoal } from "../engine/rival";
 import { motionReduced, travelDelta, type Box } from "./motion";
 import { armSound, cueFromTransition, playCue, rivalInWarningBand, setSoundMuted, soundMuted } from "./sound";
@@ -63,6 +64,8 @@ import {
   tickTockOntoCaptainScene,
   tickTockReportScene,
   hourEqualVanquishScene,
+  victoryScene,
+  rivalDefeatScene,
   hourPlaytestMoveScene,
   hourPlaytestTauntScene,
   hourPlaytestWhyScene,
@@ -112,6 +115,7 @@ function renderCard(
     inspectable?: boolean;
     expandable?: boolean;
     expanded?: boolean;
+    handRule?: boolean;
   },
 ): string {
   const d = def(card.defId);
@@ -139,6 +143,7 @@ function renderCard(
     ${typeBar}
     <h3>${esc(d.name)}</h3>
     <p class="text">${esc(cardText)}</p>
+    ${opts.handRule ? `<span class="hand-rule" data-hand-rule="${card.instanceId}">Rule</span>` : ""}
     ${opts.expandable ? `<span class="rule-toggle" data-rule-toggle="${card.instanceId}">${opts.expanded ? "Less" : "More"}</span>` : ""}
     ${attachNote}
     ${d.type === "hero" || d.type === "ally" ? `<div class="str" title="Strength" aria-label="Strength ${str}">${str}</div>` : ""}
@@ -161,7 +166,7 @@ function rivalMeter(state: GameState): string {
   const close = full || rivalInWarningBand(state);
   return `<div class="rival-meter${full ? " is-full" : ""}${close ? " is-close" : ""}" data-rival-meter role="meter" aria-label="Rival villain progress" aria-valuemin="0" aria-valuenow="${shown}" aria-valuemax="${goal}" title="If the rival reaches ${goal} before you vanquish Peter Pan at the Jolly Roger, you lose.">
     <span>Rival</span>
-    <span class="rival-track" aria-hidden="true"><i style="width:${pct}%"></i></span>
+    <span class="rival-track" aria-hidden="true"><i style="width:${pct}%"></i><span class="rival-token" style="left:${pct}%"></span></span>
     <b>${shown} / ${goal}</b>
   </div>`;
 }
@@ -184,8 +189,8 @@ function noItemDiscardBanner(): string {
   </aside>`;
 }
 
-function zone(title: string, body: string): string {
-  return `<div class="zone"><h3>${title}</h3>${body}</div>`;
+function zone(title: string, body: string, kind: string): string {
+  return `<div class="zone zone-${kind}"><h3>${title}</h3>${body}</div>`;
 }
 
 function cardDimmed(state: GameState, card: CardInstance, hi: Set<string>): boolean {
@@ -234,15 +239,19 @@ function renderLocation(
   const bottom = printed.filter((a) => a.row === "bottom");
   const showLegalActs = actionsAreLive(state) && state.villainLocation === id;
 
-  const actBtns = (list: typeof printed) =>
-    `<div class="row">${list
-      .map((a) => {
-        const legalAct = showLegalActs && !locked && hi.has(`act:${a.key}`);
-        const coachAct = legalAct && coached.has(`act:${a.key}`);
-        const inert = a.covered || a.used || !legalAct;
-        return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : "is-inert"} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${inert ? "disabled" : ""}>${esc(a.label)}</button>`;
-      })
-      .join("")}</div>`;
+  const actBtn = (a: (typeof printed)[number]) => {
+    const legalAct = showLegalActs && !locked && hi.has(`act:${a.key}`);
+    const coachAct = legalAct && coached.has(`act:${a.key}`);
+    const inert = a.covered || a.used || !legalAct;
+    return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : "is-inert"} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${inert ? "disabled" : ""}>${esc(a.label)}</button>`;
+  };
+  const extraBtns = extras
+    .map((a) => {
+      const extraLegal = showLegalActs && !locked && hi.has(`act:${a.key}`);
+      const extraInert = locked || a.used || !extraLegal;
+      return `<button class="action ${extraLegal ? "is-legal" : "is-inert"} ${extraLegal && coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}" ${extraInert ? "disabled" : ""}>${esc(a.label)}</button>`;
+    })
+    .join("");
 
   const cards = (empty: string, arr: CardInstance[]) =>
     arr.length
@@ -280,36 +289,32 @@ function renderLocation(
   const moveLabel = state.phase === "move" ? "Move here" : "Choose this place";
   const coachLoc = legal && coached.has(`loc:${id}`);
   return `<section class="location ${id} ${current ? "is-current" : ""} ${legal ? "is-legal" : ""} ${coachLoc ? "is-coached" : ""} ${locked ? "is-locked" : ""}" data-loc="${id}">
-    <div class="loc-vignette" aria-hidden="true">${locationDecor(id)}</div>
+    <div class="loc-vignette" aria-hidden="true"></div>
+    ${locked ? `<div class="lock-veil" aria-hidden="true"></div>` : ""}
     <div class="loc-head">
-      <div>
-        <h2><span class="shore-number" aria-label="Shore ${LOCATION_IDS.indexOf(id) + 1}">${LOCATION_IDS.indexOf(id) + 1}</span> ${esc(meta.name)} ${locked ? `<span class="lock-badge">LOCKED</span>` : ""}</h2>
-        <p>${esc(meta.subtitle)}</p>
-        ${locked ? `<p class="lock-need">Need: Never Land Map</p>` : ""}
+      <div class="loc-art-slot" aria-hidden="true">${locationDecor(id)}</div>
+      <div class="loc-title">
+        <div class="loc-name">
+          <h2><span class="shore-number" aria-label="Shore ${LOCATION_IDS.indexOf(id) + 1}">${LOCATION_IDS.indexOf(id) + 1}</span> ${esc(meta.name)} ${locked ? `<span class="lock-badge">LOCKED</span>` : ""}</h2>
+          <p>${esc(meta.subtitle)}</p>
+          ${locked ? `<p class="lock-need">Need: Never Land Map</p>` : ""}
+        </div>
+        ${
+          current
+            ? `<div class="captain-token" title="You — the captain">
+                ${CAPTAIN_TOKEN}
+                <span class="you-tag">You</span>
+              </div>`
+            : ""
+        }
       </div>
-      ${
-        current
-          ? `<div class="captain-token" title="You — the captain">
-              ${CAPTAIN_TOKEN}
-              <span class="you-tag">You</span>
-            </div>`
-          : ""
-      }
     </div>
     <div class="location-choice">${legal ? `<button type="button" class="drop-hint" data-move="${id}">${moveLabel}</button>` : `<span>${current ? "Captain here" : locked ? "Closed until the Map" : "Actions on arrival"}</span>`}</div>
-    <div class="loc-body">
-      ${locked ? `<div class="lock-veil" aria-hidden="true"></div>` : ""}
-      ${actBtns(top)}
-      ${zone("Heroes", cards("Clear — top actions are open.", loc.heroes))}
-      ${zone("Allies", cards("No crew stationed.", loc.allies))}
-      ${zone("Items", cards("No gear here.", loc.items))}
-      ${actBtns(bottom)}
-      ${extras.length ? `<div class="row">${extras.map((a) => {
-        const extraLegal = showLegalActs && !locked && hi.has(`act:${a.key}`);
-        const extraInert = locked || a.used || !extraLegal;
-        return `<button class="action ${extraLegal ? "is-legal" : "is-inert"} ${extraLegal && coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}" ${extraInert ? "disabled" : ""}>${esc(a.label)}</button>`;
-      }).join("")}</div>` : ""}
-    </div>
+    <div class="row row-top">${top.map(actBtn).join("")}</div>
+    ${zone("Heroes", cards("Clear — top actions are open.", loc.heroes), "heroes")}
+    ${zone("Allies", cards("No crew stationed.", loc.allies), "allies")}
+    ${zone("Items", cards("No gear here.", loc.items), "items")}
+    <div class="row row-bottom">${bottom.map(actBtn).join("")}${extraBtns}</div>
   </section>`;
 }
 
@@ -750,8 +755,53 @@ function teachRailHtml(brief: string, coach: string, reasons: string, active: Te
   </aside>`;
 }
 
-function coachPanel(advice: CoachAdvice): string {
-  return `<section class="teach-pane coach-panel" data-teach-pane="coach" aria-live="polite">
+const STAGE_LINE: Record<PlanStage["id"], string> = {
+  hideout: "Hideout is the step in front of you: open Hangman’s Tree with the Never Land Map.",
+  crew: "Crew is the step in front of you: Allies on the board are the Strength for the clash.",
+  peter: "Peter is the step in front of you: he has to enter the realm before the walk to the ship.",
+  ship: "Ship is the step in front of you: walk Peter onto the Jolly Roger.",
+  clash: "Clash is the step in front of you: vanquish Peter on the Jolly Roger.",
+};
+
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function repeatsClick(sentence: string, click: string): boolean {
+  if (sentence === click) return true;
+  if (click.length > 0 && sentence.includes(click)) return true;
+  return /\bclick\b/i.test(sentence);
+}
+
+function stageLine(stages: PlanStage[]): string {
+  const current = stages.find((stage) => stage.mark === "now") ?? stages.find((stage) => stage.mark === "later");
+  return current ? STAGE_LINE[current.id] : STAGE_LINE.clash;
+}
+
+export function planPanelCopy(state: GameState, advice: CoachAdvice): string[] {
+  const plan = coachPlan(state, advice);
+  const click = advice.do.trim();
+  const kept: string[] = [];
+  for (const line of plan.lines) {
+    const parts = splitSentences(line).filter((sentence) => !repeatsClick(sentence, click));
+    if (parts.length === 0) continue;
+    const text = parts.join(" ");
+    if (kept.includes(text)) continue;
+    kept.push(text);
+  }
+  return kept.length > 0 ? kept : [stageLine(plan.stages)];
+}
+
+function coachPanel(state: GameState, advice: CoachAdvice): string {
+  const plan = coachPlan(state, advice);
+  const lines = planPanelCopy(state, advice);
+  const why = lines[0] ?? stageLine(plan.stages);
+  const rest = lines.slice(1);
+  return `<p class="coach-do" title="${esc(advice.do)}">${esc(advice.do)}</p>
+  <section class="teach-pane coach-panel" data-teach-pane="coach" data-coach-plan aria-live="polite">
     <header class="teach-pane-head">
       <div class="pane-titles">
         <p class="coach-kicker">Coach</p>
@@ -759,13 +809,18 @@ function coachPanel(advice: CoachAdvice): string {
       </div>
       <button type="button" class="btn ghost pane-hide coach-hide" data-coach-toggle>Hide</button>
     </header>
-    <div class="coach-copy">
-      <p class="coach-do" title="${esc(advice.do)}">${esc(advice.do)}</p>
-      <details class="coach-more">
-        <summary>Why</summary>
-        <p class="coach-why">${esc(advice.why)}</p>
-        ${advice.warning ? `<p class="coach-warn">${esc(advice.warning)}</p>` : ""}
-      </details>
+    <div class="plan-panel">
+      <p class="coach-kicker">Why / Plan</p>
+      <ol class="plan-stages" aria-label="Plan">${plan.stages
+        .map(
+          (stage) =>
+            `<li class="is-${stage.mark}" data-plan-stage="${stage.id}" data-plan-mark="${stage.mark}">${esc(stage.label)}</li>`,
+        )
+        .join("")}</ol>
+      <div class="plan-lines">
+        <p class="coach-why">${esc(why ?? advice.why)}</p>
+        ${rest.map((line) => `<p class="plan-line">${esc(line)}</p>`).join("")}
+      </div>
     </div>
   </section>`;
 }
@@ -842,6 +897,7 @@ function playView(
   sceneId: string | null = null,
   lesson: LessonView | null = null,
   expanded: ReadonlySet<string> = NO_EXPANDED,
+  handRuleId: string | null = null,
 ): string {
   const hi = highlightSet(state);
   const sel = selectedSet(state);
@@ -890,7 +946,7 @@ function playView(
   }
 
   const briefHtml = briefEnabled && !settled ? strategySidebar(strategyBrief(state)) : "";
-  const coachHtml = advice ? coachPanel(advice) : "";
+  const coachHtml = advice ? coachPanel(state, advice) : "";
   const reasonHtml = reasonsEnabled && reason && !settled ? reasonDock(reason) : "";
   const teachOn = Boolean(briefHtml || coachHtml || reasonHtml);
   const activeTab = resolveTeachTab(teachTab, Boolean(briefHtml), Boolean(coachHtml), Boolean(reasonHtml));
@@ -904,6 +960,14 @@ function playView(
   const fateLogTitle = fateEmpty
     ? `Log · Fate 0 · empty`
     : `Log · Fate ${state.fateDeck.length}`;
+  const fateShow = state.lastFateShow;
+  const fateLive = state.pending?.kind === "fateReport" && state.pending.resume === "nextTurn";
+  const fateOnTable = fateLive || fateShowStillInPlay(state, fateShow);
+  const fateLogNote = fateOnTable
+    ? ""
+    : fateShow
+      ? "That Fate is over. The card is no longer on the table."
+      : "No Fate card is across the table yet.";
 
   return `<div class="sky play-sky" aria-hidden="true"><div class="stars"></div><div class="fog fog-a"></div></div>
   <div class="grain"></div>
@@ -964,16 +1028,23 @@ function playView(
           ${
             state.hand.length
               ? state.hand
-                  .map((c) =>
-                    renderCard(state, c, {
+                  .map((c) => {
+                    const cardText = def(c.defId).text;
+                    const open = handRuleId === c.instanceId;
+                    const button = renderCard(state, c, {
                       size: "hand",
                       legal: hi.has(`card:${c.instanceId}`),
                       selected: sel.has(c.instanceId),
                       dimmed: cardDimmed(state, c, hi),
                       coached: coached.has(`card:${c.instanceId}`),
                       inspectable: true,
-                    }),
-                  )
+                      handRule: cardText.length > 80,
+                    });
+                    const pop = open
+                      ? `<div class="hand-popover" data-hand-popover role="note"><p class="hand-popover-title">${esc(def(c.defId).name)}</p><p>${esc(cardText)}</p><span class="hand-rule-close" data-hand-rule-close>Close</span></div>`
+                      : "";
+                    return `<div class="hand-slot${open ? " is-open" : ""}">${button}${pop}</div>`;
+                  })
                   .join("")
               : `<p class="empty">${esc(emptyHandCopy(state))}</p>`
           }
@@ -981,7 +1052,7 @@ function playView(
       </section>
       <aside class="log">
         <h2>${esc(fateLogTitle)}</h2>
-        <ol>${state.log.map((e) => `<li class="${e.tone}">${esc(e.text)}</li>`).join("")}</ol>
+        <ol>${fateLogNote ? `<li class="info">${esc(fateLogNote)}</li>` : ""}${state.log.map((e) => `<li class="${e.tone}">${esc(e.text)}</li>`).join("")}</ol>
       </aside>
     </footer>
     </div>
@@ -1005,6 +1076,7 @@ export function renderPlay(
     teachTab?: TeachTab;
     lesson?: LessonView | null;
     expandedIds?: ReadonlySet<string>;
+    handRuleId?: string | null;
   } = {},
 ): string {
   const coachEnabled = flags.coachEnabled ?? true;
@@ -1022,6 +1094,7 @@ export function renderPlay(
     null,
     flags.lesson ?? null,
     flags.expandedIds ?? NO_EXPANDED,
+    flags.handRuleId ?? null,
   );
 }
 
@@ -1061,6 +1134,8 @@ const SCENE_LOADERS: Record<string, () => GameState> = {
   hourwhy: hourPlaytestWhyScene,
   hourequal: hourEqualVanquishScene,
   nearwin: nearWinScene,
+  victory: victoryScene,
+  defeat: rivalDefeatScene,
   rivalloss: rivalLossScene,
   mapreserve: mapReserveScene,
   worthy: worthySeatScene,
@@ -1187,12 +1262,13 @@ export function mount(root: HTMLElement): void {
   let lesson: LessonStep | null = null;
   let suppressClick = false;
   const expandedCards = new Set<string>();
+  let handRuleId: string | null = null;
 
   const bindCardDrag = () => {
     root.querySelectorAll<HTMLElement>(".card.is-draggable").forEach((cardEl) => {
       cardEl.addEventListener("pointerdown", (event) => {
         if (event.button !== 0) return;
-        if (event.target instanceof Element && event.target.closest("[data-rule-toggle]")) return;
+        if (event.target instanceof Element && event.target.closest("[data-rule-toggle], [data-hand-rule]")) return;
         armSound();
         const fromId = cardEl.dataset.card;
         if (!fromId || !isDraggableCard(state, fromId)) return;
@@ -1440,10 +1516,10 @@ export function mount(root: HTMLElement): void {
       root.innerHTML =
         (state.phase === "title"
           ? titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled, sceneWarning)
-          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards)) +
+          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards, handRuleId)) +
         helpView(state.phase !== "title") +
         inspect;
-    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards) + inspect;
+    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards, handRuleId) + inspect;
     bindCardDrag();
     root.querySelector<HTMLElement>("[data-realm-map]")?.addEventListener("scroll", () => markShown(), { passive: true });
     restoreScroll();
@@ -1462,6 +1538,7 @@ export function mount(root: HTMLElement): void {
 
   const dispatch = (input: Input) => {
     inspectId = null;
+    handRuleId = null;
     const before = state;
     state.coachOn = coachEnabled;
     state = applyInput(state, input);
@@ -1497,6 +1574,20 @@ export function mount(root: HTMLElement): void {
       return;
     }
     const t = event.target as HTMLElement;
+    const handRule = t.closest<HTMLElement>("[data-hand-rule]");
+    if (handRule?.dataset.handRule) {
+      event.preventDefault();
+      event.stopPropagation();
+      handRuleId = handRuleId === handRule.dataset.handRule ? null : handRule.dataset.handRule;
+      render();
+      return;
+    }
+    if (t.closest("[data-hand-rule-close]")) {
+      event.preventDefault();
+      handRuleId = null;
+      render();
+      return;
+    }
     const rule = t.closest<HTMLElement>("[data-rule-toggle]");
     if (rule?.dataset.ruleToggle) {
       event.preventDefault();
