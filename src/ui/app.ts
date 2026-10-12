@@ -33,7 +33,7 @@ import {
   type MoveReason,
 } from "../engine";
 import { advanceLesson, lessonOpening, lessonView, type LessonStep, type LessonView } from "../engine/lesson";
-import { coachPlan } from "../engine/coachPlan";
+import { coachPlan, type PlanStage } from "../engine/coachPlan";
 import { RIVAL_LOSE_REASON, rivalGoal } from "../engine/rival";
 import { motionReduced, travelDelta, type Box } from "./motion";
 import { armSound, cueFromTransition, playCue, rivalInWarningBand, setSoundMuted, soundMuted } from "./sound";
@@ -755,9 +755,51 @@ function teachRailHtml(brief: string, coach: string, reasons: string, active: Te
   </aside>`;
 }
 
+const STAGE_LINE: Record<PlanStage["id"], string> = {
+  hideout: "Hideout is the step in front of you: open Hangman’s Tree with the Never Land Map.",
+  crew: "Crew is the step in front of you: Allies on the board are the Strength for the clash.",
+  peter: "Peter is the step in front of you: he has to enter the realm before the walk to the ship.",
+  ship: "Ship is the step in front of you: walk Peter onto the Jolly Roger.",
+  clash: "Clash is the step in front of you: vanquish Peter on the Jolly Roger.",
+};
+
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function repeatsClick(sentence: string, click: string): boolean {
+  if (sentence === click) return true;
+  if (click.length > 0 && sentence.includes(click)) return true;
+  return /\bclick\b/i.test(sentence);
+}
+
+function stageLine(stages: PlanStage[]): string {
+  const current = stages.find((stage) => stage.mark === "now") ?? stages.find((stage) => stage.mark === "later");
+  return current ? STAGE_LINE[current.id] : STAGE_LINE.clash;
+}
+
+export function planPanelCopy(state: GameState, advice: CoachAdvice): string[] {
+  const plan = coachPlan(state, advice);
+  const click = advice.do.trim();
+  const kept: string[] = [];
+  for (const line of plan.lines) {
+    const parts = splitSentences(line).filter((sentence) => !repeatsClick(sentence, click));
+    if (parts.length === 0) continue;
+    const text = parts.join(" ");
+    if (kept.includes(text)) continue;
+    kept.push(text);
+  }
+  return kept.length > 0 ? kept : [stageLine(plan.stages)];
+}
+
 function coachPanel(state: GameState, advice: CoachAdvice): string {
   const plan = coachPlan(state, advice);
-  const [why, ...rest] = plan.lines;
+  const lines = planPanelCopy(state, advice);
+  const why = lines[0] ?? stageLine(plan.stages);
+  const rest = lines.slice(1);
   return `<p class="coach-do" title="${esc(advice.do)}">${esc(advice.do)}</p>
   <section class="teach-pane coach-panel" data-teach-pane="coach" data-coach-plan aria-live="polite">
     <header class="teach-pane-head">
