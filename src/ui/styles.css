@@ -571,10 +571,18 @@ button:focus-visible,
 .prompt.is-clash {
   flex-wrap: wrap;
   align-items: center;
+  row-gap: 2px;
 }
 .prompt.is-clash .clash-meter { order: 0; }
 .prompt.is-clash .prompt-actions { order: 1; margin-left: auto; }
 .prompt.is-clash p { order: 2; flex: 1 1 100%; }
+/* The clash meter sat in a tall padded box, leaving an empty band above and
+   below its single line of text in the prompt bar. Trim it to its content. */
+.prompt.is-clash .clash-meter {
+  align-items: center;
+  row-gap: 0;
+  padding: 2px 12px;
+}
 .prompt p { margin: 0; font-size: 18px; color: #fff6d8; flex: 1 1 220px; }
 .prompt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .clash-meter, .pay-meter {
