@@ -13,11 +13,16 @@ import { barePlayState, give } from "./helpers";
 
 describe("game graphics UI pass", () => {
   it("stacks Strategy brief, Coach, and Why this move in a right teaching rail", () => {
+    const moveReason = {
+      chose: "You played the Never Land Map.",
+      why: "It unlocks Hangman's Tree so the walk to the ship can begin.",
+      next: "Open the Tree, then find Peter.",
+    };
     const html = renderPlay(createGame("normal", 7), {
       coachEnabled: true,
       briefEnabled: true,
       reasonsEnabled: true,
-      reason: IDLE_MOVE_REASON,
+      reason: moveReason,
     });
 
     expect(html).toContain("has-teach");
@@ -70,6 +75,26 @@ describe("game graphics UI pass", () => {
     const titles = [...rail!.querySelectorAll(":scope > .teach-pane .pane-title")].map((el) => el.textContent);
     expect(titles).toEqual(["Next move", "Why this move", "How the voyage stands"]);
     expect(rail!.querySelector("[data-teach-tab]")).toBeNull();
+  });
+
+  it("collapses the idle Why this move to one compact line until a move is made", () => {
+    const html = renderPlay(createGame("normal", 7), {
+      coachEnabled: true,
+      briefEnabled: true,
+      reasonsEnabled: true,
+      reason: IDLE_MOVE_REASON,
+    });
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    const dock = root.querySelector(".reason-dock");
+    // Header stays, but the three idle blocks collapse into a single prompt line.
+    expect(dock?.classList.contains("is-idle")).toBe(true);
+    expect(dock?.querySelector(".pane-title")?.textContent).toBe("Why this move");
+    expect(dock?.querySelector(".reason-idle")).not.toBeNull();
+    expect(dock?.querySelectorAll(".reason-block").length).toBe(0);
+    expect(html).not.toContain("What you chose");
+    // The brief still renders below, so it is not pushed off the first screen.
+    expect(html.indexOf("strategy-brief")).toBeGreaterThan(html.indexOf("reason-dock"));
   });
 
   it("keeps Power, Turn, and Hand/Deck/Discard as loud HUD chips", () => {
