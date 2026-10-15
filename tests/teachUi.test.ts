@@ -193,7 +193,7 @@ describe("teaching UI for Must fixes", () => {
     expect(html).toContain("Continue anyway");
   });
 
-  it("marks teach panes so remounts can restore independent scroll", () => {
+  it("flows Coach, Why this move, and Brief as one panel in order, without tabs", () => {
     const html = renderPlay(barePlayState(), {
       coachEnabled: true,
       briefEnabled: true,
@@ -202,11 +202,11 @@ describe("teaching UI for Must fixes", () => {
     expect(html).toContain('data-teach-pane="brief"');
     expect(html).toContain('data-teach-pane="coach"');
     expect(html).toContain('data-teach-pane="reasons"');
-    expect(html).toContain('data-teach-tab="coach"');
+    expect(html).not.toContain("data-teach-tab");
+    expect(html).not.toContain("teach-tabs");
+    expect(html).not.toContain("data-active-tab");
     expect(html.indexOf('data-teach-pane="coach"')).toBeLessThan(html.indexOf('data-teach-pane="reasons"'));
     expect(html.indexOf('data-teach-pane="reasons"')).toBeLessThan(html.indexOf('data-teach-pane="brief"'));
-    expect(html.indexOf('data-teach-tab="coach"')).toBeLessThan(html.indexOf('data-teach-tab="reasons"'));
-    expect(html.indexOf('data-teach-tab="reasons"')).toBeLessThan(html.indexOf('data-teach-tab="brief"'));
   });
 
   it("DEV clash / Obsession / local-vanquish scenes paint the new teaching chrome", () => {

@@ -28,9 +28,11 @@ describe("game graphics UI pass", () => {
     expect(html).toContain("What you chose");
     expect(html).toContain("Why it helps the plan");
     expect(html).toContain("What it sets up");
-    expect(html).toContain("data-teach-tab=\"brief\"");
-    expect(html).toContain("data-teach-tab=\"coach\"");
-    expect(html).toContain("data-teach-tab=\"reasons\"");
+    // One flowing panel with section headers, not a tabbed widget.
+    expect(html).not.toContain("teach-tabs");
+    expect(html).not.toContain("data-teach-tab");
+    expect(html).not.toContain("data-active-tab");
+    expect(html).toContain('<h2 class="pane-title">Next move</h2>');
     expect(html).not.toContain("teach-dock");
     expect(html).not.toContain("teach-strip");
     expect(html).not.toContain("reason-float");
@@ -64,8 +66,10 @@ describe("game graphics UI pass", () => {
     expect(rail?.querySelectorAll(":scope > .teach-pane").length).toBe(3);
     const panes = [...rail!.querySelectorAll(":scope > .teach-pane")].map((el) => el.getAttribute("data-teach-pane"));
     expect(panes).toEqual(["coach", "reasons", "brief"]);
-    const tabs = [...rail!.querySelectorAll("[data-teach-tab]")].map((el) => el.getAttribute("data-teach-tab"));
-    expect(tabs).toEqual(["coach", "reasons", "brief"]);
+    // Each section carries its own header so the panel reads as one document.
+    const titles = [...rail!.querySelectorAll(":scope > .teach-pane .pane-title")].map((el) => el.textContent);
+    expect(titles).toEqual(["Next move", "Why this move", "How the voyage stands"]);
+    expect(rail!.querySelector("[data-teach-tab]")).toBeNull();
   });
 
   it("keeps Power, Turn, and Hand/Deck/Discard as loud HUD chips", () => {
