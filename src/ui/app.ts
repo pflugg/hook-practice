@@ -1509,7 +1509,12 @@ export function mount(root: HTMLElement): void {
     // itself), default to bringing the Coach back into view at the top of the
     // rail rather than keeping a scroll position that now hides the next move.
     const coachText = root.querySelector<HTMLElement>("[data-teach-rail] .coach-do")?.textContent?.trim() ?? "";
-    const teachSig = `${state.turn}|${state.phase}|${state.villainLocation}|${state.usedActions.join(",")}|${coachText}`;
+    // The hand and Power change on each discard/play even when the turn, phase,
+    // and Coach wording stay identical (e.g. "Discard 2 at Skull Rock …"). Fold
+    // them into the signature so every forced step re-pins the Coach line at the
+    // top of the rail instead of leaving it scrolled out of view.
+    const handSig = state.hand.map((c) => c.instanceId).join(",");
+    const teachSig = `${state.turn}|${state.phase}|${state.villainLocation}|${state.power}|${state.usedActions.join(",")}|${handSig}|${coachText}`;
     if (teachSig !== lastTeachSig) {
       railScroll = 0;
       lastTeachSig = teachSig;
