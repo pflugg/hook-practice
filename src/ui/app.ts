@@ -832,15 +832,15 @@ function strategySidebar(brief: StrategyBrief): string {
 }
 
 function reasonDock(reason: MoveReason): string {
-  return `<section class="teach-pane reason-dock${reason.soft ? " is-soft" : ""}" data-teach-pane="reasons" data-reason-dock aria-label="Why this move">
-    <header class="teach-pane-head">
-      <div class="pane-titles">
-        <p class="reason-kicker">Reasons</p>
-        <h2 class="pane-title">Why this move</h2>
-      </div>
-      <button type="button" class="btn ghost pane-hide reason-hide" data-reasons-toggle>Hide</button>
-    </header>
-    <section class="reason-block">
+  // Before any move is made the panel has nothing to explain, so it collapses to
+  // one compact line instead of three idle blocks that would push the brief off
+  // the first screen. The full three-part readout returns the moment a move exists
+  // (live "action stretch" guidance is soft but still carries real content, so it
+  // is matched on the genuine placeholder text, not the soft flag).
+  const idle = reason.chose === IDLE_MOVE_REASON.chose;
+  const body = idle
+    ? `<p class="reason-idle">Click a glowing location, action, or card. This panel then names what you chose, why it helps the plan, and what it sets up.</p>`
+    : `<section class="reason-block">
       <h3>What you chose</h3>
       <p>${esc(reason.chose)}</p>
     </section>
@@ -852,7 +852,16 @@ function reasonDock(reason: MoveReason): string {
       <h3>What it sets up</h3>
       <p>${esc(reason.next)}</p>
     </section>
-    <p class="reason-foot">Not Coach (next click) and not the Strategy brief (voyage status). It rides in the same teaching panel, below Next move and above the brief, so it never covers legal board actions.</p>
+    <p class="reason-foot">Not Coach (next click) and not the Strategy brief (voyage status). It rides in the same teaching panel, below Next move and above the brief, so it never covers legal board actions.</p>`;
+  return `<section class="teach-pane reason-dock${reason.soft ? " is-soft" : ""}${idle ? " is-idle" : ""}" data-teach-pane="reasons" data-reason-dock aria-label="Why this move">
+    <header class="teach-pane-head">
+      <div class="pane-titles">
+        <p class="reason-kicker">Reasons</p>
+        <h2 class="pane-title">Why this move</h2>
+      </div>
+      <button type="button" class="btn ghost pane-hide reason-hide" data-reasons-toggle>Hide</button>
+    </header>
+    ${body}
   </section>`;
 }
 
@@ -1315,6 +1324,7 @@ export function mount(root: HTMLElement): void {
   let realmScroll = 0;
   let handScroll = 0;
   let railScroll = 0;
+  let lastTeachSig = "";
 
   const captureScroll = () => {
     pageScrollX = window.scrollX;
@@ -1475,6 +1485,15 @@ export function mount(root: HTMLElement): void {
         helpView(state.phase !== "title") +
         inspect;
     } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, activeSceneId, lessonBeat, expandedCards, handRuleId) + inspect;
+    // When the teaching context changes (turn, phase, move, or the Coach line
+    // itself), default to bringing the Coach back into view at the top of the
+    // rail rather than keeping a scroll position that now hides the next move.
+    const coachText = root.querySelector<HTMLElement>("[data-teach-rail] .coach-do")?.textContent?.trim() ?? "";
+    const teachSig = `${state.turn}|${state.phase}|${state.villainLocation}|${state.usedActions.join(",")}|${coachText}`;
+    if (teachSig !== lastTeachSig) {
+      railScroll = 0;
+      lastTeachSig = teachSig;
+    }
     bindCardDrag();
     root.querySelector<HTMLElement>("[data-realm-map]")?.addEventListener("scroll", () => markShown(), { passive: true });
     restoreScroll();
