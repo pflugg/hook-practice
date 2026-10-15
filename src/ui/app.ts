@@ -1378,6 +1378,26 @@ export function mount(root: HTMLElement): void {
     realm.scrollLeft = Math.max(0, left);
   };
 
+  // On the wide board the shore zones scroll (overflow:auto) when they hold more
+  // mini cards than fit. A re-render resets every zone to the top, so a coached
+  // card below the fold can sit hidden. Bring it back into its zone's view, clear
+  // of the sticky zone label, so the highlighted card is never covered.
+  const bringCoachedCardIntoView = () => {
+    const desktop = typeof window.matchMedia === "function" && window.matchMedia("(min-width: 1101px)").matches;
+    if (!desktop) return;
+    const topInset = 14;
+    root.querySelectorAll<HTMLElement>(".location .zone").forEach((zone) => {
+      const card = zone.querySelector<HTMLElement>(".card.is-coached");
+      if (!card) return;
+      const zr = zone.getBoundingClientRect();
+      const cr = card.getBoundingClientRect();
+      if (cr.height <= 0 || zr.height <= 0) return;
+      if (cr.top >= zr.top + topInset && cr.bottom <= zr.bottom) return;
+      if (cr.top < zr.top + topInset) zone.scrollTop += cr.top - zr.top - topInset;
+      else if (cr.bottom > zr.bottom) zone.scrollTop += cr.bottom - zr.bottom + 2;
+    });
+  };
+
   const markShown = (forced?: LocationId) => {
     const realm = root.querySelector<HTMLElement>("[data-realm-map]");
     if (!realm || realm.clientWidth <= 0) return;
@@ -1498,12 +1518,14 @@ export function mount(root: HTMLElement): void {
     root.querySelector<HTMLElement>("[data-realm-map]")?.addEventListener("scroll", () => markShown(), { passive: true });
     restoreScroll();
     bringHighlightIntoView();
+    bringCoachedCardIntoView();
     pinNextClick();
     markShown();
     restoreFocus();
     requestAnimationFrame(() => {
       restoreScroll();
       bringHighlightIntoView();
+      bringCoachedCardIntoView();
       pinNextClick();
       markShown();
       playTravel(root, movers);
