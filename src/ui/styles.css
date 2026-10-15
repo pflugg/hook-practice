@@ -2575,12 +2575,31 @@ button:focus-visible,
       "dock   rail";
   }
   /* When sections are hidden the panel carries less, so the rail narrows and the
-     board claims the freed width instead of leaving a wide empty column. */
+     board claims the freed width instead of leaving a wide empty column. The
+     rail also stops spanning the dock row so the hand and log take the full
+     width below the board instead of leaving a tall dead column under the Coach,
+     and the shrunken teaching text grows to fill its floor-plus room. */
   .play.has-teach:has(.teach-rail > .teach-pane:nth-child(2):last-child) {
     grid-template-columns: minmax(0, 1fr) minmax(300px, 330px);
   }
   .play.has-teach:has(.teach-rail > .teach-pane:only-child) {
     grid-template-columns: minmax(0, 1fr) minmax(252px, 288px);
+    grid-template-areas:
+      "chrome chrome"
+      "board  rail"
+      "dock   dock";
+  }
+  .play.has-teach:has(.teach-rail > .teach-pane:only-child) .coach-do {
+    font-size: 22px;
+    line-height: 1.32;
+  }
+  .play.has-teach:has(.teach-rail > .teach-pane:only-child) .coach-why,
+  .play.has-teach:has(.teach-rail > .teach-pane:only-child) .plan-lines .coach-why {
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  .play.has-teach:has(.teach-rail > .teach-pane:only-child) .plan-lines .plan-line {
+    font-size: 15px;
   }
   .play:not(.has-teach) {
     display: grid;
