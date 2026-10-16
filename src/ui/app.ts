@@ -1325,6 +1325,7 @@ export function mount(root: HTMLElement): void {
   let handScroll = 0;
   let railScroll = 0;
   let lastTeachSig = "";
+  let coachScrollTimer: number | null = null;
 
   const captureScroll = () => {
     pageScrollX = window.scrollX;
@@ -1385,16 +1386,21 @@ export function mount(root: HTMLElement): void {
   const bringCoachedCardIntoView = () => {
     const desktop = typeof window.matchMedia === "function" && window.matchMedia("(min-width: 1101px)").matches;
     if (!desktop) return;
-    const topInset = 14;
+    const topInset = 14; // clear the sticky zone label at the top of the zone
     root.querySelectorAll<HTMLElement>(".location .zone").forEach((zone) => {
       const card = zone.querySelector<HTMLElement>(".card.is-coached");
-      if (!card) return;
+      // A card mid-FLIP is offset by a transform, so centre on the resting box.
+      if (!card || card.classList.contains("is-traveling")) return;
       const zr = zone.getBoundingClientRect();
       const cr = card.getBoundingClientRect();
       if (cr.height <= 0 || zr.height <= 0) return;
-      if (cr.top >= zr.top + topInset && cr.bottom <= zr.bottom) return;
-      if (cr.top < zr.top + topInset) zone.scrollTop += cr.top - zr.top - topInset;
-      else if (cr.bottom > zr.bottom) zone.scrollTop += cr.bottom - zr.bottom + 2;
+      const viewTop = zr.top + topInset;
+      const viewHeight = zr.bottom - viewTop;
+      let delta = 0;
+      if (cr.height >= viewHeight) delta = cr.top + cr.height / 2 - (viewTop + viewHeight / 2);
+      else if (cr.top < viewTop) delta = cr.top - viewTop;
+      else if (cr.bottom > zr.bottom) delta = cr.bottom - zr.bottom;
+      if (Math.abs(delta) > 0.5) zone.scrollTop += delta;
     });
   };
 
@@ -1534,6 +1540,13 @@ export function mount(root: HTMLElement): void {
       pinNextClick();
       markShown();
       playTravel(root, movers);
+      // A coached card can be mid-FLIP here; its scroll target is only correct
+      // once the travel settles (~360ms), so re-centre it in its zone then.
+      if (coachScrollTimer !== null) window.clearTimeout(coachScrollTimer);
+      coachScrollTimer = window.setTimeout(() => {
+        coachScrollTimer = null;
+        bringCoachedCardIntoView();
+      }, 380);
     });
   };
 
