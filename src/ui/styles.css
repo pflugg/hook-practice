@@ -1275,6 +1275,14 @@ button:focus-visible,
   color: #fff8e8;
   border: 1px solid #f0d48a;
 }
+/* Hand cards clip their own box, so the badge can't hang above the card top the
+   way it does on the roomy board zones. Tuck it flush to the top-left corner. */
+.card.hand-card .playable-tag,
+.card.hand-card .spent-tag {
+  top: 0;
+  left: 0;
+  border-radius: 0 0 6px 0;
+}
 .card.is-spent { opacity: 0.94; }
 
 .card.is-dimmed { opacity: 0.42; filter: grayscale(0.18); }
