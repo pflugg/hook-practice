@@ -1899,6 +1899,16 @@ button:focus-visible,
     overflow-y: auto;
   }
   .location.is-coached { scroll-margin-top: 96px; }
+  /* The fixed Next-click strip sits over the top of the scroll, so anything that
+     gets scrolled to the top (End turn, Confirm, Cancel, the prompt) must leave
+     room for it instead of landing underneath. */
+  .prompt,
+  .prompt-actions .btn,
+  [data-end],
+  [data-confirm],
+  [data-cancel] {
+    scroll-margin-top: 96px;
+  }
   .quick-coach {
     display: flex;
     flex-direction: column;
