@@ -454,8 +454,7 @@ button:focus-visible,
 .chip:focus-visible,
 .card:focus-visible,
 .drop-hint:focus-visible,
-.prompt-place:focus-visible,
-.teach-tab:focus-visible {
+.prompt-place:focus-visible {
   outline: 3px solid #fff6d2;
   outline-offset: 2px;
 }
@@ -505,12 +504,14 @@ button:focus-visible,
   background: rgba(48, 34, 16, 0.72);
 }
 
+/* One flowing teaching panel: a single scroll box with stacked sections. */
 .teach-rail {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   position: sticky;
   top: 0;
   align-self: stretch;
@@ -518,56 +519,34 @@ button:focus-visible,
   max-height: 100%;
   border-left: 1px solid rgba(232, 195, 106, 0.42);
   background:
-    linear-gradient(180deg, rgba(255, 246, 210, 0.08), transparent 18%),
-    linear-gradient(180deg, rgba(52, 36, 20, 0.94), rgba(12, 12, 14, 0.96)),
+    linear-gradient(180deg, rgba(255, 246, 210, 0.08), transparent 12%),
+    linear-gradient(180deg, rgba(52, 36, 20, 0.96), rgba(28, 20, 12, 0.98)),
     repeating-linear-gradient(90deg, rgba(201, 161, 74, 0.045) 0 14px, transparent 14px 15px);
   box-shadow:
     inset 1px 0 0 rgba(255, 246, 210, 0.08),
     -12px 0 32px rgba(0, 0, 0, 0.22);
-}
-.teach-tabs {
-  display: none;
-  flex-shrink: 0;
-  border-bottom: 1px solid rgba(232, 195, 106, 0.28);
-  background: rgba(16, 12, 8, 0.45);
-}
-.teach-tab {
-  flex: 1;
-  min-width: 0;
-  padding: 10px 8px;
-  border-right: 1px solid rgba(232, 195, 106, 0.16);
-  color: #d7c7a2;
-  font-family: var(--display);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  scroll-margin: 0;
-}
-.teach-tab:last-child { border-right: 0; }
-.teach-tab.is-on {
-  color: #1b1408;
-  background: linear-gradient(180deg, #f3d790, #c4922e);
-  font-weight: 700;
-}
-.teach-rail > .teach-pane {
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  padding: 8px 10px 10px;
-  border-bottom: 1px solid rgba(232, 195, 106, 0.22);
-  scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: rgba(232, 195, 106, 0.55) rgba(8, 8, 10, 0.35);
   overscroll-behavior: contain;
   overflow-anchor: none;
 }
+.teach-rail > .teach-pane {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: visible;
+  padding: 10px 12px 12px;
+  border-bottom: 1px solid rgba(232, 195, 106, 0.22);
+}
 .strategy-brief,
 .coach-panel,
 .reason-dock {
-  overflow: auto;
+  overflow: visible;
 }
-.teach-rail > .teach-pane:last-child { border-bottom: 0; }
+/* Last section stretches to fill the rail so the box has no dead space below it. */
+.teach-rail > .teach-pane:last-child {
+  border-bottom: 0;
+  flex: 1 0 auto;
+}
 
 .prompt {
   margin: 0;
@@ -592,10 +571,18 @@ button:focus-visible,
 .prompt.is-clash {
   flex-wrap: wrap;
   align-items: center;
+  row-gap: 2px;
 }
 .prompt.is-clash .clash-meter { order: 0; }
 .prompt.is-clash .prompt-actions { order: 1; margin-left: auto; }
 .prompt.is-clash p { order: 2; flex: 1 1 100%; }
+/* The clash meter sat in a tall padded box, leaving an empty band above and
+   below its single line of text in the prompt bar. Trim it to its content. */
+.prompt.is-clash .clash-meter {
+  align-items: center;
+  row-gap: 0;
+  padding: 2px 12px;
+}
 .prompt p { margin: 0; font-size: 18px; color: #fff6d8; flex: 1 1 220px; }
 .prompt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .clash-meter, .pay-meter {
@@ -660,8 +647,8 @@ button:focus-visible,
 .brief-kicker {
   margin: 0 0 4px;
   font-family: var(--display);
-  font-size: 10px;
-  letter-spacing: 0.2em;
+  font-size: 12px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--gold);
 }
@@ -700,8 +687,8 @@ button:focus-visible,
 .brief-kicker {
   margin: 0 0 4px;
   font-family: var(--display);
-  font-size: 10px;
-  letter-spacing: 0.2em;
+  font-size: 12px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--gold);
 }
@@ -721,8 +708,8 @@ button:focus-visible,
 .brief-block h3 {
   margin: 0 0 8px;
   font-family: var(--display);
-  font-size: 11px;
-  letter-spacing: 0.16em;
+  font-size: 13px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #e8c36a;
 }
@@ -1288,6 +1275,14 @@ button:focus-visible,
   color: #fff8e8;
   border: 1px solid #f0d48a;
 }
+/* Hand cards clip their own box, so the badge can't hang above the card top the
+   way it does on the roomy board zones. Tuck it flush to the top-left corner. */
+.card.hand-card .playable-tag,
+.card.hand-card .spent-tag {
+  top: 0;
+  left: 0;
+  border-radius: 0 0 6px 0;
+}
 .card.is-spent { opacity: 0.94; }
 
 .card.is-dimmed { opacity: 0.42; filter: grayscale(0.18); }
@@ -1753,22 +1748,15 @@ button:focus-visible,
     position: static;
     height: auto;
     max-height: none;
+    overflow: visible;
     border-left: 0;
     border-top: 1px solid rgba(232, 195, 106, 0.42);
   }
-  .teach-tabs { display: flex; }
   .teach-rail > .teach-pane {
-    display: none;
-    flex: none;
-    max-height: min(52vh, 520px);
-    overflow: auto;
+    flex: 0 0 auto;
+    overflow: visible;
   }
-  .teach-rail[data-active-tab="brief"] > .strategy-brief,
-  .teach-rail[data-active-tab="coach"] > .coach-panel,
-  .teach-rail[data-active-tab="reasons"] > .reason-dock,
-  .teach-rail:not(:has(.teach-tabs)) > .teach-pane {
-    display: block;
-  }
+  .teach-rail > .teach-pane:last-child { flex: 0 0 auto; }
   .loc-head h2 { font-size: 15px; }
   .card.mini { width: 96px; }
 }
@@ -1802,6 +1790,13 @@ button:focus-visible,
   line-height: 1.45;
   color: #e6d7b4;
 }
+.reason-idle {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #d9c7a0;
+}
+.reason-dock.is-idle { padding-bottom: 10px; }
 
 @media (max-width: 900px) {
   .topbar {
@@ -1912,6 +1907,16 @@ button:focus-visible,
     overflow-y: auto;
   }
   .location.is-coached { scroll-margin-top: 96px; }
+  /* The fixed Next-click strip sits over the top of the scroll, so anything that
+     gets scrolled to the top (End turn, Confirm, Cancel, the prompt) must leave
+     room for it instead of landing underneath. */
+  .prompt,
+  .prompt-actions .btn,
+  [data-end],
+  [data-confirm],
+  [data-cancel] {
+    scroll-margin-top: 96px;
+  }
   .quick-coach {
     display: flex;
     flex-direction: column;
@@ -1928,7 +1933,10 @@ button:focus-visible,
   }
   .quick-coach > span { font: 700 11px var(--display); letter-spacing: .12em; text-transform: uppercase; color: #e8c36a; }
   .quick-coach p { margin: 0; font-size: 15px; line-height: 1.4; }
-  .teach-rail > .coach-do { display: none; }
+  /* On narrow the whole page scrolls, so section headers must not stick under the
+     fixed Next-click strip and half-cover the next heading. */
+  .teach-pane-head,
+  .brief-head { position: static; }
   .location-choice { padding: 2px 4px 8px; }
   .loc-head h2 { font-size: 15px; }
   .card.mini { width: 100%; }
@@ -1956,7 +1964,7 @@ button:focus-visible,
     padding: 8px 12px 10px;
     background: linear-gradient(180deg, rgba(18, 14, 10, 0), #16120e 36%);
   }
-  .prompt { gap: 8px; padding: 10px 12px; }
+  .prompt { gap: 8px; padding: 10px 12px; flex-wrap: wrap; }
   .prompt p { font-size: 15px; line-height: 1.35; }
   .prompt-actions { gap: 6px; }
   .prompt-actions .btn { min-height: 44px; font-size: 12px; padding: 9px; }
@@ -2168,73 +2176,6 @@ button:focus-visible,
 }
 
 @media (min-width: 1101px) {
-  .play.has-teach {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    grid-template-areas:
-      "rail"
-      "main";
-  }
-  .teach-rail {
-    position: static;
-    display: flex;
-    flex-direction: column;
-    height: auto;
-    min-height: 44px;
-    max-height: 84px;
-    overflow: auto;
-    border-left: 0;
-    border-bottom: 1px solid rgba(201, 161, 74, 0.45);
-    align-self: auto;
-    background:
-      linear-gradient(180deg, rgba(255, 246, 210, 0.1), transparent 48%),
-      linear-gradient(90deg, #3a2618, #2a1a10 58%, #24160e);
-  }
-  .teach-rail:has(.teach-tabs) { max-height: 84px; }
-  .teach-rail:has(.teach-tabs) .teach-tabs { display: flex; }
-  .teach-rail:has(.teach-tabs) > .teach-pane { display: none; }
-  .teach-rail[data-active-tab="brief"] > .strategy-brief,
-  .teach-rail[data-active-tab="coach"] > .coach-panel,
-  .teach-rail[data-active-tab="reasons"] > .reason-dock { display: block; }
-  .teach-pane-head { display: none; }
-  .teach-rail > .teach-pane {
-    flex: 0 0 auto;
-    min-height: min-content;
-    height: auto;
-    padding: 2px 12px 4px;
-    overflow: visible;
-  }
-  .coach-copy {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-areas:
-      "click click"
-      "stages lines";
-    column-gap: 14px;
-    row-gap: 2px;
-    align-items: start;
-    min-width: 0;
-  }
-  .coach-do {
-    grid-area: click;
-    margin: 0;
-    min-width: 0;
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .plan-stages { grid-area: stages; margin: 0; }
-  .plan-lines { grid-area: lines; min-width: 0; }
-  .coach-more { margin: 0; }
-  .coach-more summary {
-    cursor: pointer;
-    color: #d7c7a2;
-    font: 700 12px var(--display);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
   .play-scroll {
     display: flex;
     flex-direction: column;
@@ -2258,7 +2199,11 @@ button:focus-visible,
     height: 100%;
     min-height: 0;
     padding-top: 0;
-    column-gap: 36px;
+    /* Scale the four shores to the board column so nothing is clipped or
+       scrolls sideways on a narrow desktop; the gap shrinks with the viewport. */
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: clamp(8px, 1.8vw, 36px);
     row-gap: 0;
     align-items: stretch;
     grid-template-rows: auto auto auto minmax(74px, 1fr) minmax(74px, 1fr) auto auto;
@@ -2556,8 +2501,8 @@ button:focus-visible,
   list-style: none;
 }
 .plan-stages li {
-  font: 700 10px var(--display);
-  letter-spacing: 0.08em;
+  font: 700 12px var(--display);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #cbb892;
 }
@@ -2642,18 +2587,45 @@ button:focus-visible,
   .zone-items:not(:has(.card)) { padding-bottom: 0; }
   .plan-lines p { line-height: 1.35; }
 
+  /* Board + hand/log on the left, one tall teaching panel filling the right. */
   .play.has-teach {
     display: grid;
     height: 100dvh;
     max-height: 100dvh;
     overflow: hidden;
-    grid-template-columns: minmax(0, 1.42fr) minmax(300px, 0.95fr) minmax(148px, 180px);
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+    grid-template-rows: auto minmax(220px, 1fr) minmax(0, 240px);
     grid-template-areas:
-      "chrome chrome chrome"
-      "click click click"
-      "board board board"
-      "hand plan log";
+      "chrome chrome"
+      "board  rail"
+      "dock   rail";
+  }
+  /* When sections are hidden the panel carries less, so the rail narrows and the
+     board claims the freed width instead of leaving a wide empty column. The
+     rail also stops spanning the dock row so the hand and log take the full
+     width below the board instead of leaving a tall dead column under the Coach,
+     and the shrunken teaching text grows to fill its floor-plus room. */
+  .play.has-teach:has(.teach-rail > .teach-pane:nth-child(2):last-child) {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 330px);
+  }
+  .play.has-teach:has(.teach-rail > .teach-pane:only-child) {
+    grid-template-columns: minmax(0, 1fr) minmax(252px, 288px);
+    grid-template-areas:
+      "chrome chrome"
+      "board  rail"
+      "dock   dock";
+  }
+  .play.has-teach:has(.teach-rail > .teach-pane:only-child) .coach-do {
+    font-size: 22px;
+    line-height: 1.32;
+  }
+  .play.has-teach:has(.teach-rail > .teach-pane:only-child) .coach-why,
+  .play.has-teach:has(.teach-rail > .teach-pane:only-child) .plan-lines .coach-why {
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  .play.has-teach:has(.teach-rail > .teach-pane:only-child) .plan-lines .plan-line {
+    font-size: 15px;
   }
   .play:not(.has-teach) {
     display: grid;
@@ -2668,9 +2640,8 @@ button:focus-visible,
       "hand log";
   }
   .play-main,
-  .play-scroll,
-  .dock,
-  .teach-rail { display: contents; }
+  .play-scroll { display: contents; }
+  .play:not(.has-teach) .dock { display: contents; }
   .play-chrome { grid-area: chrome; }
   .stage {
     grid-area: board;
@@ -2680,54 +2651,57 @@ button:focus-visible,
     display: flex;
     flex-direction: column;
   }
-  .coach-do {
-    grid-area: click;
-    margin: 0;
-    padding: 4px 16px 6px;
-    background: #2a1a10;
-    border-bottom: 1px solid rgba(201, 161, 74, 0.45);
-  }
-  .play .teach-rail[data-active-tab="coach"] > .coach-panel,
-  .play .teach-rail:not(:has(.teach-tabs)) > .coach-panel { display: contents; }
-  .plan-panel,
-  .reason-dock,
-  .strategy-brief { grid-area: plan; }
-  .teach-tabs {
-    grid-area: plan;
-    align-self: start;
-    z-index: 2;
-    margin: 6px 8px 0;
-  }
-  .play:has(.teach-tabs) .plan-panel,
-  .play:has(.teach-tabs) .reason-dock,
-  .play:has(.teach-tabs) .strategy-brief { padding-top: 36px; }
-  .plan-panel {
-    min-height: 0;
-    height: 100%;
-    overflow: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 8px 14px 10px;
-    background: linear-gradient(180deg, #3a2618, #24160e);
-    border-top: 1px solid rgba(201, 161, 74, 0.45);
-  }
-  .plan-panel .coach-kicker { margin: 0; }
-  .plan-stages { margin: 0; }
-  .plan-lines { min-height: 0; }
+  .coach-do { margin: 0 0 8px; }
+  .plan-stages { margin: 6px 0; }
   .plan-lines p {
     overflow: visible;
     display: block;
     -webkit-line-clamp: unset;
   }
-  .hand {
-    grid-area: hand;
-    min-width: 0;
-    padding: 6px 10px 8px;
+  /* The teaching panel is one flowing, scrolling column that fills the rail. */
+  .teach-rail {
+    grid-area: rail;
+    position: static;
+    align-self: stretch;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  /* Hand and Log share the bottom-left dock below the board. */
+  .play.has-teach .dock {
+    grid-area: dock;
     display: flex;
-    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    padding: 6px 10px 8px;
     background: linear-gradient(180deg, #3a2618, #24160e);
     border-top: 1px solid rgba(201, 161, 74, 0.45);
+  }
+  .play.has-teach .hand {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    background: none;
+    border-top: 0;
+  }
+  .play.has-teach .log {
+    flex: 0 0 clamp(170px, 24%, 260px);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    max-height: none;
+    overflow: hidden;
+    padding: 0 0 0 10px;
+    border-left: 1px solid rgba(201, 161, 74, 0.3);
+    background: none;
+    border-top: 0;
   }
   .hand-row {
     min-height: 0;
@@ -2750,19 +2724,33 @@ button:focus-visible,
     min-height: 168px;
     max-height: 188px;
   }
-  .log {
-    grid-area: log;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    min-height: 0;
-    max-height: none;
-    overflow: hidden;
-    padding: 6px 8px 8px;
-    background: linear-gradient(180deg, #3a2618, #24160e);
-    border-top: 1px solid rgba(201, 161, 74, 0.45);
-  }
   .log h2 { font-size: 11px; line-height: 1.25; }
   .log ol { overflow: auto; min-height: 0; flex: 1 1 auto; }
   .log li { font-size: 12px; line-height: 1.3; padding: 3px 0; }
+}
+
+/* Short desktop windows (e.g. 1366x768, 1280x800, 1120x800, especially once the
+   Fate banner compresses the board). The shore subgrid used a hard 74px floor on
+   the Heroes and Allies zone rows, so when the board ran short the grid squeezed
+   the content (auto) rows instead — the shore title/subtitle then overflowed on
+   top of the "Captain here" / "Actions on arrival" tag. Let the two scrolling
+   zone rows absorb the compression (minmax 0) so the heading rows always keep
+   their content, and trim the mini cards so a shrunken zone still shows one. */
+@media (min-width: 1101px) and (max-height: 860px) {
+  .board {
+    grid-template-rows: auto auto auto minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  }
+  .loc-art-slot { height: 12px; }
+  .loc-head { padding: 2px 6px 3px; }
+  .loc-head h2 { line-height: 16px; }
+  .loc-head p { line-height: 14px; }
+  .location .card.mini {
+    grid-template-rows: 14px 12px 12px;
+    min-height: 46px;
+    padding: 4px 4px 2px 6px;
+  }
+  .location .card.mini h3 { height: 14px; max-height: 14px; line-height: 14px; }
+  .location .card.mini .text { height: 12px; max-height: 12px; line-height: 12px; }
+  .location .card.mini .str { top: 4px; }
+  .row .action { line-height: 15px; padding: 2px 4px; }
 }

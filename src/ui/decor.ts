@@ -26,7 +26,7 @@ export const TOPBAR_MAP = `<svg class="topbar-map" viewBox="0 0 1600 56" preserv
   <path d="M-6 38C84 30 148 16 214 22s122 16 198 8 120-16 178-8 114 16 178 6 126-16 198-6 120 8 186 0 130 6 206 5 116-6 186 0" fill="none" stroke="#fff6d2" stroke-width="2.4" stroke-linecap="round"/>
   <path d="M348 11c15-7 36-4 41 6 5 10-8 16-22 18-17 2-32-7-19-24z" fill="#e8c36a" stroke="#fff6d2" stroke-width="1.2"/>
   <path d="M704 8c12-6 30-3 34 6 3 8-8 13-19 14-14 1-24-6-15-20z" fill="#e8c36a" stroke="#fff6d2" stroke-width="1.2"/>
-  <path d="M70 34C160 24 250 16 348 14S470 22 520 22 620 12 704 10 820 18 900 16 980 28 1010 26 1120 16 1240 24 1360 20" fill="none" stroke="#fff6d2" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2.4 4.2"/>
+  <path d="M70 34C160 24 250 16 348 14S470 22 520 22 620 12 704 10 820 18 900 16 980 28 1010 26 1120 16 1240 24 1360 20 1480 24" fill="none" stroke="#fff6d2" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2.4 4.2"/>
   <g transform="translate(1010 26)" fill="none" stroke="#fff6d2" stroke-width="1.2">
     <circle r="12"/>
     <circle r="6.5" stroke="#e8c36a" stroke-width=".8"/>

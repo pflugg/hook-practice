@@ -74,7 +74,7 @@ import {
   worthySeatScene,
 } from "../engine/scenes";
 import { resolveBoardClick } from "./clicks";
-import { parseDifficulty, parseLocationId, parseTeachTab, type TeachTab } from "./parse";
+import { parseDifficulty, parseLocationId } from "./parse";
 import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
 import { CAPTAIN_TOKEN, CREST, locationDecor, MAP_COAST, MAP_COMPASS, TITLE_SCENE, TOPBAR_MAP, TREASURE_MAP } from "./decor";
 import "./styles.css";
@@ -359,7 +359,7 @@ function titleView(
         ${soundToggle()}
         <button type="button" class="ctrl" data-help>How to play</button>
       </div>
-      <p class="coach-lede">Coach names the next click. Coach, <b>Why this move</b>, and the Strategy brief stack in the right teaching rail — each pane scrolls on its own. Move reasons names what you picked, why it helps the chain, and what to watch. Tutorial starts all three on. Hide any during play.</p>
+      <p class="coach-lede">Coach names the next click. Coach, <b>Why this move</b>, and the Strategy brief flow together as one teaching panel in the right-hand rail — one scroll, clear section headers. Move reasons names what you picked, why it helps the chain, and what to watch. Tutorial starts all three on. Hide any during play.</p>
       <div class="actions-row title-starts">
         <button class="btn primary" data-start>Set Sail</button>
         <button class="btn" data-tutorial>Tutorial</button>
@@ -376,9 +376,9 @@ export function helpView(fromPlay: boolean): string {
     <h2 id="help-title">How to play</h2>
     <p>Each turn you <b>must move</b> to a different unlocked location, then may use each uncovered action there once. Heroes cover the top row. End the turn to refill to 4 cards; the computer then Fates you.</p>
     <p><b>Win</b> by vanquishing Peter Pan at the Jolly Roger after unlocking Hangman’s Tree with the Never Land Map. Vanquishing him anywhere else loses the duel.</p>
-    <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable. It lives in the right teaching rail with the Strategy brief and Why this move — each pane scrolls independently.</p>
-    <p><b>Strategy brief:</b> a persistent right-rail pane that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
-    <p><b>Move reasons:</b> a “Why this move” pane in that same right-hand stack. After each legal click it names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on and teaches move, Gain, the Map, Fate, one escort step, and the ship clash before a normal voyage. Below about 1100px the three panes tab under the board so type stays at the desktop floor.</p>
+    <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable. It is the top section of the right-hand teaching panel, above the Strategy brief and Why this move.</p>
+    <p><b>Strategy brief:</b> a section of that teaching panel that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
+    <p><b>Move reasons:</b> a “Why this move” section in that same panel, between Coach and the brief. After each legal click it names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on and teaches move, Gain, the Map, Fate, one escort step, and the ship clash before a normal voyage. The whole panel is one flowing document with section headers and a single scroll; below about 1100px it drops under the board so type stays at the desktop floor.</p>
     <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it. The <b>Across the table</b> strip keeps the last revealed Fate play visible while that card is still on the table — never the face-down deck.</p>
     <p><b>Finding Peter:</b> At a table, Hook finds Peter with hunt cards (Worthy Opponent, Give Them a Scare, Obsession) and by being Fated. Your Fate action there hits another villain. This solo tool always Fates you after each turn, and your Fate action is a <b>practice self-Fate</b> — it flips Hook’s own Fate deck so you can practice the find without a second player.</p>
     <p><b>Rival villain:</b> A track in the top bar fills after each of your turns. Normal adds more than Easy. Pixie Dust adds the most when the computer plays it. Taunt adds a smaller step. Splitting Headache adds nothing in a regular game. If the track fills before you vanquish Peter Pan at the Jolly Roger, you lose. Your own Fate action does not move the rival. With the Coach off, Easy runs to 74 and Normal runs to 154. With the Coach on, the track runs to 222, Normal adds 1, and those three Fate cards each add 1.</p>
@@ -717,40 +717,9 @@ function inspectOverlay(state: GameState, instanceId: string): string {
   </div></div>`;
 }
 
-function resolveTeachTab(
-  requested: TeachTab,
-  briefOn: boolean,
-  coachOn: boolean,
-  reasonsOn: boolean,
-): TeachTab {
-  if (requested === "coach" && coachOn) return "coach";
-  if (requested === "reasons" && reasonsOn) return "reasons";
-  if (requested === "brief" && briefOn) return "brief";
-  if (coachOn) return "coach";
-  if (reasonsOn) return "reasons";
-  return "brief";
-}
-
-function teachTabBar(briefOn: boolean, coachOn: boolean, reasonsOn: boolean, active: TeachTab): string {
-  const tabs: { id: TeachTab; label: string }[] = [];
-  if (coachOn) tabs.push({ id: "coach", label: "Coach" });
-  if (reasonsOn) tabs.push({ id: "reasons", label: "Why this move" });
-  if (briefOn) tabs.push({ id: "brief", label: "Brief" });
-  if (tabs.length < 2) return "";
-  return `<div class="teach-tabs" role="tablist" aria-label="Teaching panes">
-    ${tabs
-      .map(
-        (tab) =>
-          `<button type="button" role="tab" class="teach-tab${tab.id === active ? " is-on" : ""}" data-teach-tab="${tab.id}" aria-selected="${tab.id === active ? "true" : "false"}">${esc(tab.label)}</button>`,
-      )
-      .join("")}
-  </div>`;
-}
-
-function teachRailHtml(brief: string, coach: string, reasons: string, active: TeachTab): string {
+function teachRailHtml(brief: string, coach: string, reasons: string): string {
   if (!brief && !coach && !reasons) return "";
-  return `<aside class="teach-rail" data-teach-rail data-active-tab="${active}" aria-label="Teaching">
-    ${teachTabBar(Boolean(brief), Boolean(coach), Boolean(reasons), active)}
+  return `<aside class="teach-rail" data-teach-rail aria-label="Teaching">
     ${coach}${reasons}${brief}
   </aside>`;
 }
@@ -800,15 +769,15 @@ function coachPanel(state: GameState, advice: CoachAdvice): string {
   const lines = planPanelCopy(state, advice);
   const why = lines[0] ?? stageLine(plan.stages);
   const rest = lines.slice(1);
-  return `<p class="coach-do" title="${esc(advice.do)}">${esc(advice.do)}</p>
-  <section class="teach-pane coach-panel" data-teach-pane="coach" data-coach-plan aria-live="polite">
+  return `<section class="teach-pane coach-panel" data-teach-pane="coach" data-coach-plan aria-live="polite">
     <header class="teach-pane-head">
       <div class="pane-titles">
         <p class="coach-kicker">Coach</p>
-        <h2 class="pane-title">Next click</h2>
+        <h2 class="pane-title">Next move</h2>
       </div>
       <button type="button" class="btn ghost pane-hide coach-hide" data-coach-toggle>Hide</button>
     </header>
+    <p class="coach-do" title="${esc(advice.do)}">${esc(advice.do)}</p>
     <div class="plan-panel">
       <p class="coach-kicker">Why / Plan</p>
       <ol class="plan-stages" aria-label="Plan">${plan.stages
@@ -863,15 +832,15 @@ function strategySidebar(brief: StrategyBrief): string {
 }
 
 function reasonDock(reason: MoveReason): string {
-  return `<section class="teach-pane reason-dock${reason.soft ? " is-soft" : ""}" data-teach-pane="reasons" data-reason-dock aria-label="Why this move">
-    <header class="teach-pane-head">
-      <div class="pane-titles">
-        <p class="reason-kicker">Why this move</p>
-        <h2 class="pane-title">Post-selection</h2>
-      </div>
-      <button type="button" class="btn ghost pane-hide reason-hide" data-reasons-toggle>Hide</button>
-    </header>
-    <section class="reason-block">
+  // Before any move is made the panel has nothing to explain, so it collapses to
+  // one compact line instead of three idle blocks that would push the brief off
+  // the first screen. The full three-part readout returns the moment a move exists
+  // (live "action stretch" guidance is soft but still carries real content, so it
+  // is matched on the genuine placeholder text, not the soft flag).
+  const idle = reason.chose === IDLE_MOVE_REASON.chose;
+  const body = idle
+    ? `<p class="reason-idle">Click a glowing location, action, or card. This panel then names what you chose, why it helps the plan, and what it sets up.</p>`
+    : `<section class="reason-block">
       <h3>What you chose</h3>
       <p>${esc(reason.chose)}</p>
     </section>
@@ -883,7 +852,16 @@ function reasonDock(reason: MoveReason): string {
       <h3>What it sets up</h3>
       <p>${esc(reason.next)}</p>
     </section>
-    <p class="reason-foot">Not Coach (next click) and not the Strategy brief (voyage status). This pane stays in the right teaching rail so it never covers legal board actions. Scroll it on its own — Coach and the brief keep their own overflow.</p>
+    <p class="reason-foot">Not Coach (next click) and not the Strategy brief (voyage status). It rides in the same teaching panel, below Next move and above the brief, so it never covers legal board actions.</p>`;
+  return `<section class="teach-pane reason-dock${reason.soft ? " is-soft" : ""}${idle ? " is-idle" : ""}" data-teach-pane="reasons" data-reason-dock aria-label="Why this move">
+    <header class="teach-pane-head">
+      <div class="pane-titles">
+        <p class="reason-kicker">Reasons</p>
+        <h2 class="pane-title">Why this move</h2>
+      </div>
+      <button type="button" class="btn ghost pane-hide reason-hide" data-reasons-toggle>Hide</button>
+    </header>
+    ${body}
   </section>`;
 }
 
@@ -893,7 +871,6 @@ function playView(
   briefEnabled: boolean,
   reasonsEnabled: boolean,
   reason: MoveReason | null,
-  teachTab: TeachTab = "brief",
   sceneId: string | null = null,
   lesson: LessonView | null = null,
   expanded: ReadonlySet<string> = NO_EXPANDED,
@@ -949,7 +926,6 @@ function playView(
   const coachHtml = advice ? coachPanel(state, advice) : "";
   const reasonHtml = reasonsEnabled && reason && !settled ? reasonDock(reason) : "";
   const teachOn = Boolean(briefHtml || coachHtml || reasonHtml);
-  const activeTab = resolveTeachTab(teachTab, Boolean(briefHtml), Boolean(coachHtml), Boolean(reasonHtml));
   const placeLabel = state.phase === "move" && !state.pending ? "Move here" : "Choose this place";
   const placementInPanel = state.pending?.kind === "worthyLocation" || state.pending?.kind === "obsessionLocation";
   const placeButtons = placementInPanel ? [] : LOCATION_IDS.filter((id) => hi.has(`loc:${id}`)).map(
@@ -1057,7 +1033,7 @@ function playView(
     </footer>
     </div>
     </div>
-    ${teachRailHtml(briefHtml, coachHtml, reasonHtml, activeTab)}
+    ${teachRailHtml(briefHtml, coachHtml, reasonHtml)}
   </div>
   ${overlayFor(state, hi, sel, coached, Boolean(lesson))}`;
 }
@@ -1073,7 +1049,6 @@ export function renderPlay(
     briefEnabled?: boolean;
     reasonsEnabled?: boolean;
     reason?: MoveReason | null;
-    teachTab?: TeachTab;
     lesson?: LessonView | null;
     expandedIds?: ReadonlySet<string>;
     handRuleId?: string | null;
@@ -1083,14 +1058,12 @@ export function renderPlay(
   const briefEnabled = flags.briefEnabled ?? true;
   const reasonsEnabled = flags.reasonsEnabled ?? true;
   const reason = reasonsEnabled ? (flags.reason ?? IDLE_MOVE_REASON) : null;
-  const teachTab = flags.teachTab ?? "coach";
   return playView(
     state,
     coachEnabled,
     briefEnabled,
     reasonsEnabled,
     reason,
-    teachTab,
     null,
     flags.lesson ?? null,
     flags.expandedIds ?? NO_EXPANDED,
@@ -1257,7 +1230,6 @@ export function mount(root: HTMLElement): void {
   let briefEnabled = readFlag("nld-brief", false);
   let reasonsEnabled = readFlag("nld-reasons", false);
   let lastReason: MoveReason = IDLE_MOVE_REASON;
-  let teachTab: TeachTab = "coach";
   let inspectId: string | null = null;
   let lesson: LessonStep | null = null;
   let suppressClick = false;
@@ -1345,15 +1317,15 @@ export function mount(root: HTMLElement): void {
     });
   };
 
-  const activeTeachTab = () => resolveTeachTab(teachTab, briefEnabled, coachEnabled, reasonsEnabled);
-
-  const paneScroll: Record<TeachTab, number> = { brief: 0, coach: 0, reasons: 0 };
   let pageScrollX = 0;
   let pageScrollY = 0;
   let rootScroll = 0;
   let mainScroll = 0;
   let realmScroll = 0;
   let handScroll = 0;
+  let railScroll = 0;
+  let lastTeachSig = "";
+  let coachScrollTimer: number | null = null;
 
   const captureScroll = () => {
     pageScrollX = window.scrollX;
@@ -1363,17 +1335,12 @@ export function mount(root: HTMLElement): void {
     if (scroller) mainScroll = scroller.scrollTop;
     realmScroll = root.querySelector<HTMLElement>("[data-realm-map]")?.scrollLeft ?? 0;
     handScroll = root.querySelector<HTMLElement>(".hand-row")?.scrollLeft ?? 0;
-    root.querySelectorAll<HTMLElement>("[data-teach-pane]").forEach((pane) => {
-      const key = parseTeachTab(pane.dataset.teachPane);
-      if (key) paneScroll[key] = pane.scrollTop;
-    });
+    railScroll = root.querySelector<HTMLElement>("[data-teach-rail]")?.scrollTop ?? 0;
   };
 
   const restoreScroll = () => {
-    root.querySelectorAll<HTMLElement>("[data-teach-pane]").forEach((pane) => {
-      const key = parseTeachTab(pane.dataset.teachPane);
-      if (key) pane.scrollTop = paneScroll[key];
-    });
+    const rail = root.querySelector<HTMLElement>("[data-teach-rail]");
+    if (rail) rail.scrollTop = railScroll;
     const scroller = root.querySelector<HTMLElement>("[data-play-scroll]") ?? root.querySelector<HTMLElement>("[data-play-main]");
     if (scroller) scroller.scrollTop = mainScroll;
     const realm = root.querySelector<HTMLElement>("[data-realm-map]");
@@ -1410,6 +1377,31 @@ export function mount(root: HTMLElement): void {
     const inset = phoneShore ? 0 : (realm.clientWidth - locRect.width) / 2;
     const left = realm.scrollLeft + (locRect.left - realmRect.left) - inset;
     realm.scrollLeft = Math.max(0, left);
+  };
+
+  // On the wide board the shore zones scroll (overflow:auto) when they hold more
+  // mini cards than fit. A re-render resets every zone to the top, so a coached
+  // card below the fold can sit hidden. Bring it back into its zone's view, clear
+  // of the sticky zone label, so the highlighted card is never covered.
+  const bringCoachedCardIntoView = () => {
+    const desktop = typeof window.matchMedia === "function" && window.matchMedia("(min-width: 1101px)").matches;
+    if (!desktop) return;
+    const topInset = 14; // clear the sticky zone label at the top of the zone
+    root.querySelectorAll<HTMLElement>(".location .zone").forEach((zone) => {
+      const card = zone.querySelector<HTMLElement>(".card.is-coached");
+      // A card mid-FLIP is offset by a transform, so centre on the resting box.
+      if (!card || card.classList.contains("is-traveling")) return;
+      const zr = zone.getBoundingClientRect();
+      const cr = card.getBoundingClientRect();
+      if (cr.height <= 0 || zr.height <= 0) return;
+      const viewTop = zr.top + topInset;
+      const viewHeight = zr.bottom - viewTop;
+      let delta = 0;
+      if (cr.height >= viewHeight) delta = cr.top + cr.height / 2 - (viewTop + viewHeight / 2);
+      else if (cr.top < viewTop) delta = cr.top - viewTop;
+      else if (cr.bottom > zr.bottom) delta = cr.bottom - zr.bottom;
+      if (Math.abs(delta) > 0.5) zone.scrollTop += delta;
+    });
   };
 
   const markShown = (forced?: LocationId) => {
@@ -1508,7 +1500,6 @@ export function mount(root: HTMLElement): void {
     const movers = snapshotMovers(root);
     const inspect = inspectId ? inspectOverlay(state, inspectId) : "";
     const reason = reasonsEnabled ? lastReason : null;
-    const tab = activeTeachTab();
     const sceneWarning = unknownSceneWarning();
     const lessonBeat = lesson ? lessonView(state, lesson) : null;
     if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled, sceneWarning);
@@ -1516,23 +1507,46 @@ export function mount(root: HTMLElement): void {
       root.innerHTML =
         (state.phase === "title"
           ? titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled, sceneWarning)
-          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards, handRuleId)) +
+          : playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, activeSceneId, lessonBeat, expandedCards, handRuleId)) +
         helpView(state.phase !== "title") +
         inspect;
-    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, tab, activeSceneId, lessonBeat, expandedCards, handRuleId) + inspect;
+    } else root.innerHTML = playView(state, coachEnabled, briefEnabled, reasonsEnabled, reason, activeSceneId, lessonBeat, expandedCards, handRuleId) + inspect;
+    // When the teaching context changes (turn, phase, move, or the Coach line
+    // itself), default to bringing the Coach back into view at the top of the
+    // rail rather than keeping a scroll position that now hides the next move.
+    const coachText = root.querySelector<HTMLElement>("[data-teach-rail] .coach-do")?.textContent?.trim() ?? "";
+    // The hand and Power change on each discard/play even when the turn, phase,
+    // and Coach wording stay identical (e.g. "Discard 2 at Skull Rock …"). Fold
+    // them into the signature so every forced step re-pins the Coach line at the
+    // top of the rail instead of leaving it scrolled out of view.
+    const handSig = state.hand.map((c) => c.instanceId).join(",");
+    const teachSig = `${state.turn}|${state.phase}|${state.villainLocation}|${state.power}|${state.usedActions.join(",")}|${handSig}|${coachText}`;
+    if (teachSig !== lastTeachSig) {
+      railScroll = 0;
+      lastTeachSig = teachSig;
+    }
     bindCardDrag();
     root.querySelector<HTMLElement>("[data-realm-map]")?.addEventListener("scroll", () => markShown(), { passive: true });
     restoreScroll();
     bringHighlightIntoView();
+    bringCoachedCardIntoView();
     pinNextClick();
     markShown();
     restoreFocus();
     requestAnimationFrame(() => {
       restoreScroll();
       bringHighlightIntoView();
+      bringCoachedCardIntoView();
       pinNextClick();
       markShown();
       playTravel(root, movers);
+      // A coached card can be mid-FLIP here; its scroll target is only correct
+      // once the travel settles (~360ms), so re-centre it in its zone then.
+      if (coachScrollTimer !== null) window.clearTimeout(coachScrollTimer);
+      coachScrollTimer = window.setTimeout(() => {
+        coachScrollTimer = null;
+        bringCoachedCardIntoView();
+      }, 380);
     });
   };
 
@@ -1603,19 +1617,6 @@ export function mount(root: HTMLElement): void {
       event.preventDefault();
       const id = parseLocationId(shore.dataset.shoreTab);
       if (id) showShore(id);
-      return;
-    }
-    const tabBtn = t.closest<HTMLElement>("[data-teach-tab]");
-    if (tabBtn?.dataset.teachTab) {
-      event.preventDefault();
-      pageScrollX = window.scrollX;
-      pageScrollY = window.scrollY;
-      const nextTab = parseTeachTab(tabBtn.dataset.teachTab);
-      if (!nextTab) return;
-      teachTab = nextTab;
-      render();
-      window.scrollTo(pageScrollX, pageScrollY);
-      requestAnimationFrame(() => window.scrollTo(pageScrollX, pageScrollY));
       return;
     }
     if (t.closest("[data-sound-toggle]")) {

@@ -4,8 +4,8 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "../src/ui/app";
 
-describe("teach-pane scroll across remounts", () => {
-  it("keeps window and pane scroll when the Coach tab is selected", () => {
+describe("teaching panel scroll across remounts", () => {
+  it("restores the single rail scroll and the window scroll when the view re-renders", () => {
     window.history.replaceState({}, "", "/?scene=crocmove");
     const root = document.createElement("div");
     document.body.appendChild(root);
@@ -25,27 +25,30 @@ describe("teach-pane scroll across remounts", () => {
     }) as typeof window.scrollTo;
 
     mount(root);
-    expect(root.querySelector("[data-teach-rail]")).toBeTruthy();
-    if (!root.querySelector('[data-teach-pane="brief"]')) {
+
+    // The teaching rail is one flowing scroll box, not a set of tabs.
+    const rail = root.querySelector<HTMLElement>("[data-teach-rail]");
+    expect(rail).toBeTruthy();
+    expect(root.querySelector("[data-teach-tab]")).toBeNull();
+    expect(root.querySelector(".teach-tabs")).toBeNull();
+
+    // Make sure all enabled sections live in the one rail, in order.
+    if (!rail!.querySelector('[data-teach-pane="brief"]')) {
       root.querySelector<HTMLButtonElement>("[data-brief-toggle]")!.click();
     }
+    const panes = [...rail!.querySelectorAll(":scope > .teach-pane")].map((el) => el.getAttribute("data-teach-pane"));
+    expect(panes[0]).toBe("coach");
 
-    const brief = root.querySelector<HTMLElement>('[data-teach-pane="brief"]');
-    expect(brief).toBeTruthy();
-    brief!.scrollTop = 64;
-
+    // A scroll position on the single rail survives a re-render.
+    const liveRail = root.querySelector<HTMLElement>("[data-teach-rail]")!;
+    liveRail.scrollTop = 72;
     window.scrollTo(0, 140);
-    const coachTab = root.querySelector<HTMLButtonElement>('[data-teach-tab="coach"]');
-    expect(coachTab).toBeTruthy();
-    coachTab!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
 
-    expect(root.querySelector("[data-teach-rail]")?.getAttribute("data-active-tab")).toBe("coach");
+    // Toggling a section (re-render) must keep the rail and window scroll put.
+    root.querySelector<HTMLButtonElement>("[data-reasons-toggle]")!.click();
     expect(window.scrollY).toBe(140);
+    expect(root.querySelector<HTMLElement>("[data-teach-rail]")?.scrollTop).toBe(72);
 
-    const briefTab = root.querySelector<HTMLButtonElement>('[data-teach-tab="brief"]');
-    briefTab!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-    expect(root.querySelector<HTMLElement>('[data-teach-pane="brief"]')?.scrollTop).toBe(64);
-    expect(window.scrollY).toBe(140);
     root.remove();
   });
 });
