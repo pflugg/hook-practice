@@ -6,13 +6,20 @@ This is an unofficial personal practice aid with original UI and paraphrased mec
 
 ## Learn, practise, then play
 
-Start with **Tutorial** for six guided lessons. Each lesson explains the rule behind the click. Then use the three **Practice drills** on the title screen: equal-Strength combat, Peter’s final escort step, and the ship clash. Drills start with Coach hidden so the player makes the decision; Coach remains available as an optional hint. Completing the real action opens feedback explaining the skill, with retry, library, and Set Sail options.
+Start with **Tutorial** for six guided lessons. Every hint is on, there are no plan questions, and Coach names one legal click at a time. The lesson notes connect the board facts to the rule and explain what to watch next. **Play a full voyage with hints** keeps Coach, reasons, and strategy notes on for the first shuffled game.
 
-The **Before you play with people** checklist on the title and Help screens explains the five solo differences that matter at a human table: self-Fate, local-only card placement, rewritten Conditions, the rival clock, and the off-ship Peter loss. This is Captain Hook objective practice, not certification of all Villainous rules. Compare the [published base-game instructions](https://www.ravensburger.org/spielanleitungen/ecm/Spielanleitungen/26295%20anl%202050897.pdf) with the cards in your own edition.
+The three **Practice drills** each progress from a core skill to a strategy twist: equal Strength → Wendy’s boost and saving crew; one escort step → chaining printed and Item actions for two moves; a ready ship clash → strengthening the crew after Pixie Dust. Each topic offers two explicit modes:
+
+- **Follow along** starts immediately with every hint, a current legal next click, and an explanation. A beginner never has to answer a plan question to get this help.
+- **Choose a plan** lets the player inspect the board and hand, then choose among three plans. Feedback names the relevant numbers or route. Hints become available after an attempt; a matching plan unlocks the actions. **Show me every step** switches to full guidance at any time before play.
+
+Completing the actual action opens a reflection about the skill, the first plan attempt, and optional hints used. Guided runs are identified as guided practice. Players can repeat a setup, try the strategy twist, or return to the core skill. Guided and plan-choice modes progress separately during the mounted session; entering and abandoning a setup does not advance that mode. A different setup changes the board and starts fresh; plan choices shuffle once per setup and remain stable during feedback. The Wendy setup also explains when a legal clash spent more crew than necessary. No score claims that the learner has mastered the whole game.
+
+The **Before you play with people** checklist on the title and Help screens explains six solo differences that matter at a human table: self-Fate, local-only card placement, the trainer’s restricted Vanquish target range, rewritten Conditions, the rival clock, and the off-ship Peter loss. This is Captain Hook objective practice, not certification of all Villainous rules. The [published base-game instructions](https://www.ravensburger.org/spielanleitungen/ecm/Spielanleitungen/26295%20anl%202050897.pdf?ossl=pds_text_Spielanleitung) support the action, current-Strength, adjacent-movement, and discard explanations; compare them with the cards in your own edition. In particular, published Vanquish can target a Hero anywhere in the realm using Allies at that Hero’s location; the trainer limits the range around Hook. No engine rules are changed by the learning modes.
 
 The play screen grows vertically on short windows. The Fate summary has its own grid row outside the board and expands to review revealed cards. Location rows align across the desktop board, while card text and the hand can grow. Desktop teaching remains in the right rail; phone guidance stays with the turn controls.
 
-For a short hackathon demonstration: complete the guided voyage, try **Make the numbers work** without Coach, then start **Set Sail** to show a shuffled game. Open the table-habits checklist to explain how the practice transfers to a human game.
+For a short hackathon demonstration: begin with **Tutorial** to show the welcoming, fully guided path. Continue with hints for one normal turn. Then show the two modes of **Make the numbers work**, including the changed Wendy setup and its explanation. Open the table-habits checklist to explain how the practice transfers to a human game.
 
 ## Requirements
 
