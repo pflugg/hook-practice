@@ -142,13 +142,13 @@ async function shoreReport(page: Page): Promise<ShoreReport> {
     trackTops(".location .row-bottom", "bottom actions");
 
     const root = document.documentElement;
-    if (root.scrollHeight - root.clientHeight > 1) {
-      fit.push(`page overflow ${root.scrollHeight - root.clientHeight}px`);
-    }
+    // Short windows must scroll instead of squeezing every card into one viewport.
+    if (getComputedStyle(root).overflowY === "hidden") fit.push("page scrolling is locked");
     document.querySelectorAll<HTMLElement>(".card.hand-card").forEach((card) => {
       const box = card.getBoundingClientRect();
       if (box.height < 150) fit.push(`hand card height ${box.height.toFixed(0)}`);
-      if (box.bottom > root.clientHeight + 1) fit.push(`hand card below the viewport (${box.bottom.toFixed(0)})`);
+      const text = card.querySelector<HTMLElement>(".text");
+      if (text && text.scrollHeight > text.clientHeight + 2) fit.push("hand card text clipped");
     });
     document.querySelectorAll<HTMLElement>(".location").forEach((shore) => {
       const id = shore.dataset.loc ?? "shore";
@@ -160,6 +160,7 @@ async function shoreReport(page: Page): Promise<ShoreReport> {
         if (gap < 4) fit.push(`${id} choice gap ${gap.toFixed(1)}`);
       }
       const shoreBox = shore.getBoundingClientRect();
+      if (shoreBox.height < 380) fit.push(`${id} shore crushed to ${shoreBox.height.toFixed(0)}px`);
       shore.querySelectorAll<HTMLElement>(".action").forEach((btn) => {
         const box = btn.getBoundingClientRect();
         if (box.height < 1) return;

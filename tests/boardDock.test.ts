@@ -39,6 +39,8 @@ type Geometry = {
   dockH: number;
   logItems: number;
   overlap: boolean;
+  clippedHandText: boolean;
+  logH: number;
 };
 
 async function geometry(page: Page): Promise<Geometry> {
@@ -57,6 +59,8 @@ async function geometry(page: Page): Promise<Geometry> {
       dockH: dockBox ? Math.round(dockBox.height) : 0,
       logItems: document.querySelectorAll(".log li").length,
       overlap,
+      clippedHandText: [...document.querySelectorAll<HTMLElement>(".hand-card .text")].some((text) => text.scrollHeight > text.clientHeight + 2),
+      logH: document.querySelector(".log")?.getBoundingClientRect().height ?? 0,
     };
   });
 }
@@ -162,8 +166,9 @@ describe.skipIf(chromePath === undefined)("board keeps its height as the log gro
         expect(g.boardH, `board collapsed to ${g.boardH}px after turn ${turn} (log ${g.logItems})`).toBeGreaterThanOrEqual(
           250,
         );
-        // The dock stays capped and never climbs into the board area.
-        expect(g.dockH, `dock grew to ${g.dockH}px after turn ${turn}`).toBeLessThanOrEqual(260);
+        // Hand cards may grow to show their full text; only the log is capped.
+        expect(g.clippedHandText, `hand text clipped after turn ${turn}`).toBe(false);
+        expect(g.logH, `log grew to ${g.logH}px after turn ${turn}`).toBeLessThanOrEqual(260);
         expect(g.overlap, `dock overlapped the board after turn ${turn}`).toBe(false);
       }
 

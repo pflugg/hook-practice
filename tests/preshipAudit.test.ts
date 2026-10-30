@@ -269,14 +269,14 @@ describe("pre-ship should", () => {
     expect(paying.attachments.some((a) => a.item.defId === "cutlass")).toBe(false);
   });
 
-  it("HP-26 gives Set Sail the only gold start and keeps Tutorial secondary", () => {
+  it("HP-26 gives first-time learners a clear Tutorial start and keeps Set Sail available", () => {
     const html = renderPlay(barePlayState());
     expect(html).not.toContain("data-start");
     const title = readFileSync(join(process.cwd(), "src/ui/app.ts"), "utf8");
     const starts = title.slice(title.indexOf("title-starts"), title.indexOf("title-tutorial-note"));
-    expect(starts).toMatch(/class="btn primary"[^>]*data-start/);
-    expect(starts).toMatch(/class="btn"[^>]*data-tutorial/);
-    expect(starts).not.toMatch(/class="btn primary"[^>]*data-tutorial/);
+    expect(starts).toMatch(/class="btn primary"[^>]*data-tutorial/);
+    expect(starts).toMatch(/class="btn"[^>]*data-start/);
+    expect(starts).not.toMatch(/class="btn primary"[^>]*data-start/);
     expect(IDLE_MOVE_REASON.why.length).toBeGreaterThan(40);
   });
 });
