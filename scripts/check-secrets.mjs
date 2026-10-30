@@ -5,7 +5,7 @@ import path from "node:path";
 
 // Compare locally held secrets in memory; never print their values.
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
-const secrets = [process.env.OPENAI_API_KEY, process.env.UPSTASH_REDIS_REST_TOKEN].filter((value) => value && value.length > 12);
+const secrets = [process.env.OPENAI_API_KEY, process.env.UPSTASH_REDIS_REST_TOKEN, process.env.KV_REST_API_TOKEN].filter((value) => value && value.length > 12);
 const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { encoding: "utf8" }).split("\0").filter(Boolean);
 const walk = (folder) => readdirSync(folder).flatMap((name) => {
   const target = path.join(folder, name);

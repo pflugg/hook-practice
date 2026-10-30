@@ -1,7 +1,7 @@
 const script = `
 local used = tonumber(redis.call('GET', KEYS[1]) or '0')
 local burst = tonumber(redis.call('GET', KEYS[2]) or '0')
-if not used or not burst then return redis.error_reply('Invalid quota') end
+if not used or not burst or used < 0 or burst < 0 then return redis.error_reply('Invalid quota') end
 if used >= tonumber(ARGV[1]) or burst >= 20 then return 0 end
 redis.call('INCR', KEYS[1])
 local current = redis.call('INCR', KEYS[2])
@@ -11,8 +11,8 @@ return 1
 
 /** A shared atomic quota survives serverless cold starts and redeploys. No expiry on total usage. */
 export function createSharedReservation(options = {}) {
-  const url = options.url ?? process.env.UPSTASH_REDIS_REST_URL;
-  const token = options.token ?? process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = options.url ?? process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+  const token = options.token ?? process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
   const key = options.key ?? "neverland-duel:luna:v1";
   const fetchImpl = options.fetchImpl ?? fetch;
   const now = options.now ?? Date.now;

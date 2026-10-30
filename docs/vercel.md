@@ -41,7 +41,7 @@ Connect an **Upstash Redis** database through Vercel's Marketplace/Storage integ
 | `UPSTASH_REDIS_REST_URL` | Database's HTTPS REST URL ending in `.upstash.io` | **Secret** |
 | `UPSTASH_REDIS_REST_TOKEN` | Database's REST token with read/write permission | **Secret** |
 
-Use these exact names, even if an integration provides names with another prefix. Do not use a read-only token: quota reservations increment counters. Do not set `LUNA_BUDGET_PATH` on Vercel; that file is only for local development.
+The Vercel integration can instead create `KV_REST_API_URL` and `KV_REST_API_TOKEN` when connected with the prefix **KV**. The server accepts these names as aliases, so there is no need to copy or expose their values. Do not use a read-only token: quota reservations increment counters. Do not set `LUNA_BUDGET_PATH` on Vercel; that file is only for local development.
 
 The shared database receives counters only, not player questions, board facts, or the OpenAI key. Keep key eviction disabled so the total cannot disappear to free space. The total key is `neverland-duel:luna:v1:total`, without an expiry. Deleting that key or changing databases starts a fresh allowance.
 
@@ -51,7 +51,7 @@ This bounds requests, not an exact dollar amount. Use an OpenAI project-specific
 
 ## 4. Redeploy and check
 
-Environment-variable changes apply to new deployments. Redeploy after saving all three values.
+Environment-variable changes apply to new deployments. Redeploy after saving the OpenAI key and connecting both Redis REST variables.
 
 1. Open the new production URL and confirm the title is **Neverland Duel** and the video link is present.
 2. Start **Tutorial**, open **Ask Coach a question**, and ask **Why does the next move help?**

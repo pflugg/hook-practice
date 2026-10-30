@@ -9,7 +9,7 @@ import { createSharedReservation } from "../server/shared-budget.mjs";
 
 const folders: string[] = [];
 function budget() { const folder = mkdtempSync(path.join(os.tmpdir(), "nld-tutor-test-")); folders.push(folder); return path.join(folder, "budget.json"); }
-afterEach(() => { for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true }); });
+afterEach(() => { for (const folder of folders.splice(0)) rmSync(folder, { recursive: true, force: true }); vi.unstubAllEnvs(); });
 const request = (question = "Why move?") => ({ question, context: { position: "test-position", facts: [{ id: "next", title: "Next", text: "Move to Skull Rock." }, { id: "reason", title: "Why", text: "Move before using actions." }] } });
 const completed = (selection: unknown) => new Response(JSON.stringify({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(selection) }] }] }));
 const good = () => completed({ answerable: true, factIds: ["reason"] });
@@ -91,6 +91,20 @@ describe("optional Luna server", () => {
 });
 
 describe("Vercel's shared quota", () => {
+  it("uses the integration's KV-prefixed secrets without copying their values", async () => {
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", undefined);
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", undefined);
+    vi.stubEnv("KV_REST_API_URL", "https://integration.upstash.io");
+    vi.stubEnv("KV_REST_API_TOKEN", "integration-test-token");
+    const fetchImpl = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      expect(url).toBe("https://integration.upstash.io");
+      expect(init?.headers).toMatchObject({ Authorization: "Bearer integration-test-token" });
+      expect(String(init?.body)).not.toContain("integration-test-token");
+      return new Response('{"result":1}');
+    });
+    expect(await createSharedReservation({ fetchImpl })(200)).toBe(true);
+  });
+
   it("uses a single atomic operation and a nonexpiring total across cold starts", async () => {
     const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const command = JSON.parse(String(init?.body));
