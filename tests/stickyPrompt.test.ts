@@ -49,20 +49,28 @@ describe("sticky command / prompt bar", () => {
     expect(root.querySelectorAll(".location .drop-hint").length).toBeGreaterThan(0);
   });
 
-  it("puts discard Confirm on the sticky prompt so a lower action cannot hide it", () => {
+  it("keeps the discard count in the sticky confirmation as cards are selected and deselected", () => {
     const state = barePlayState();
     state.villainLocation = "skullRock";
     state.phase = "actions";
-    give(state, "cannon");
-    const next = applyInput(state, { type: "selectAction", actionKey: "sr-discard" });
+    const cannon = give(state, "cannon");
+    const brute = give(state, "pirateBrute");
+    let next = applyInput(state, { type: "selectAction", actionKey: "sr-discard" });
     expect(next.pending?.kind).toBe("discardSelect");
 
     const html = renderPlay(next, { coachEnabled: false, briefEnabled: false, reasonsEnabled: false });
     const root = document.createElement("div");
     root.innerHTML = html;
     const prompt = root.querySelector("[data-prompt]");
-    expect(prompt?.querySelector("[data-confirm]")?.textContent).toMatch(/Confirm/);
+    expect(prompt?.querySelector("[data-confirm]")?.textContent).toBe("Confirm discard (0)");
     expect(prompt?.querySelector("[data-cancel]")).toBeTruthy();
+    expect(root.querySelector(`[data-card="${cannon.instanceId}"]`)?.getAttribute("aria-pressed")).toBe("false");
+    for (const [card, count, cannonSelected] of [[cannon, 1, true], [brute, 2, true], [cannon, 1, false]] as const) {
+      next = applyInput(next, { type: "selectCard", instanceId: card.instanceId });
+      root.innerHTML = renderPlay(next, { coachEnabled: false, briefEnabled: false, reasonsEnabled: false });
+      expect(root.querySelector("[data-prompt] [data-confirm]")?.textContent).toBe(`Confirm discard (${count})`);
+      expect(root.querySelector(`[data-card="${cannon.instanceId}"]`)?.getAttribute("aria-pressed")).toBe(String(cannonSelected));
+    }
   });
 
   it("keeps play-main scroll when the board remounts after a hand click", () => {
