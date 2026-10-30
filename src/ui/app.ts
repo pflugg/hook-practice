@@ -79,7 +79,8 @@ import { dropTargets, inputsForDrop, isDraggableCard } from "./drag";
 import { CAPTAIN_TOKEN, CREST, locationDecor, MAP_COAST, MAP_COMPASS, TITLE_SCENE, TOPBAR_MAP, TREASURE_MAP } from "./decor";
 import "./styles.css";
 import "./experience.css";
-import { LESSON_INSIGHTS, PRACTICE_DRILLS, TABLE_HABITS, type PracticeDrill } from "./learning";
+import { chosenPlan, LESSON_INSIGHTS, PRACTICE_DRILLS, startDrill, TABLE_HABITS, type DrillRun } from "./learning";
+import { drillAdvice } from "./drillCoach";
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]!));
@@ -118,6 +119,7 @@ function renderCard(
     expandable?: boolean;
     expanded?: boolean;
     handRule?: boolean;
+    readOnly?: boolean;
   },
 ): string {
   const d = def(card.defId);
@@ -126,7 +128,7 @@ function renderCard(
   const attached = attachmentsOn(state, card.instanceId);
   const attachNote = attached.length ? `<p class="text">+ ${attached.map((a) => esc(def(a.defId).name)).join(", ")}</p>` : "";
   const inspectable = Boolean(opts.inspectable && !opts.legal && opts.size !== "reveal");
-  const draggable = isDraggableCard(state, card.instanceId);
+  const draggable = !opts.readOnly && isDraggableCard(state, card.instanceId);
   const spentObsession = d.id === "obsession" && state.peterPanRevealed;
   const costMark = d.deck === "villain" ? String(d.cost) : "Fate";
   const typeBar =
@@ -224,6 +226,7 @@ function renderLocation(
   sel: Set<string>,
   coached: Set<string>,
   expanded: ReadonlySet<string>,
+  preview = false,
 ): string {
   const meta = REALM[id];
   const loc = state.locations[id];
@@ -245,13 +248,13 @@ function renderLocation(
   const actBtn = (a: (typeof printed)[number]) => {
     const legalAct = showLegalActs && !locked && hi.has(`act:${a.key}`);
     const coachAct = legalAct && coached.has(`act:${a.key}`);
-    const inert = a.covered || a.used || !legalAct;
+    const inert = preview || a.covered || a.used || !legalAct;
     return `<button class="action ${a.covered ? "is-covered" : ""} ${a.used ? "is-used" : ""} ${legalAct ? "is-legal" : "is-inert"} ${coachAct ? "is-coached" : ""}" data-act="${a.key}" ${inert ? "disabled" : ""}>${esc(a.label)}</button>`;
   };
   const extraBtns = extras
     .map((a) => {
       const extraLegal = showLegalActs && !locked && hi.has(`act:${a.key}`);
-      const extraInert = locked || a.used || !extraLegal;
+      const extraInert = preview || locked || a.used || !extraLegal;
       return `<button class="action ${extraLegal ? "is-legal" : "is-inert"} ${extraLegal && coached.has(`act:${a.key}`) ? "is-coached" : ""} ${a.used ? "is-used" : ""}" data-act="${a.key}" ${extraInert ? "disabled" : ""}>${esc(a.label)}</button>`;
     })
     .join("");
@@ -262,13 +265,14 @@ function renderLocation(
           .map((c) => {
             const host = renderCard(state, c, {
               size: "mini",
-              legal: hi.has(`card:${c.instanceId}`),
+              legal: !preview && hi.has(`card:${c.instanceId}`),
               selected: sel.has(c.instanceId),
               dimmed: cardDimmed(state, c, hi),
               coached: coached.has(`card:${c.instanceId}`),
               inspectable: true,
               expandable: true,
               expanded: expanded.has(c.instanceId),
+              readOnly: preview,
             });
             const extras = attachmentsOn(state, c.instanceId)
               .filter((a) => hi.has(`card:${a.instanceId}`))
@@ -322,7 +326,7 @@ function renderLocation(
 }
 
 function tableHabits(): string {
-  return `<details class="table-habits" data-table-habits><summary>Before you play with people · 5 table habits</summary>
+  return `<details class="table-habits" data-table-habits><summary>Before you play with people · ${TABLE_HABITS.length} table habits</summary>
     <ul>${TABLE_HABITS.map(([title, copy]) => `<li><strong>${esc(title)}</strong>${esc(copy)}</li>`).join("")}</ul>
     <p class="fine">Captain Hook practice for the base game. Check your own edition’s rulebook and cards at the table. <a href="https://www.ravensburger.org/spielanleitungen/ecm/Spielanleitungen/26295%20anl%202050897.pdf" target="_blank" rel="noopener noreferrer">Published base-game rules</a></p>
   </details>`;
@@ -331,18 +335,97 @@ function tableHabits(): string {
 function drillLibrary(): string {
   return `<section class="drill-library" aria-label="Practice drills">
     <h2 class="section-heading">A little practice. A better captain.</h2>
-    <p class="section-intro">After the tutorial, try a short challenge without the next-click coach. Turn Coach on whenever you need a hint.</p>
-    <div class="drill-grid">${PRACTICE_DRILLS.map((drill) => `<button type="button" class="drill-card" data-drill="${drill.id}"><span>${esc(drill.skill)}</span><strong>${esc(drill.title)}</strong><em>Try this drill →</em></button>`).join("")}</div>
+    <p class="section-intro">2 · Practise a core skill. Follow along keeps all hints visible. Choose a plan lets you think first, then ask for hints.</p><p class="section-intro">3 · When that feels comfortable, try a strategy twist: changed Strength, saving crew, or chaining actions. You can keep the guidance on and return to the core setup.</p>
+    <div class="drill-grid">${PRACTICE_DRILLS.map((drill) => `<article class="drill-card"><span>${esc(drill.skill)}</span><h3>${esc(drill.title)}</h3><div class="drill-entry-actions"><button type="button" class="btn primary" data-drill-guided="${drill.id}">Follow along</button><button type="button" class="btn" data-drill="${drill.id}">Choose a plan</button></div></article>`).join("")}</div>
   </section>`;
 }
 
-function drillResult(drill: PracticeDrill): string {
+function drillResult(run: DrillRun, state: GameState): string {
+  const firstPlan = run.plans.find((plan) => plan.id === run.attempts[0]);
+  const reflection = run.guided ? "You followed the guided version. Try a different setup with all hints again, or choose a plan when you feel ready."
+    : `${firstPlan?.works ? "Your first plan matched this setup." : "You revised your plan after feedback."} You used ${run.hintsShown} optional ${run.hintsShown === 1 ? "hint" : "hints"}.`;
   return `<div class="overlay" data-overlay="blocking"><section class="modal wood drill-complete" ${namedDialog("drill-result-title")}>
-    <p class="eyebrow">Skill practiced</p><h2 id="drill-result-title">${esc(drill.title)}</h2>
-    <p class="takeaway">${esc(drill.takeaway)}</p>
-    <p>Try it again without Coach, or put the skill to work in a shuffled voyage. Completing a drill is practice, not a test of every table rule.</p>
-    <div class="actions-row"><button type="button" class="btn primary" data-drill-exit data-initial-focus>Back to practice drills</button><button type="button" class="btn" data-drill-retry>Try again</button><button type="button" class="btn" data-drill-sail>Set Sail</button></div>
+    <p class="eyebrow">${run.setup.level === "core" ? "Core skill practiced" : "Strategy twist practiced"} · ${esc(run.setup.focus)}</p><h2 id="drill-result-title">${esc(run.drill.title)}</h2>
+    <p class="takeaway">${esc(run.setup.takeaway)}</p>
+    ${run.setup.feedback ? `<p>${esc(run.setup.feedback(state))}</p>` : ""}
+    <p data-drill-reflection>${esc(reflection)}</p>
+    <p>Completing a setup is practice, not a test of every table rule.</p>
+    <div class="actions-row"><button type="button" class="btn primary" data-drill-next data-initial-focus>${run.setup.level === "core" ? "Try the strategy twist" : "Return to the core setup"}</button><button type="button" class="btn" data-drill-retry>Repeat this setup</button><button type="button" class="btn" data-drill-exit>Drill library</button><button type="button" class="btn" data-drill-sail>Set Sail</button></div>
   </section></div>`;
+}
+
+function drillStudy(state: GameState, run: DrillRun): string {
+  const plan = chosenPlan(run);
+  return `<main class="drill-study" data-drill-study data-drill-setup="${esc(run.setup.id)}">
+    <header class="drill-study-header"><div><p class="eyebrow">Choose a plan · ${esc(run.setup.name)}</p><h1>${esc(run.drill.title)}</h1><p>${esc(run.setup.task)}</p></div><div class="study-header-actions"><a class="btn study-plan-link" href="#drill-plan-title">See plan choices ↓</a><button class="btn" data-drill-follow>Show me every step</button><button class="btn" data-drill-exit>Drill library</button></div></header>
+    <div class="drill-study-layout">
+      <section class="drill-study-table" aria-label="Read this setup">
+        <p class="study-notice">Read the board and hand. Click a card to inspect it. Actions unlock after you choose a matching plan.</p>
+        <nav class="shore-tabs" aria-label="Shores">${LOCATION_IDS.map((id, i) => `<button type="button" class="shore-tab" data-shore-tab="${id}" aria-label="${esc(REALM[id].name)}">${i + 1} ${SHORE_SHORT[id]}</button>`).join("")}</nav>
+        <div class="board-wrap" data-realm-map role="region" aria-label="Never Land shores, ordered from Jolly Roger to Hangman's Tree" tabindex="0"><div class="board">${TREASURE_MAP}${MAP_COMPASS}${LOCATION_IDS.map((id) => renderLocation(state, id, highlightSet(state), new Set(), new Set(), NO_EXPANDED, true)).join("")}${MAP_COAST}</div></div>
+        <section class="study-hand"><h2>Hand · ${state.power} Power available</h2><div class="hand-row">${state.hand.length ? state.hand.map((c) => renderCard(state, c, { size: "hand", legal: false, selected: false, inspectable: true, readOnly: true })).join("") : '<p class="study-notice">Your hand is empty. Use the cards already on the board.</p>'}</div></section>
+      </section>
+      <aside class="drill-plan-panel" aria-labelledby="drill-plan-title">
+        <p class="eyebrow">${run.setup.level === "core" ? "Core skill" : "Strategy twist"} · ${esc(run.setup.focus)}</p><h2 id="drill-plan-title">${esc(run.setup.question)}</h2>
+        <p>Choose the plan you would try. Feedback will explain the board facts behind it.</p>
+        <div class="plan-choices">${run.plans.map((choice) => `<button type="button" class="plan-choice" data-drill-plan="${esc(choice.id)}" aria-pressed="${run.chosen === choice.id}">${esc(choice.label)}</button>`).join("")}</div>
+        ${plan ? `<div class="plan-feedback ${plan.works ? "is-ready" : ""}" role="status"><strong>${plan.works ? "This plan fits the setup." : "Recheck this plan."}</strong><p>${esc(plan.feedback)}</p></div>` : ""}
+        ${run.hintsShown ? `<p class="plan-hint" role="note">${esc(run.setup.hints[run.hintsShown - 1] ?? "")}</p>` : ""}
+        <div class="plan-controls"><button type="button" class="btn primary" data-drill-begin ${plan?.works ? "" : "disabled"}>Try the plan on the board</button>${run.attempts.length && run.hintsShown < run.setup.hints.length ? '<button type="button" class="btn" data-drill-hint>Show a hint</button>' : ""}</div>
+        <div class="guided-escape"><p>Want every step shown?</p><button type="button" class="btn" data-drill-follow>Follow along with all hints</button></div>
+      </aside>
+    </div>
+  </main>`;
+}
+
+function drillGuidance(state: GameState, run: DrillRun): string {
+  if (!run.guided && run.hintsShown === 0) return "";
+  const advice = drillAdvice(run, state);
+  return `<section class="teach-pane drill-guidance" data-drill-guidance aria-label="Drill guidance"><header class="teach-pane-head"><div><p class="coach-kicker">${run.guided ? "Follow along · all hints visible" : "Optional hints"}</p><h2 class="pane-title">${run.guided ? "One click at a time" : "A little help"}</h2></div></header>
+    ${run.guided ? `<p class="coach-do">${esc(advice.do)}</p><h3>Why this helps</h3><p class="coach-why">${esc(advice.why)}</p>` : ""}
+    <h3>${run.guided ? "Keep these notes in view" : "Hints you revealed"}</h3><ol>${run.setup.hints.slice(0, run.hintsShown).map((hint) => `<li>${esc(hint)}</li>`).join("")}</ol>
+    <p class="coach-why">${esc(run.setup.takeaway)}</p>
+  </section>`;
+}
+
+function lessonNotesPanel(state: GameState, step: LessonStep): string {
+  const cost = def("neverLandMap").cost;
+  const gap = Math.max(0, cost - state.power);
+  const peter = state.peterPanLocation ? REALM[state.peterPanLocation].name : "still hidden";
+  const notes: Record<LessonStep, { notice: string; rule: string; watch: string }> = {
+    move: {
+      notice: `The Map costs ${cost} Power; you have ${state.power}. Skull Rock offers Gain 1 and Play a Card in the same turn.`,
+      rule: "Start a turn by moving Hook to a different unlocked shore. That shore supplies your actions for the turn. Choose a stop that helps the next part of the objective.",
+      watch: "This opening plans two actions together: collect the missing Power, then play the Map. Moving Hook alone does not move any other card.",
+    },
+    gain: {
+      notice: gap ? `You have ${state.power} Power and need ${gap} more to afford the Map’s ${cost}.` : `You have ${state.power} Power, enough to pay the Map’s ${cost}.`,
+      rule: "Gain adds Power to your supply. Playing a card is a separate action and also requires paying that card’s cost. You may use uncovered actions in any order, once each.",
+      watch: "Save the Map’s cost before buying other cards. Power is useful because it enables the next play; collecting it alone does not open the tree.",
+    },
+    play: {
+      notice: `The Never Land Map is the key to the locked tree. You have ${state.power} Power available for its cost of ${cost}.`,
+      rule: "Use Play a Card, choose the Map and its place, then pay. Choosing a card has not finished the play; the Map opens the tree only after payment.",
+      watch: "Trainer rule: ordinary Allies and Items land at Hook’s shore here. At a human table, they can generally be played to any unlocked location; attached Items follow their own text.",
+    },
+    fate: {
+      notice: "The tree is open. End turn refills your hand toward four, then this solo adversary reveals Fate.",
+      rule: "Read the revealed ability and what changed before continuing. A Hero covers the top action row at its shore. Bottom-row actions remain available if unused.",
+      watch: "At a human table, opponents choose when to Fate you, and your Fate action targets another villain. This trainer uses automatic Fate and practice self-Fate.",
+    },
+    escort: {
+      notice: `Peter is ${peter === "still hidden" ? peter : `at ${peter}`}. The shore order is ship → Skull Rock → Mermaid Lagoon → tree.`,
+      rule: "Move a Hero moves one Hero by one adjacent unlocked shore. It does not move Hook. Moving Peter away can also uncover the top actions he was blocking.",
+      watch: "Work west toward the ship while keeping enough Ally Strength ready there. Hook must defeat Peter at the Jolly Roger to win; a clash on the path does not complete the objective.",
+    },
+    clash: {
+      notice: "This lesson staged Peter on the ship with two Brutes: 4 + 4 = 8. The Strength meter changes as you select Allies.",
+      rule: "Equal or greater Ally Strength defeats a Hero. The Hero and the Allies committed to Vanquish are discarded. Peter’s defeat wins only at the Jolly Roger.",
+      watch: "At a human table, Vanquish can target a Hero anywhere in your realm with Allies at that Hero’s location. This trainer limits the target range around Hook. Count current Strength again after Fate changes it.",
+    },
+  };
+  const note = notes[step];
+  return `<section class="teach-pane strategy-brief" data-lesson-notes aria-label="Lesson strategy notes"><header class="teach-pane-head"><div><p class="brief-kicker">Rule &amp; strategy</p><h2 class="pane-title">Understand this move</h2></div><button type="button" class="btn ghost pane-hide" data-brief-toggle>Hide</button></header>${[["Notice on the board", note.notice], ["The rule behind it", note.rule], ["Carry this forward", note.watch]].map(([heading, copy]) => `<section class="brief-block"><h3>${esc(heading ?? "")}</h3><p>${esc(copy ?? "")}</p></section>`).join("")}</section>`;
 }
 
 function titleView(
@@ -375,11 +458,12 @@ function titleView(
         <div class="obj-pip"><b>III</b><span>Move him to the ship</span></div>
         <div class="obj-pip"><b>IV</b><span>Vanquish him there</span></div>
       </div>
+      <p class="start-here">1 · Brand new? Start with the guided Tutorial.</p>
       <div class="actions-row title-starts">
         <button class="btn primary" data-tutorial>Tutorial</button>
         <button class="btn" data-start>Set Sail</button>
       </div>
-      <p class="fine title-tutorial-note">Tutorial is a short first voyage: one action at a time, with a guaranteed Map, then a normal shuffled voyage. Set Sail skips the lesson.</p>
+      <p class="fine title-tutorial-note">All hints are on. Follow one click at a time through six short lessons, with explanations of why each move helps. No plan questions. Then continue into a full voyage with hints still on. Set Sail skips the lessons.</p>
       <div class="diff">
         <button data-diff="easy" class="${difficulty === "easy" ? "is-on" : ""}">Easy — random Fate</button>
         <button data-diff="normal" class="${difficulty === "normal" ? "is-on" : ""}">Normal — heuristic Fate</button>
@@ -403,7 +487,7 @@ function titleView(
 export function helpView(fromPlay: boolean): string {
   return `<div class="overlay" data-overlay="blocking"><div class="modal wood" ${namedDialog("help-title")}>
     <h2 id="help-title">How to play</h2>
-    <p>Start with <b>Tutorial</b> to learn the objective chain. Use the three <b>Practice drills</b> on the title screen to try decisions without Coach, then choose <b>Set Sail</b> for a shuffled voyage.</p>
+    <p>Start with <b>Tutorial</b>: every hint is on and there are no plan questions. After six lessons, continue into a full voyage with hints. The three <b>Practice drills</b> each have two setups: <b>Follow along</b> shows every hint, while <b>Choose a plan</b> asks for your idea before revealing feedback or optional hints. Choose <b>Set Sail</b> for a shuffled voyage.</p>
     ${tableHabits()}
     <p>Each turn you <b>must move</b> to a different unlocked location, then may use each uncovered action there once. Heroes cover the top row. End the turn to refill to 4 cards; the computer then Fates you.</p>
     <p><b>Win</b> by vanquishing Peter Pan at the Jolly Roger after unlocking Hangman’s Tree with the Never Land Map. Vanquishing him anywhere else loses the duel.</p>
@@ -452,7 +536,7 @@ function overlayFor(
       </section>`
       : "";
     const lessonActions = lessonActive
-      ? `<button type="button" class="btn primary" data-lesson-sail data-initial-focus>Begin a normal voyage</button>
+      ? `<button type="button" class="btn primary" data-lesson-sail data-initial-focus>Play a full voyage with hints</button>
         <button type="button" class="btn" data-again>Replay the first voyage</button>
         <button type="button" class="btn ghost" data-home>Return to title &amp; drills</button>`
       : `<button type="button" class="btn primary${coachClass(coached, "btn:again")}" data-again data-initial-focus>Play again</button>
@@ -909,12 +993,12 @@ function playView(
   lesson: LessonView | null = null,
   expanded: ReadonlySet<string> = NO_EXPANDED,
   handRuleId: string | null = null,
-  drill: PracticeDrill | null = null,
+  drill: DrillRun | null = null,
 ): string {
   const hi = highlightSet(state);
   const sel = selectedSet(state);
   const settled = state.phase === "over" || state.won || state.lost;
-  const advice = settled ? null : lesson && coachEnabled ? lesson.advice : coachEnabled ? advise(state) : null;
+  const advice = settled ? null : drill?.guided ? drillAdvice(drill, state) : lesson && coachEnabled ? lesson.advice : coachEnabled ? advise(state) : null;
   const coached = new Set(advice?.highlights ?? []);
   const promptButtons: string[] = [];
   if (state.phase === "actions" && !state.pending) {
@@ -956,10 +1040,13 @@ function playView(
   if (state.pending?.kind === "tinkerDiscard") {
     promptButtons.push(`<button class="btn ghost${coachClass(coached, "btn:skip-cond")}" data-skip-cond>Skip discard</button>`);
   }
+  if (drill && !drill.guided && drill.hintsShown < drill.setup.hints.length && !settled) {
+    promptButtons.push('<button type="button" class="btn" data-drill-hint>Show a hint</button>');
+  }
 
-  const briefHtml = briefEnabled && !settled ? strategySidebar(strategyBrief(state)) : "";
-  const coachHtml = advice ? coachPanel(state, advice) : "";
-  const reasonHtml = reasonsEnabled && reason && !settled ? reasonDock(reason) : "";
+  const briefHtml = briefEnabled && !settled && !drill ? (lesson ? lessonNotesPanel(state, lesson.step) : strategySidebar(strategyBrief(state))) : "";
+  const coachHtml = !settled && drill ? drillGuidance(state, drill) : advice ? coachPanel(state, advice) : "";
+  const reasonHtml = reasonsEnabled && reason && !settled && !drill ? reasonDock(reason) : "";
   const teachOn = Boolean(briefHtml || coachHtml || reasonHtml);
   const placeLabel = state.phase === "move" && !state.pending ? "Move here" : "Choose this place";
   const placementInPanel = state.pending?.kind === "worthyLocation" || state.pending?.kind === "obsessionLocation";
@@ -997,13 +1084,12 @@ function playView(
         <div class="hud-toggles">
           ${sceneId ? `<div class="chip" data-scene-chip>Scene: ${esc(sceneId)}</div>` : ""}
           <div class="chip">${state.difficulty === "easy" ? "Easy Fate" : "Normal Fate"}</div>
-          <button type="button" class="ctrl ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>
+          ${drill ? `<span class="chip">${drill.guided ? "Follow along" : "Plan practice"}</span>` : `<button type="button" class="ctrl ${coachEnabled ? "is-on" : ""}" data-coach-toggle>${coachEnabled ? "Coach on" : "Coach off"}</button>`}
           <details class="hud-menu">
             <summary class="ctrl" aria-label="More controls">Menu</summary>
             <div class="hud-menu-panel">
               <div class="chip chip-stat chip-piles" title="Hand, deck, and discard">Hand ${state.hand.length} · Deck ${state.villainDeck.length} · Discard ${state.villainDiscard.length}</div>
-              <button type="button" class="ctrl ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button>
-              <button type="button" class="ctrl ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>
+              ${drill ? "" : `<button type="button" class="ctrl ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button><button type="button" class="ctrl ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>`}
               ${soundToggle()}
               <button type="button" class="ctrl" data-help>Help</button>
               <button type="button" class="ctrl" data-resign ${resignBlocked(state) ? "disabled" : ""}>Resign</button>
@@ -1024,7 +1110,7 @@ function playView(
         ? `<section class="lesson-banner" data-lesson-banner aria-live="polite"><strong>Lesson ${lesson.index} of ${lesson.total} · ${esc(lesson.title)}</strong><p>${esc(lesson.advice.do)}</p><p class="lesson-insight">${esc(LESSON_INSIGHTS[lesson.step])}</p></section>`
         : ""
     }
-    ${drill && !drill.complete(state) ? `<section class="drill-banner" data-drill-banner><strong>Practice drill · ${esc(drill.title)}</strong><p>${esc(drill.task)}</p><div class="actions-row"><button type="button" class="btn ghost" data-drill-retry>Restart drill</button><button type="button" class="btn ghost" data-drill-exit>Drill library</button></div></section>` : ""}
+    ${drill && !drill.setup.complete(state) ? `<section class="drill-banner" data-drill-banner data-drill-setup="${esc(drill.setup.id)}"><strong>${drill.guided ? "Follow along" : "Plan practice"} · ${drill.setup.level === "core" ? "Core skill" : "Strategy twist"} · ${esc(drill.setup.name)}</strong><p>${esc(drill.setup.task)}</p><div class="actions-row"><button type="button" class="btn ghost" data-drill-retry>Restart setup</button><button type="button" class="btn ghost" data-drill-next>${drill.setup.level === "core" ? "Try a twist" : "Core setup"}</button><button type="button" class="btn ghost" data-drill-exit>Drill library</button></div></section>` : ""}
     </div>
     <div class="play-scroll" data-play-scroll>
     ${fateRail(state)}
@@ -1071,7 +1157,7 @@ function playView(
     </div>
     ${teachRailHtml(briefHtml, coachHtml, reasonHtml)}
   </div>
-  ${drill?.complete(state) ? drillResult(drill) : overlayFor(state, hi, sel, coached, Boolean(lesson))}`;
+  ${drill?.setup.complete(state) ? drillResult(drill, state) : overlayFor(state, hi, sel, coached, Boolean(lesson))}`;
 }
 
 export function renderOverlay(state: GameState): string {
@@ -1271,7 +1357,8 @@ export function mount(root: HTMLElement): void {
   let lastReason: MoveReason = IDLE_MOVE_REASON;
   let inspectId: string | null = null;
   let lesson: LessonStep | null = null;
-  let activeDrill: PracticeDrill | null = null;
+  let activeDrill: DrillRun | null = null;
+  const lastDrillSetups = new Map<string, string>();
   let suppressClick = false;
   const expandedCards = new Set<string>();
   let handRuleId: string | null = null;
@@ -1517,7 +1604,7 @@ export function mount(root: HTMLElement): void {
   const restoreFocus = () => {
     const blocking = root.querySelector<HTMLElement>(".overlay:not(.pass-through)");
     const dialog = topDialog();
-    const play = root.querySelector<HTMLElement>(".play");
+    const play = root.querySelector<HTMLElement>(".play, [data-drill-study]");
     if (play && blocking) play.setAttribute("inert", "");
     else play?.removeAttribute("inert");
     if (inspectId) {
@@ -1558,6 +1645,7 @@ export function mount(root: HTMLElement): void {
     const sceneWarning = unknownSceneWarning();
     const lessonBeat = lesson ? lessonView(state, lesson) : null;
     if (state.screen === "title") root.innerHTML = titleView(difficulty, coachEnabled, briefEnabled, reasonsEnabled, sceneWarning);
+    else if (activeDrill && !activeDrill.started) root.innerHTML = drillStudy(state, activeDrill) + inspect;
     else if (state.screen === "help") {
       root.innerHTML =
         (state.phase === "title"
@@ -1580,7 +1668,7 @@ export function mount(root: HTMLElement): void {
       railScroll = 0;
       lastTeachSig = teachSig;
     }
-    bindCardDrag();
+    if (!activeDrill || activeDrill.started) bindCardDrag();
     root.querySelector<HTMLElement>("[data-realm-map]")?.addEventListener("scroll", () => markShown(), { passive: true });
     restoreScroll();
     pinNextClick();
@@ -1606,6 +1694,7 @@ export function mount(root: HTMLElement): void {
   };
 
   const dispatch = (input: Input) => {
+    if (activeDrill && !activeDrill.started) return;
     inspectId = null;
     handRuleId = null;
     const before = state;
@@ -1613,6 +1702,9 @@ export function mount(root: HTMLElement): void {
     state = applyInput(state, input);
     if (before.screen === "title" || input.type === "newGame") window.scrollTo(0, 0);
     state.coachOn = coachEnabled;
+    if (activeDrill?.setup.complete(state)) {
+      lastDrillSetups.set(`${activeDrill.drill.id}:${activeDrill.guided ? "guided" : "plan"}`, activeDrill.setup.id);
+    }
     if (lesson) {
       const advanced = advanceLesson(lesson, before, state);
       const jumped = advanced.state !== state;
@@ -1644,11 +1736,15 @@ export function mount(root: HTMLElement): void {
       return;
     }
     const t = event.target as HTMLElement;
-    const drillStart = t.closest<HTMLElement>("[data-drill]");
-    if (drillStart || t.closest("[data-drill-retry]") || (activeDrill && t.closest("[data-again]"))) {
-      const drill = drillStart ? PRACTICE_DRILLS.find((item) => item.id === drillStart.dataset.drill) : activeDrill;
+    const drillStart = t.closest<HTMLElement>("[data-drill], [data-drill-guided]");
+    if (drillStart || t.closest("[data-drill-next]") || t.closest("[data-drill-retry]") || (activeDrill && t.closest("[data-again]"))) {
+      const id = drillStart?.dataset.drill ?? drillStart?.dataset.drillGuided;
+      const drill = drillStart ? PRACTICE_DRILLS.find((item) => item.id === id) : activeDrill?.drill;
       if (!drill) return;
-      activeDrill = drill;
+      const same = Boolean(t.closest("[data-drill-retry], [data-again]"));
+      const guided = drillStart ? drillStart.dataset.drillGuided !== undefined : activeDrill?.guided ?? false;
+      const previous = drillStart ? lastDrillSetups.get(`${drill.id}:${guided ? "guided" : "plan"}`) : activeDrill?.setup.id;
+      activeDrill = startDrill(drill, previous, same, guided);
       lesson = null;
       activeSceneId = null;
       inspectId = null;
@@ -1656,19 +1752,64 @@ export function mount(root: HTMLElement): void {
       briefEnabled = false;
       reasonsEnabled = false;
       lastReason = IDLE_MOVE_REASON;
-      state = drill.open();
+      state = activeDrill.setup.open();
+      state.log = [{ id: state.logSeq++, text: `Practice setup: ${activeDrill.setup.name}. ${activeDrill.setup.task}`, tone: "info" }];
+      window.scrollTo(0, 0);
+      pageScrollY = 0;
+      render();
+      if (typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1100px)").matches) showShore(state.villainLocation);
+      return;
+    }
+    const planChoice = t.closest<HTMLElement>("[data-drill-plan]");
+    if (activeDrill && !activeDrill.started && planChoice) {
+      const plan = activeDrill.plans.find((choice) => choice.id === planChoice.dataset.drillPlan);
+      if (!plan) return;
+      activeDrill.chosen = plan.id;
+      if (activeDrill.attempts[activeDrill.attempts.length - 1] !== plan.id) activeDrill.attempts.push(plan.id);
+      render();
+      return;
+    }
+    if (activeDrill && t.closest("[data-drill-follow], [data-drill-begin]")) {
+      const guided = Boolean(t.closest("[data-drill-follow]"));
+      if (!guided && !chosenPlan(activeDrill)?.works) return;
+      activeDrill.guided = guided;
+      activeDrill.started = true;
+      if (guided) activeDrill.hintsShown = activeDrill.setup.hints.length;
       window.scrollTo(0, 0);
       pageScrollY = 0;
       render();
       return;
     }
+    if (activeDrill && t.closest("[data-drill-hint]")) {
+      if (!activeDrill.started && activeDrill.attempts.length === 0) return;
+      activeDrill.hintsShown = Math.min(activeDrill.setup.hints.length, activeDrill.hintsShown + 1);
+      render();
+      if (activeDrill.started && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1100px)").matches) {
+        root.querySelector<HTMLElement>("[data-drill-guidance]")?.scrollIntoView({ block: "start" });
+        pageScrollY = window.scrollY;
+      }
+      return;
+    }
     if (t.closest("[data-drill-exit]") || t.closest("[data-drill-sail]")) {
+      const keepGuidance = activeDrill?.guided && Boolean(t.closest("[data-drill-sail]"));
       activeDrill = null;
       lesson = null;
       inspectId = null;
+      coachEnabled = keepGuidance ? true : readFlag("nld-coach");
+      briefEnabled = keepGuidance ? true : readFlag("nld-brief", false);
+      reasonsEnabled = keepGuidance ? true : readFlag("nld-reasons", false);
       window.scrollTo(0, 0);
       pageScrollY = 0;
       dispatch(t.closest("[data-drill-sail]") ? { type: "start", difficulty } : { type: "newGame" });
+      return;
+    }
+    if (activeDrill && !activeDrill.started) {
+      const shore = t.closest<HTMLElement>("[data-shore-tab]");
+      const location = parseLocationId(shore?.dataset.shoreTab);
+      if (location) { showShore(location); return; }
+      if (t.closest("[data-inspect-close]")) { inspectId = null; render(); return; }
+      const id = t.closest<HTMLElement>("[data-card]")?.dataset.card;
+      if (id && !t.closest(".overlay") && findCard(state, id)) { inspectId = id; render(); }
       return;
     }
     const handRule = t.closest<HTMLElement>("[data-hand-rule]");
@@ -1776,6 +1917,12 @@ export function mount(root: HTMLElement): void {
     }
     if (t.closest("[data-lesson-sail]")) {
       activeDrill = null;
+      coachEnabled = true;
+      briefEnabled = true;
+      reasonsEnabled = true;
+      writeFlag("nld-coach", true);
+      writeFlag("nld-brief", true);
+      writeFlag("nld-reasons", true);
       const sailDifficulty = state.difficulty;
       lesson = null;
       activeSceneId = null;
