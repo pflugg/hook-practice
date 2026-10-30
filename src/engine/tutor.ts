@@ -64,8 +64,15 @@ export function tutorContext(state: GameState, guidance: CoachAdvice = advise(st
     }
     for (const ally of location.allies) {
       const d = def(ally.defId);
-      const attached = attachmentsOn(state, ally.instanceId).map((card) => def(card.defId).name);
-      add(`ally:${ally.instanceId}`, `${d.name} at ${locName(id)}`, `Current Strength: ${allyStrength(state, ally)}. ${d.text}${attached.length ? ` Attachments: ${attached.join(", ")}.` : ""}`);
+      const attachments = attachmentsOn(state, ally.instanceId);
+      const attached = attachments.map((card) => def(card.defId).name);
+      const changes: string[] = [];
+      if (ally.defId === "smee" && id === "jollyRoger") changes.push("+2 because Smee is at the Jolly Roger");
+      const cutlasses = attachments.filter((card) => card.defId === "cutlass").length;
+      if (cutlasses) changes.push(`+${cutlasses * 2} from Cutlass`);
+      const temporary = state.tempStrength[ally.instanceId] ?? 0;
+      if (temporary) changes.push(`${temporary >= 0 ? "+" : ""}${temporary} temporary Strength this turn`);
+      add(`ally:${ally.instanceId}`, `${d.name} at ${locName(id)}`, `Current Strength: ${allyStrength(state, ally)}. Printed Strength: ${d.strength}.${changes.length ? ` Changes: ${changes.join("; ")}.` : ""} ${d.text}${attached.length ? ` Attachments: ${attached.join(", ")}.` : ""}`);
     }
     for (const item of location.items) {
       const d = def(item.defId);

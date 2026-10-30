@@ -47,6 +47,8 @@ For the shortest overview, play the 48-second video before the live demonstratio
 
 ## Final handoff
 
-The build is prepared locally. The existing [public preview](https://hook-practice-ten.vercel.app/) was checked during this pass and still showed the older **Never Land Duel — Hook Practice** title and copy. Deploy the final source project there before using that URL for this submission; [Vercel setup](../docs/vercel.md) covers the server function and credentials for Luna. A static-only deployment of `dist/` supports the complete game with local Coach. The source-repository URL, entrant/team details, and the event’s final form must also be supplied at the submission destination. No deployment of this final build or submission acceptance is claimed here.
+The [live game](https://hook-practice-ten.vercel.app/) and [video preview](https://hook-practice-ten.vercel.app/submission/explainer.html) are deployed from [the GitHub source](https://github.com/pflugg/hook-practice). The production walkthrough checked the tutorial, practice drill, real Luna answer, video, captions, and return link at desktop and phone sizes. The OpenAI key and free Upstash quota credentials are server-only Production secrets. [Vercel setup](../docs/vercel.md) explains the configuration.
+
+A static-only deployment of `dist/` supports the complete game with local Coach. The entrant/team details and event’s final form still need to be supplied at the submission destination. Confirm that reviewers can access any repository link you provide. No submission acceptance is claimed here.
 
 Build and test evidence is recorded in [QA.md](QA.md). For the exact source and playable archives, use the files in the local `release/` directory produced at handoff.

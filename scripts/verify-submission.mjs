@@ -11,8 +11,10 @@ import { findChrome } from "./browser.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const dist = path.join(root, "dist");
 const browserName = process.env.VERIFY_BROWSER ?? "chromium";
+const liveURL = process.env.VERIFY_LIVE_URL;
+if (liveURL) assert.equal(new URL(liveURL).origin, "https://hook-practice-ten.vercel.app", "Live proof is restricted to the project's production host");
 assert(["chromium", "firefox"].includes(browserName), "VERIFY_BROWSER must be chromium or firefox");
-const output = path.join(root, "verification-evidence", browserName === "chromium" ? "submission" : `submission-${browserName}`);
+const output = path.join(root, "verification-evidence", liveURL ? "live" : browserName === "chromium" ? "submission" : `submission-${browserName}`);
 mkdirSync(output, { recursive: true });
 assert(existsSync(path.join(dist, "index.html")), "Run npm run build first");
 const prefix = "/review/neverland-duel/";
@@ -33,12 +35,11 @@ const server = createServer((request, response) => {
     response.writeHead(400).end();
   }
 });
-await new Promise((resolve, reject) => {
+if (!liveURL) await new Promise((resolve, reject) => {
   server.once("error", reject);
   server.listen(0, "127.0.0.1", resolve);
 });
-const { port } = server.address();
-const url = `http://127.0.0.1:${port}${prefix}`;
+const url = liveURL ?? `http://127.0.0.1:${server.address().port}${prefix}`;
 const errors = [];
 const failures = [];
 const evidence = [];
@@ -67,14 +68,20 @@ try {
   browser = browserName === "firefox"
     ? await firefox.launch({ headless: true })
     : await chromium.launch({ executablePath: findChrome(), headless: true });
-  for (const [width, height] of [[1440, 1000], [390, 844], [320, 568], [844, 390], [1280, 568]]) {
+  for (const [width, height] of liveURL ? [[1440, 1000], [390, 844]] : [[1440, 1000], [390, 844], [320, 568], [844, 390], [1280, 568]]) {
     const context = await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" });
     // The optional font service must not be a prerequisite for playing.
     await context.route("https://fonts.googleapis.com/**", (route) => route.abort());
     await context.route("https://fonts.gstatic.com/**", (route) => route.abort());
     const page = await context.newPage();
     let tutorRequests = 0;
-    page.on("request", (request) => { if (request.url().endsWith("/api/tutor")) tutorRequests++; });
+    page.on("request", (request) => {
+      if (request.url().endsWith("/api/tutor")) {
+        tutorRequests++;
+        if (request.headers().authorization) failures.push("Browser tutor request must not carry an API authorization header");
+      }
+      if (new URL(request.url()).hostname === "api.openai.com") failures.push("Browser must not call OpenAI directly");
+    });
     page.on("pageerror", (error) => errors.push(`${width}x${height}: ${error.message}`));
     page.on("response", (response) => {
       if (response.url().startsWith(url) && response.status() >= 400 && !response.url().endsWith("/api/tutor")) failures.push(`${response.status()} ${response.url()}`);
@@ -88,15 +95,17 @@ try {
       await page.locator(".luna-open").click();
       assert.equal(tutorRequests, 0, "Opening Ask Coach must not call AI");
       await page.locator("[data-luna-question]").first().click();
-      await page.getByText("Local Coach · verified explanation", { exact: true }).waitFor();
-      await page.locator("[data-luna-close]").click();
-      // Exercise the client contract without spending API credits in routine CI.
-      await page.route("**/api/tutor", async (route) => {
-        const { context } = route.request().postDataJSON();
-        await route.fulfill({ json: { source: "luna", position: context.position, answerable: true, factIds: ["reason"] } });
-      });
-      await page.locator(".luna-open").click();
-      await page.locator("[data-luna-question]").first().click();
+      if (!liveURL) {
+        await page.getByText("Local Coach · verified explanation", { exact: true }).waitFor();
+        await page.locator("[data-luna-close]").click();
+        // Exercise the client contract without spending API credits in routine CI.
+        await page.route("**/api/tutor", async (route) => {
+          const { context } = route.request().postDataJSON();
+          await route.fulfill({ json: { source: "luna", position: context.position, answerable: true, factIds: ["reason"] } });
+        });
+        await page.locator(".luna-open").click();
+        await page.locator("[data-luna-question]").first().click();
+      }
       await page.getByText("Selected by Luna · facts checked by the game", { exact: true }).waitFor();
       assert(await page.locator(".luna-answer").textContent().then((text) => text.includes("Every turn starts")), "Tutor did not display the engine explanation");
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Tutor overflows the viewport");
@@ -154,7 +163,7 @@ try {
       assert(captions.includes("00:00:40.000 --> 00:00:48.000"));
       await page.getByRole("link", { name: "Play the game", exact: true }).click();
       await page.locator("[data-tutorial]").waitFor({ state: "visible" });
-      evidence.push({ width, height, lessons: [...lessons], tutorNoAutomaticCalls: true, tutorStaticFallback: true, tutorValidatedDisplay: true, helpAndResignMenu: true, guidedCombatCompleted: true, optionalFontsBlocked: true, subfolderAssetsLoaded: true, video, captions: 6, videoReturnLink: true });
+      evidence.push({ width, height, lessons: [...lessons], tutorNoAutomaticCalls: true, tutorStaticFallback: !liveURL, tutorLiveService: !!liveURL, tutorValidatedDisplay: true, helpAndResignMenu: true, guidedCombatCompleted: true, optionalFontsBlocked: true, subfolderAssetsLoaded: !liveURL, video, captions: 6, videoReturnLink: true });
       console.log(`${width}x${height}: production tutorial, drill, video, captions, and return link passed`);
     } catch (error) {
       await page.screenshot({ path: path.join(output, `failure-${width}x${height}.png`) });
@@ -167,6 +176,6 @@ try {
   assert.equal(failures.length, 0, failures.map((failure) => failure.split("\n").slice(0, 2).join(" ")).join("\n"));
 } finally {
   await browser?.close();
-  await new Promise((resolve) => server.close(resolve));
+  if (server.listening) await new Promise((resolve) => server.close(resolve));
   writeFileSync(path.join(output, "proof.json"), `${JSON.stringify({ url, browser: browserName, checkedAt: new Date().toISOString(), evidence, errors, failures }, null, 2)}\n`);
 }

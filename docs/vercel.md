@@ -68,4 +68,4 @@ Never paste a key into logs while diagnosing a failure. Server responses deliber
 - [Vercel Config and Secret types](https://vercel.com/changelog/environment-variables-now-use-config-and-secret-types)
 - [Upstash Redis REST API](https://upstash.com/docs/redis/features/restapi)
 
-These instructions prepare a deployment; they do not claim this build is already live. The previously published preview must be redeployed from the final source before submission.
+On October 30, 2026, this source was deployed to [the production game](https://hook-practice-ten.vercel.app/). The OpenAI key is a Production Secret. The connected `neverland-duel-luna-quota` database uses Upstash's Free plan, with eviction disabled and KV-prefixed secret variables restricted to Production. A real tutor question succeeded on the deployed function. These deployment checks do not imply acceptance by a submission event.

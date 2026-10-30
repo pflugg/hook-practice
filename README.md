@@ -8,7 +8,7 @@ A new board game should feel like an invitation. Too often, your first turn feel
 
 **See a legal move → understand why → try it → reflect → repeat with less help.**
 
-[Watch the 48-second introduction](submission/neverland-duel.mp4) · [Video, captions & transcript](submission/explainer.html) · [Submission notes](submission/SUBMISSION.md)
+[Play the live game](https://hook-practice-ten.vercel.app/) · [Watch the 48-second introduction](https://hook-practice-ten.vercel.app/submission/explainer.html) · [Submission notes](submission/SUBMISSION.md)
 
 ![The guided tutorial highlights Gain 1 while Coach explains why the Map needs that extra Power.](docs/images/tutorial.png)
 
@@ -111,6 +111,14 @@ node scripts/verify.mjs cleanup
 It records screenshots and measurements under the gitignored `verification-evidence/learning/` directory. `npm run verify` runs the smaller tutorial-opening proof. For 200 reproducible simulated voyages, run `npm run soak`; the JSON report goes to `/tmp/hook-soak/summary.json`. These simulations test software behavior, not learning outcomes.
 
 `npm run verify:submission` builds the complete submission and checks it through a plain static server under a nested hosting path. It completes the tutorial and a guided drill, checks the video and six caption cues, and follows the return link at desktop, phone, small-phone, and landscape sizes. The optional font service is blocked during this check to verify the local fallbacks.
+
+The optional live check uses two real tutor questions against the production site. Routine CI uses mocked selections and spends no API credits:
+
+```bash
+VERIFY_LIVE_URL=https://hook-practice-ten.vercel.app/ node scripts/verify-submission.mjs
+```
+
+`node scripts/check-secrets.mjs` checks source and build files without printing saved credential values. After the final build and commit, `python3 scripts/package-submission.py` creates source and static ZIPs, SHA-256 checksums, and a release manifest under ignored `release/`.
 
 ## Build and host
 

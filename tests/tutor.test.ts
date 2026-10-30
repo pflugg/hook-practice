@@ -22,10 +22,16 @@ describe("engine-grounded tutor facts", () => {
     putHero(state, "wendy", "skullRock");
     const tinker = putHero(state, "tinkerBell", "mermaidLagoon");
     putHero(state, "tickTock", "jollyRoger");
+    const smee = putAlly(state, "smee", "jollyRoger");
+    state.attachments.push({ attachedTo: smee.instanceId, item: { instanceId: "tutor-cutlass", defId: "cutlass" } });
+    state.tempStrength[smee.instanceId] = 3;
     const facts = tutorContext(state).facts;
     expect(facts.find((fact) => fact.id === `hero:${tinker.instanceId}`)?.text).toContain("Current Strength: 3");
     expect(facts.find((fact) => fact.id === `hero:${tinker.instanceId}`)?.text).toContain("+1 because Wendy is in the realm");
     expect(facts.find((fact) => fact.id === "ticktock")?.text).toMatch(/Seating Tick Tock.*does not discard/);
+    const crew = facts.find((fact) => fact.id === `ally:${smee.instanceId}`)?.text;
+    expect(crew).toContain("Current Strength: 9. Printed Strength: 2.");
+    expect(crew).toContain("+2 because Smee is at the Jolly Roger; +2 from Cutlass; +3 temporary Strength this turn");
   });
 
   it("explains the two-Ally requirement even when one Ally matches Lost Boys' Strength", () => {

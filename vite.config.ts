@@ -15,6 +15,8 @@ export default defineConfig(({ mode }) => {
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    // Browser suites launch real processes; bound their competition on shared machines.
+    maxWorkers: 2,
   },
   };
 });
