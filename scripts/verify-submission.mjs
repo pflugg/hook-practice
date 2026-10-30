@@ -100,6 +100,11 @@ try {
       await page.getByText("Selected by Luna · facts checked by the game", { exact: true }).waitFor();
       assert(await page.locator(".luna-answer").textContent().then((text) => text.includes("Every turn starts")), "Tutor did not display the engine explanation");
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Tutor overflows the viewport");
+      assert(await page.locator(".luna-source").evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const modal = element.closest(".modal").getBoundingClientRect();
+        return bounds.top >= modal.top && bounds.bottom <= modal.bottom;
+      }), "Tutor reply source is below the visible dialog after answering");
       await page.screenshot({ path: path.join(output, `tutor-${width}x${height}.png`) });
       await page.locator("[data-luna-close]").click();
       const lessons = new Set();

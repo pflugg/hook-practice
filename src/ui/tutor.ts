@@ -42,14 +42,17 @@ export function installTutor(root: HTMLElement, getContext: () => TutorContext |
     const field = panel.querySelector<HTMLTextAreaElement>("textarea")!;
     const answer = panel.querySelector<HTMLElement>(".luna-answer")!;
     const submit = panel.querySelector<HTMLButtonElement>('[type="submit"]')!;
+    const revealAnswer = () => answer.scrollIntoView?.({ block: "start" });
 
     const show = (selection: TutorSelection, source: "luna" | "local") => {
       if (!selection.answerable) {
         answer.innerHTML = "<h3>That goes beyond the facts I have</h3><p>I can help with the current position and the rules shown in this trainer. Try one of the game questions above.</p>";
+        revealAnswer();
         return;
       }
       const facts = selection.factIds.flatMap((id) => context.facts.find((fact) => fact.id === id) ?? []);
       answer.innerHTML = `<p class="luna-source">${source === "luna" ? "Selected by Luna · facts checked by the game" : "Local Coach · verified explanation"}</p>${facts.map((fact) => `<section><h3>${escape(fact.title)}</h3><p>${escape(fact.text)}</p></section>`).join("")}`;
+      revealAnswer();
     };
     const fallback = () => show({ answerable: true, factIds: ["next", "reason"].filter((id) => context.facts.some((fact) => fact.id === id)) }, "local");
     const ask = async (question: string) => {
@@ -69,6 +72,7 @@ export function installTutor(root: HTMLElement, getContext: () => TutorContext |
       submit.disabled = true;
       panel.querySelectorAll<HTMLButtonElement>("[data-luna-question]").forEach((button) => { button.disabled = true; });
       answer.textContent = "Finding the relevant rule and board facts…";
+      revealAnswer();
       const timeout = window.setTimeout(() => request.abort(), 14000);
       try {
         const response = await fetch(new URL("api/tutor", document.baseURI), {
