@@ -1,4 +1,4 @@
-# Rules notes — Never Land Duel v1
+# Rules notes — Neverland Duel v1
 
 This practice tool aims for a playable Hook-style objective, not FAQ-perfect parity. Card text is **paraphrased** so the repo does not reproduce published flavor or rulebook wording. See `LEGAL.md`.
 

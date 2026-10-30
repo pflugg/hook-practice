@@ -5,6 +5,8 @@ const nodeGlobals = {
   console: "readonly",
   fetch: "readonly",
   process: "readonly",
+  Buffer: "readonly",
+  AbortSignal: "readonly",
 };
 
 const datasetCasts = [
@@ -23,7 +25,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["scripts/**/*.mjs"],
+    files: ["scripts/**/*.mjs", "server/**/*.mjs", "api/**/*.js"],
     languageOptions: { globals: nodeGlobals },
   },
   {

@@ -1170,7 +1170,6 @@ function pickAction(state: GameState): ActionSlot | "end" | null {
 
 function bankableGain(state: GameState, acts: ActionSlot[]): ActionSlot | undefined {
   if (state.power >= 12) return undefined;
-  if (rivalWarning(state) && !needPowerForMap(state)) return undefined;
   return [...acts.filter((a) => a.kind === "gainPower")].sort((a, b) => (b.amount ?? 1) - (a.amount ?? 1))[0];
 }
 

@@ -1,13 +1,14 @@
 /* global document, getComputedStyle, innerWidth, requestAnimationFrame, window */
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { chromium } from "playwright";
+import { findChrome } from "./browser.mjs";
 
 // Use the server started and checked by verify.mjs; never manipulate engine state.
 const { url } = JSON.parse(readFileSync("/tmp/hook-practice-verify/server.json", "utf8"));
 const output = "verification-evidence/learning";
 mkdirSync(output, { recursive: true });
-const executablePath = [process.env.CHROME_PATH, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome", "/usr/bin/chromium"].find((p) => p && existsSync(p));
+const executablePath = findChrome();
 const browser = await chromium.launch({ executablePath, headless: true });
 const sizes = [[1301, 692], [1280, 720], [1280, 800], [1440, 900], [1024, 768], [390, 844]];
 const evidence = [];

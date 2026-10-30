@@ -22,6 +22,35 @@ const RIVAL_CLOSE =
   "The rival villain is at 140 of 154. Finish Peter Pan at the Jolly Roger before that track fills.";
 
 describe("coach tempo", () => {
+  it("takes free Power before ending even when the rival is close", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.villainLocation = "mermaidLagoon";
+    state.power = 9;
+    state.rivalProgress = 140;
+
+    const advice = advise(state);
+    expect(advice.highlights).toEqual(["act:ml-gain"]);
+    expect(advice.do).toMatch(/Gain 3/);
+    const gained = applyInput(state, { type: "selectAction", actionKey: "ml-gain" });
+    expect(gained.power).toBe(12);
+    expect(gained.rivalProgress).toBe(state.rivalProgress);
+    expect(gained.turn).toBe(state.turn);
+  });
+
+  it("finishes a ready ship clash before collecting optional Power", () => {
+    const state = barePlayState();
+    state.hangmansUnlocked = true;
+    state.villainLocation = "jollyRoger";
+    state.power = 9;
+    state.rivalProgress = 140;
+    putHero(state, "peterPan", "jollyRoger");
+    putAlly(state, "pirateBrute", "jollyRoger");
+    putAlly(state, "pirateBrute", "jollyRoger");
+
+    expect(advise(state).highlights).toEqual(["act:jr-vanquish"]);
+  });
+
   it("warns in plain words when the rival track is close and stays quiet when it is empty", () => {
     const state = barePlayState();
     state.power = 12;

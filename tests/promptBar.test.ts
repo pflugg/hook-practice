@@ -1,21 +1,10 @@
+import { findChrome } from "./browserSupport";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
 import net from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium, type Browser, type Locator, type Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-function findChrome(): string | undefined {
-  const candidates = [
-    process.env.CHROME_PATH,
-    "/opt/google/chrome/chrome",
-    "/usr/bin/google-chrome",
-    "/usr/bin/google-chrome-stable",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-  ];
-  return candidates.find((candidate): candidate is string => typeof candidate === "string" && existsSync(candidate));
-}
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {

@@ -8,6 +8,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { def } from "../src/engine/cards";
 import { advise } from "../src/engine/coach";
 import { applyInput, createGame, highlightSet } from "../src/engine/game";
@@ -392,6 +393,10 @@ function checkCoach(state: GameState): void {
     ];
     for (const id of LOCATION_IDS) names.push(...state.locations[id].items.map((card) => def(card.defId).name));
     if (state.pending?.kind === "scarePeek") names.push(...state.pending.cards.map((card) => def(card.defId).name));
+    if (state.pending?.kind === "obsessionDecide") {
+      const hero = state.heldCard?.instanceId === state.pending.heroId ? state.heldCard : findCard(state, state.pending.heroId);
+      if (hero) names.push(def(hero.defId).name);
+    }
     if (state.pending?.kind === "discardSelect") {
       for (const id of state.pending.selected) {
         const card = findCard(state, id);
@@ -1243,8 +1248,11 @@ function runScripted(deadline: number): void {
 }
 
 function hydrateUi(): void {
-  const result = spawnSync("npx", ["vite-node", "scripts/hammer-scenes.ts"], {
-    cwd: "/workspace",
+  const result = spawnSync(process.execPath, [
+    fileURLToPath(new URL("../node_modules/vite-node/vite-node.mjs", import.meta.url)),
+    fileURLToPath(new URL("./hammer-scenes.ts", import.meta.url)),
+  ], {
+    cwd: fileURLToPath(new URL("../", import.meta.url)),
     encoding: "utf8",
     timeout: 60_000,
   });

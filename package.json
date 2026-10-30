@@ -3,13 +3,18 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Never Land Duel — a browser practice tool for the captain's objective chain, vs a computer Fate adversary.",
+  "description": "Neverland Duel — an independent board-game teaching prototype with guided lessons, move explanations, and focused practice.",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/prepare-submission.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "verify": "node scripts/verify.mjs prove",
+    "verify:submission": "npm run build && node scripts/verify-submission.mjs",
+    "video": "node scripts/render-explainer.mjs",
     "soak": "vite-node scripts/soak-games.ts -- --games 200 --out /tmp/hook-soak/summary.json",
     "preview": "vite preview",
     "test": "vitest run",

@@ -1,21 +1,30 @@
-# Legal
+# Educational purpose and rights status
 
-**Never Land Duel** (also called **Hook Practice**) is an unofficial, personal, non-commercial practice tool. It is **not affiliated with, endorsed by, or associated with** The Walt Disney Company, Ravensburger, or any of their affiliates, subsidiaries, or licensors.
+**Neverland Duel** is an independent educational prototype. Its intended use is to help a learner practise decisions and understand Captain Hook’s objective in the published tabletop game Disney Villainous before joining a human table.
 
-## What this is
+It is **not affiliated with, endorsed by, sponsored by, or associated with** The Walt Disney Company, Ravensburger, or their affiliates or licensors. It is not an official digital edition, and it is not intended to replace the published game, its components, or its rules.
 
-- A private study aid for someone who already owns or knows the published tabletop game.
-- Original TypeScript, CSS, and SVG written for this repository.
-- Mechanical descriptions that are **paraphrased** so they describe play effects without reproducing published flavor text, villain guides, or rulebook wording.
+## What the prototype does
 
-## What this is not
+- Provides six staged lessons, three focused practice topics, move explanations, and reflection.
+- Uses a solo simulation, including computer Fate pressure and a practice clock, to create repeatable learning situations.
+- Identifies differences from tabletop play in the in-app **Before you play with people** checklist and [RULES_NOTES.md](RULES_NOTES.md).
+- Uses custom interface code and presentation, with card effects paraphrased for instruction rather than copied flavor text.
 
-- Not an official product, digital edition, or substitute for the published game.
-- Not for sale, relicensing, or redistribution as a competing or replacement product.
-- Not a source of official art, logos, proprietary game fonts, box scans, or PDF rules text.
+Character, location, card, and game names remain visible to connect lessons to the learner’s own copy. The prototype still implements game-specific rules and card interactions. Calling it a teaching tool describes its purpose; it does not remove those underlying dependencies or establish a right to distribute them.
 
-Character and location names that appear here are used only as **mechanical identifiers** so a player can practice the same objective chain. The interface uses original ornaments and abstract atmosphere — not character likenesses or official silhouettes. The player pawn is a generic captain figure (hat, coat, hook) drawn for this tool, not a likeness of any licensed character.
+## Working name and limits
 
-If you do not already have the published game, buy and learn it from its rights-holders. This tool assumes that context; it does not grant any license to those marks or works.
+**Neverland Duel is a working name. No comprehensive trademark clearance or legal determination of permitted use has been completed for this submission.** Changing the name, adding a disclaimer, paraphrasing text, making original artwork, owning a physical copy, or having an educational/noncommercial purpose does not by itself establish permission, fair use, or freedom from trademark concerns.
 
-See also `RULES_NOTES.md` for solo-play simplifications.
+The U.S. Copyright Office explains that educational purpose is one factor in a case-specific fair-use analysis; not every nonprofit educational use is fair use. See [More Information on Fair Use](https://www.copyright.gov/fair-use/more-info.html).
+
+Trademark analysis considers possible confusion and the relationship between the goods or services. A name should be checked for similar marks, including relevant uses outside federal registration records. See the USPTO’s [Likelihood of confusion](https://www.uspto.gov/trademarks/search/likelihood-confusion) and [Comprehensive clearance search](https://www.uspto.gov/trademarks/search/comprehensive-clearance-search-similar-trademarks).
+
+## Submission and distribution
+
+Present this work as a teaching prototype and describe its current scope and solo adaptations accurately. Do not claim ownership of third-party characters, marks, artwork, rules text, or other protected material, and do not imply approval from a rights-holder. This repository does not grant a license to third-party material.
+
+Before broader public distribution or commercialization, obtain a rights review covering the name, game-specific implementation, visual assets, and promotional material, and resolve any permissions that review identifies. An alternative is to replace the third-party-dependent lesson with an original teaching scenario; that would require changes to the content and implementation, beyond a title change.
+
+The submission explainer uses original geometric teaching diagrams, no official artwork or music, and a visible non-affiliation statement. These are presentation choices, not a legal-clearance claim.

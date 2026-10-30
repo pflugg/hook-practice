@@ -1,6 +1,6 @@
 import { def } from "./cards";
 import { LOCATION_IDS, type CardInstance, type GameState, type LocationId } from "./types";
-import { adjacentIds } from "./realm";
+import { adjacentIds, locName } from "./realm";
 import { allAllies, allLocationItems, allyStrength, attachableHeroes, heroStrength, isUnlocked } from "./queries";
 import { pickIndex } from "./rng";
 
@@ -188,7 +188,13 @@ function normalHeuristicClause(state: GameState, played: CardInstance): string {
       : "Normal Fate played Splitting Headache to strip an Item.";
   }
   if (d.id === "tickTock") return "Normal Fate parked Tick Tock to threaten the hand.";
-  if (d.id === "tinkerBell") return "Normal Fate seated Tinker Bell to dismiss crew.";
+  if (d.id === "tinkerBell") {
+    const location = bestHeroLocation(state, played);
+    const ally = chooseTinkerAlly(state, location);
+    return ally
+      ? `Normal Fate seated Tinker Bell to dismiss ${def(ally.defId).name} at ${locName(location)}.`
+      : `Normal Fate seated Tinker Bell to cover actions at ${locName(location)}. No Ally was there to dismiss.`;
+  }
   if (d.id === "wendy") return "Normal Fate seated Wendy to raise every other Hero's Strength.";
   if (d.id === "lostBoys") return "Normal Fate seated Lost Boys to tax the crew.";
   if (d.id === "taunt") {

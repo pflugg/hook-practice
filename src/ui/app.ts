@@ -81,6 +81,8 @@ import "./styles.css";
 import "./experience.css";
 import { chosenPlan, LESSON_INSIGHTS, PRACTICE_DRILLS, startDrill, TABLE_HABITS, type DrillRun } from "./learning";
 import { drillAdvice } from "./drillCoach";
+import { tutorContext } from "../engine/tutor";
+import { installTutor } from "./tutor";
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]!));
@@ -448,10 +450,10 @@ function titleView(
     <section class="title-card">
       <div class="foil-frame" aria-hidden="true"></div>
       ${CREST}
-      <p class="eyebrow">Learn the game. Command the captain.</p>
-      <h1 class="wordmark">Never Land Duel</h1>
-      <p class="subtitle">Hook Practice</p>
-      <p class="lede">Learn Captain Hook’s Villainous objective one move at a time. Practise the tricky decisions, then captain a full voyage against a computer Fate adversary.</p>
+      <p class="eyebrow">Practice privately. Join the table with confidence.</p>
+      <h1 class="wordmark">Neverland Duel</h1>
+      <p class="subtitle">A board-game teaching tool</p>
+      <p class="lede">Learn Captain Hook’s objective in Disney Villainous, one move at a time. Follow along first. Choose your own plan when you want to.</p>
       <div class="objective-row">
         <div class="obj-pip"><b>I</b><span>Play the Never Land Map</span></div>
         <div class="obj-pip"><b>II</b><span>Reveal Peter at the Tree</span></div>
@@ -476,10 +478,12 @@ function titleView(
         <button type="button" class="ctrl" data-help>How to play</button>
       </div>
       <p class="coach-lede">New to the captain? Start with the six guided lessons. Coach suggests a next move, <b>Why this move</b> explains your choice, and the Strategy brief keeps the bigger plan in view. You can hide any of them during play.</p>
+      <p class="fine"><a href="submission/explainer.html">Watch the 48-second introduction</a> · Silent, with captions and a transcript.</p>
       ${sceneWarning ? `<p class="fine" data-scene-warning>${esc(sceneWarning)}</p>` : ""}
       ${drillLibrary()}
       ${tableHabits()}
-      <p class="fine">Unofficial personal practice tool. Not affiliated with, endorsed by, or associated with Disney or Ravensburger.</p>
+      <p class="fine teaching-scope">This independent teaching companion uses solo adaptations; use the published game and its rules when you play with people.</p>
+      <p class="fine">Independent educational prototype; not an official digital edition or a replacement for the published game. Not affiliated with, endorsed by, or associated with Disney or Ravensburger.</p>
     </section>
   </main>`;
 }
@@ -487,11 +491,12 @@ function titleView(
 export function helpView(fromPlay: boolean): string {
   return `<div class="overlay" data-overlay="blocking"><div class="modal wood" ${namedDialog("help-title")}>
     <h2 id="help-title">How to play</h2>
+    <p><b>About this teaching tool:</b> Neverland Duel is an independent educational prototype for practising Captain Hook’s objective in Disney Villainous. Guided lessons, explanations, and drills prepare you for the table. The simulated voyage includes solo adaptations and does not replace the published game or its rules. Not affiliated with or endorsed by Disney or Ravensburger.</p>
     <p>Start with <b>Tutorial</b>: every hint is on and there are no plan questions. After six lessons, continue into a full voyage with hints. The three <b>Practice drills</b> each have two setups: <b>Follow along</b> shows every hint, while <b>Choose a plan</b> asks for your idea before revealing feedback or optional hints. Choose <b>Set Sail</b> for a shuffled voyage.</p>
     ${tableHabits()}
     <p>Each turn you <b>must move</b> to a different unlocked location, then may use each uncovered action there once. Heroes cover the top row. End the turn to refill to 4 cards; the computer then Fates you.</p>
     <p><b>Win</b> by vanquishing Peter Pan at the Jolly Roger after unlocking Hangman’s Tree with the Never Land Map. Vanquishing him anywhere else loses the duel.</p>
-    <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable. It is the top section of the right-hand teaching panel, above the Strategy brief and Why this move.</p>
+    <p><b>Coach:</b> names the next legal click and why it helps. Other legal options stay clickable. It is the top section of the right-hand teaching panel, above Why this move and the Strategy brief.</p>
     <p><b>Strategy brief:</b> a section of that teaching panel that teaches the voyage — objective progress, the current board, what this phase is for, and what the turn is setting up. Distinct from Coach.</p>
     <p><b>Move reasons:</b> a “Why this move” section in that same panel, between Coach and the brief. After each legal click it names what you just chose, why it helps the Map → tree → Peter → ship chain, and what to watch (Fate, covered actions, Tick Tock). Distinct from Coach (next suggestion) and the brief (voyage status). Tutorial starts all three on and teaches move, Gain, the Map, Fate, one escort step, and the ship clash before a normal voyage. The whole panel is one flowing document with section headers and a single scroll; below about 1100px it drops under the board so type stays at the desktop floor.</p>
     <p><b>Card text:</b> Fate reveal modals show the full paraphrased ability and stay until Continue. Click a hand or board mini that is not a legal target to inspect it. The <b>Across the table</b> strip keeps the last revealed Fate play visible while that card is still on the table — never the face-down deck.</p>
@@ -909,6 +914,7 @@ function coachPanel(state: GameState, advice: CoachAdvice): string {
         ${rest.map((line) => `<p class="plan-line">${esc(line)}</p>`).join("")}
       </div>
     </div>
+    <button type="button" class="btn ghost luna-open" data-tutor-open>Ask Coach a question</button>
   </section>`;
 }
 
@@ -1073,7 +1079,7 @@ function playView(
     <div class="play-main" data-play-main>
     <div class="play-chrome">
     <header class="topbar" data-topbar-map>
-      <div class="brand">${CREST}<div><h1>Never Land Duel</h1><small>Hook Practice</small></div></div>
+      <div class="brand">${CREST}<div><h1>Neverland Duel</h1><small>Guided practice · Teaching tool</small></div></div>
       ${TOPBAR_MAP}
       <div class="meters">
         <div class="hud-core" aria-label="Voyage meters">
@@ -1091,6 +1097,7 @@ function playView(
               <div class="chip chip-stat chip-piles" title="Hand, deck, and discard">Hand ${state.hand.length} · Deck ${state.villainDeck.length} · Discard ${state.villainDiscard.length}</div>
               ${drill ? "" : `<button type="button" class="ctrl ${briefEnabled ? "is-on" : ""}" data-brief-toggle>${briefEnabled ? "Brief on" : "Brief off"}</button><button type="button" class="ctrl ${reasonsEnabled ? "is-on" : ""}" data-reasons-toggle>${reasonsEnabled ? "Reasons on" : "Reasons off"}</button>`}
               ${soundToggle()}
+              ${!drill ? '<button type="button" class="ctrl" data-tutor-open>Ask Coach</button>' : ""}
               <button type="button" class="ctrl" data-help>Help</button>
               <button type="button" class="ctrl" data-resign ${resignBlocked(state) ? "disabled" : ""}>Resign</button>
             </div>
@@ -2057,5 +2064,10 @@ export function mount(root: HTMLElement): void {
     dispatch({ type: "cancel" });
   });
 
+  installTutor(root, () => {
+    if (activeDrill || state.screen !== "play" || state.phase === "over") return null;
+    const guidance = lesson ? lessonView(state, lesson)?.advice : undefined;
+    return tutorContext(state, guidance, lastReason);
+  });
   render();
 }

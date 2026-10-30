@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neverland Duel · Animated teaching explainer source</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#071d24;color:#f9f0dc;font:16px system-ui,sans-serif;display:grid;min-height:100vh;place-content:center;gap:16px;padding:16px}canvas{display:block;width:min(1280px,100%);height:auto;border-radius:12px}nav{display:flex;gap:16px;align-items:center;flex-wrap:wrap}button,input{font:inherit}button{background:#f1d394;color:#102c32;border:0;padding:12px 20px;border-radius:6px;cursor:pointer}input{flex:1;min-width:180px}button:focus-visible,input:focus-visible{outline:3px solid #7fd0b9;outline-offset:4px}p{max-width:78ch;color:#bfd0ca;line-height:1.6;margin:0}@media(prefers-reduced-motion:reduce){canvas{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<canvas id="film" width="1280" height="720" aria-label="Animated explainer for Neverland Duel. A complete transcript is provided in explainer.html."></canvas>
+<nav aria-label="Animation controls"><button id="play">Play animation</button><input id="seek" type="range" min="0" max="48" step="0.1" value="0" aria-label="Time in seconds"><output id="time">0:00 / 0:48</output></nav>
+<p>Editable source · Simplified teaching diagrams, not screenshots of the app. Silent by design; every teaching point appears on screen. Open <a href="explainer.html" style="color:#f1d394">the video preview and transcript</a> for the rendered version.</p>
+<script>
+const canvas = document.getElementById('film');
+const ctx = canvas.getContext('2d');
+const W=1280, H=720, duration=48;
+const C={bg:'#092830',deep:'#071d24',panel:'#153b41',line:'#456167',paper:'#f8efd9',muted:'#b7cbc5',gold:'#efcd89',mint:'#91d5bd',ink:'#14363b',dim:'#77928e'};
+const sans='-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+const serif='Georgia, "Times New Roman", serif';
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const ease=x=>1-Math.pow(1-clamp(x),3);
+const lerp=(a,b,p)=>a+(b-a)*p;
+function box(x,y,w,h,r=18,fill=C.panel,stroke=null){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.stroke()}}
+function txt(text,x,y,size=24,color=C.paper,weight=400,font=sans,align='left'){ctx.fillStyle=color;ctx.font=`${weight} ${size}px ${font}`;ctx.textAlign=align;ctx.textBaseline='alphabetic';ctx.fillText(text,x,y)}
+function lines(a,x,y,size=24,color=C.paper,weight=400,gap=1.3,font=sans,align='left'){a.forEach((s,i)=>txt(s,x,y+i*size*gap,size,color,weight,font,align))}
+function fade(p,start=0,len=.65){return ease((p-start)/len)}
+function appear(p,start,fn){const a=fade(p,start);ctx.save();ctx.globalAlpha*=a;ctx.translate(0,16*(1-a));fn();ctx.restore()}
+function pill(text,x,y,w,fill=C.panel,color=C.mint){box(x,y,w,38,19,fill);txt(text,x+w/2,y+25,16,color,600,sans,'center')}
+function line(x1,y1,x2,y2,color=C.line,width=2){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke()}
+function arrow(x1,y,x2,p=1,color=C.gold){const x=lerp(x1,x2,clamp(p));line(x1,y,x,y,color,3);if(p>.1){line(x-8,y-6,x,y,color,3);line(x-8,y+6,x,y,color,3)}}
+function circle(x,y,r,color){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=color;ctx.fill()}
+function compass(x,y,size=24,color=C.gold){ctx.save();ctx.translate(x,y);ctx.fillStyle=color;for(let i=0;i<4;i++){ctx.rotate(Math.PI/2);ctx.beginPath();ctx.moveTo(0,-size);ctx.lineTo(size*.22,0);ctx.lineTo(0,size*.22);ctx.lineTo(-size*.22,0);ctx.closePath();ctx.fill()}circle(0,0,3,C.deep);ctx.restore()}
+function check(x,y,color=C.mint){ctx.beginPath();ctx.moveTo(x-7,y);ctx.lineTo(x-1,y+6);ctx.lineTo(x+11,y-8);ctx.lineWidth=3;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=color;ctx.stroke()}
+function pawn(x,y,s=1,color=C.gold){ctx.save();ctx.translate(x,y);ctx.scale(s,s);circle(0,-14,11,color);ctx.beginPath();ctx.moveTo(-10,-1);ctx.lineTo(-18,24);ctx.quadraticCurveTo(0,33,18,24);ctx.lineTo(10,-1);ctx.closePath();ctx.fillStyle=color;ctx.fill();box(-21,25,42,8,4,color);ctx.restore()}
+function coin(x,y,n,r=31){circle(x,y,r,C.gold);ctx.beginPath();ctx.arc(x,y,r-5,0,Math.PI*2);ctx.strokeStyle='#b28a48';ctx.lineWidth=1;ctx.stroke();txt(String(n),x,y+10,r*.88,C.ink,700,sans,'center')}
+function caption(a){box(56,604,1168,76,14,'#061c23');lines(a,640,a.length>1?634:649,22,C.paper,400,1.28,sans,'center')}
+function heading(kicker,title,sub){txt(kicker.toUpperCase(),80,143,15,C.mint,700);txt(title,80,202,49,C.paper,400,serif);if(sub)txt(sub,80,244,22,C.muted)}
+function backdrop(t,scene){const grad=ctx.createLinearGradient(0,0,W,H);grad.addColorStop(0,'#143e44');grad.addColorStop(.65,C.bg);grad.addColorStop(1,C.deep);ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);ctx.save();ctx.strokeStyle='#91d5bd0b';ctx.lineWidth=1;for(let j=0;j<9;j++){ctx.beginPath();for(let x=-60;x<1380;x+=12){const y=280+j*45+Math.sin(x/190+t/13+j*.5)*60;if(x===-60)ctx.moveTo(x,y);else ctx.lineTo(x,y)}ctx.stroke()}for(let i=0;i<25;i++){const x=(i*197.37+t*(i%3+1)*2)%1280,y=(i*127.9)%720;circle(x,y,i%3===0?1.5:1,'#f8efd91a')}ctx.restore();compass(73,48,18);txt('NEVERLAND DUEL',106,55,20,C.paper,600);txt('A BOARD-GAME TEACHING TOOL',1200,54,12,C.muted,600,sans,'right');for(let i=0;i<6;i++){box(80+i*29,98,20,3,1.5,i<=scene?C.gold:'#ffffff18')}txt(`${scene+1} / 6`,1200,102,14,C.muted,500,sans,'right');box(0,715,W*(t/duration),5,0,C.gold)}
+function first(p){
+ appear(p,0,()=>{pill('FOR YOUR NEXT GAME NIGHT',80,154,284);lines(['New game night.','Same first-turn nerves?'],80,267,54,C.paper,400,1.2,serif);lines(['Give yourself a place to try, ask why,','and start again at your own pace.'],82,435,26,C.muted,400,1.45)});
+ appear(p,.5,()=>{ctx.save();ctx.translate(948,352);ctx.rotate(-.05+Math.sin(p*.5)*.015);box(-186,-106,372,220,95,'#254a4d',C.line);box(-155,-76,310,160,62,'#1b3e43');for(let i=0;i<3;i++){ctx.save();ctx.translate(-80+i*80,5);ctx.rotate((i-1)*.16);box(-27,-44,54,79,6,C.paper);compass(0,-5,18,C.ink);ctx.restore()}ctx.restore();circle(948,182,28,C.mint);circle(727,352,28,C.gold);circle(1168,352,28,'#d7b49a');circle(948,510,28,'#94b3c6')});
+ appear(p,1.2,()=>{box(820,125,265,48,12,C.paper);txt('Where do I start?',952,156,21,C.ink,500,sans,'center')});
+ appear(p,2.8,()=>{pill('No pressure.',80,514,156);pill('Repeat any step.',250,514,204)});
+ caption(['Practice privately before you play with people.']);
+}
+function move(p){
+ heading('01 · See the next move','One move at a time.','Start with a short guided lesson.');
+ const start=fade(p,1.5,1.5);const xs=[165,420,675,930];
+ xs.forEach((x,i)=>{box(x,307,183,185,18,i===1?'#284f4d':C.panel,i===1?C.gold:C.line);txt(['Ship','Rock','Lagoon','Tree'][i],x+91,345,24,C.paper,500,sans,'center');line(x+20,365,x+163,365);if(i===1){pill('GAIN 1',x+26,421,130,p>3.3?C.gold:'#24494a',p>3.3?C.ink:C.muted)}else{txt(i===3?'Locked':'Actions',x+91,454,18,C.muted,400,sans,'center')}});
+ if(start>.05)arrow(293,390,432,start,C.mint);
+ pawn(lerp(256,511,start),388,1,C.gold);
+ appear(p,3.4,()=>{check(770,537);txt('Move first. Then use open actions.',794,544,21,C.muted,500)});
+ txt('SIMPLIFIED LESSON DIAGRAM',80,558,12,C.dim,600);
+ caption(['Move to a different unlocked location before using its actions.']);
+}
+function why(p){
+ heading('02 · Understand the reason','A hint should explain why.','Connect the next click to what you are trying to do.');
+ box(80,295,500,265,20,C.paper);txt('YOUR POWER',112,336,15,C.ink,700);const earned=p>2.5;coin(151,393,earned?4:3,36);txt(earned?'4 available':'One short',209,401,24,C.ink,600);pill('+1 POWER',112,475,165,earned?'#c9e2d1':'#e7dcc4',C.ink);arrow(296,494,346,fade(p,1.4,1));box(366,365,169,158,12,'#e5d9b9','#c1b394');txt('MAP',450,402,18,C.ink,700,sans,'center');compass(450,442,22,C.ink);txt('Costs 4',450,496,21,C.ink,500,sans,'center');
+ box(614,295,586,265,20,C.panel,C.line);txt('WHY THIS MOVE',646,337,15,C.mint,700);lines(['The Map costs 4 Power.','You have 3. Take Gain 1,','then pay for the Map.'],646,385,29,C.paper,500,1.35);appear(p,3.1,()=>{check(656,520);txt('Build toward the unlock.',682,526,20,C.mint,500)});
+ caption(['Need 4 Power? Gain 1 before paying for the Map.']);
+}
+function practice(p){
+ heading('03 · Practise the tricky part','Try. Repeat. Make it click.','Follow along first. Choose your own plan when you want to.');
+ const xs=[112,320,766];[4,4,8].forEach((n,i)=>{appear(p,.25+i*.38,()=>{box(xs[i],291,i===2?176:150,179,16,i===2?C.panel:C.paper,i===2?C.gold:null);txt(i===2?'HERO':'CREW',xs[i]+(i===2?88:75),331,15,i===2?C.mint:C.ink,700,sans,'center');txt(String(n),xs[i]+(i===2?88:75),422,76,i===2?C.paper:C.ink,600,sans,'center')})});
+ txt('+',291,398,42,C.gold,400,sans,'center');txt('=',615,398,48,C.gold,400,sans,'center');
+ appear(p,1.8,()=>{box(984,303,212,155,16,'#245249');check(1084,342);lines(['Equal Strength','is enough.'],1090,393,25,C.paper,600,1.3,sans,'center')});
+ pill('Follow along',112,503,230);pill('Choose a plan',358,503,252);txt('In this clash, selected crew are spent afterward.',648,529,18,C.muted);
+ caption(['Check the total before a clash: 4 + 4 = 8. Equal Strength works.']);
+}
+function support(p){
+ heading('04 · See the bigger picture','Help for the click. And the plan.','Use the coaching you need while you practise.');
+ const cards=[{x:80,k:'COACH',h:'What next?',body:['A legal next click,','one step at a time.'],symbol:'1'},{x:461,k:'WHY THIS MOVE',h:'Why this?',body:['An explanation of','the choice you made.'],symbol:'?'},{x:842,k:'STRATEGY BRIEF',h:'What am I building?',body:['The objective, your progress,','and what comes next.'],symbol:'→'}];
+ cards.forEach((c,i)=>appear(p,.25+i*.6,()=>{box(c.x,293,358,254,18,C.panel,C.line);txt(c.k,c.x+25,331,14,C.mint,700);circle(c.x+303,326,17,'#274b4d');txt(c.symbol,c.x+303,332,19,C.gold,500,sans,'center');txt(c.h,c.x+25,393,28,C.paper,500,serif);lines(c.body,c.x+25,441,21,C.muted,400,1.45)}));
+ caption(['Six guided lessons. Three focused drills. A coached simulated voyage.']);
+}
+function close(p){
+ appear(p,0,()=>{compass(640,190,35);txt('Neverland Duel',640,274,60,C.paper,400,serif,'center');lines(['Practice privately.','Join the table with confidence.'],640,347,43,C.paper,500,1.25,sans,'center')});
+ appear(p,.8,()=>{pill('START WITH TUTORIAL',486,454,308,C.gold,C.ink)});
+ appear(p,1.25,()=>{lines(['Independent teaching prototype · Current lesson: Captain Hook’s objective in Disney Villainous.','Solo adaptations are explained before table play.','Not affiliated with or endorsed by Disney or Ravensburger.'],640,546,18,C.muted,400,1.45,sans,'center')});
+ caption(['A teaching companion for learning before game night.']);
+}
+const scenes=[first,move,why,practice,support,close];
+function draw(t){t=clamp(t,0,duration-.001);const i=Math.floor(t/8),p=t-i*8;backdrop(t,i);ctx.save();const alpha=clamp(p/.45)*(i===scenes.length-1?1:clamp((8-p)/.4));ctx.globalAlpha=alpha;ctx.translate(0,10*(1-alpha));scenes[i](p);ctx.restore()}
+let playing=false,begin=0,offset=0;
+const play=document.getElementById('play'),seek=document.getElementById('seek'),time=document.getElementById('time');
+function update(t){draw(t);seek.value=String(t);time.textContent=`0:${String(Math.floor(t)).padStart(2,'0')} / 0:48`}
+function tick(now){if(!playing)return;const t=offset+(now-begin)/1000;update(Math.min(t,duration-.001));if(t>=duration){playing=false;offset=0;play.textContent='Replay animation';return}requestAnimationFrame(tick)}
+play.onclick=()=>{if(playing){offset=Number(seek.value);playing=false;play.textContent='Play animation'}else{playing=true;begin=performance.now();play.textContent='Pause';requestAnimationFrame(tick)}};
+seek.oninput=()=>{playing=false;offset=Number(seek.value);play.textContent='Play animation';update(offset)};
+async function record(){
+ playing=false;draw(0);
+ const stream=canvas.captureStream(30);
+ const mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+ const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:5500000});
+ const chunks=[];
+ const result=new Promise((resolve,reject)=>{recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recorder.onerror=reject;recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());const reader=new FileReader();reader.onerror=reject;reader.onloadend=()=>resolve(reader.result.split(',')[1]);reader.readAsDataURL(new Blob(chunks,{type:'video/webm'}))}});
+ recorder.start(1000);const started=performance.now();
+ await new Promise(resolve=>{function frame(now){const t=(now-started)/1000;draw(t);if(t<duration)requestAnimationFrame(frame);else{recorder.stop();resolve()}}requestAnimationFrame(frame)});
+ return result;
+}
+window.explainer={draw,record,duration};update(1.5);
+</script>
+</body>
+</html>

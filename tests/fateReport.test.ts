@@ -4,9 +4,36 @@ import { applyInput } from "../src/engine/game";
 import { promptText } from "../src/engine/queries";
 import { advise } from "../src/engine/coach";
 import { strategyBrief } from "../src/engine/strategyBrief";
-import { barePlayState, give, inst, putHero } from "./helpers";
+import { barePlayState, give, inst, putAlly, putHero } from "./helpers";
 
 const TICK_TEXT = def("tickTock").text;
+
+describe("Tinker Bell's placement explanation", () => {
+  it("does not imply a distant Ally was dismissed when Fate covers an empty shore", () => {
+    const state = barePlayState();
+    state.villainLocation = "mermaidLagoon";
+    const saved = putAlly(state, "swashbuckler", "skullRock");
+    state.fateDeck = [inst("tinkerBell"), inst("splittingHeadache")];
+    const next = applyInput(state, { type: "endTurn" });
+    expect(next.pending?.kind).toBe("fateReport");
+    if (next.pending?.kind !== "fateReport") throw new Error("expected Fate report");
+    expect(next.locations.mermaidLagoon.heroes.some((card) => card.defId === "tinkerBell")).toBe(true);
+    expect(next.locations.skullRock.allies.some((card) => card.instanceId === saved.instanceId)).toBe(true);
+    expect(next.pending.choiceReason).toMatch(/No Ally was there to dismiss/);
+    expect(next.pending.choiceReason).toContain("Mermaid Lagoon");
+  });
+
+  it("names the Ally and shore when Tinker Bell really does dismiss crew", () => {
+    const state = barePlayState();
+    const dismissed = putAlly(state, "pirateBrute", "skullRock");
+    state.fateDeck = [inst("tinkerBell"), inst("splittingHeadache")];
+    const next = applyInput(state, { type: "endTurn" });
+    expect(next.pending?.kind).toBe("fateReport");
+    if (next.pending?.kind !== "fateReport") throw new Error("expected Fate report");
+    expect(next.villainDiscard.some((card) => card.instanceId === dismissed.instanceId)).toBe(true);
+    expect(next.pending.choiceReason).toMatch(/dismiss Pirate Brute at Skull Rock/);
+  });
+});
 
 describe("computer Fate Tick Tock report", () => {
   function afterComputerTickTock() {

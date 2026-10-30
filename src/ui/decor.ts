@@ -167,10 +167,10 @@ export const MAP_COMPASS = `<svg class="map-compass" viewBox="0 0 64 64" aria-hi
 
 /**
  * Realm chart painted behind the four shores.
- * Served from public/assets so Vite exposes it at /assets/treasure-map.png.
+ * Resolve against Vite's base so a submission hosted in a subfolder keeps its chart.
  * The illustration is backdrop only. Movement is still any unlocked shore.
  */
-export const TREASURE_MAP = `<img class="map-scene" src="/assets/treasure-map.png" alt="" width="3000" height="1680" aria-hidden="true" />`;
+export const TREASURE_MAP = `<img class="map-scene" src="${import.meta.env.BASE_URL}assets/treasure-map.png" alt="" width="3000" height="1680" aria-hidden="true" />`;
 
 /** Decorative shoreline under the four shores. Not a movement rule. */
 export const MAP_COAST = `<svg class="map-coast" viewBox="0 0 800 18" preserveAspectRatio="none" aria-hidden="true">

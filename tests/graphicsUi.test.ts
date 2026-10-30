@@ -241,7 +241,7 @@ describe("game graphics UI pass", () => {
     expect(board?.querySelector("svg.map-coast")).toBeTruthy();
     const scene = board?.querySelector("img.map-scene");
     expect(scene).toBeTruthy();
-    expect(scene?.getAttribute("src")).toBe("/assets/treasure-map.png");
+    expect(scene?.getAttribute("src")).toBe(`${import.meta.env.BASE_URL}assets/treasure-map.png`);
     expect(root.querySelector(".loc-head h2")?.textContent).toMatch(/Jolly Roger/);
     expect(existsSync(join(process.cwd(), "public/assets/treasure-map.png"))).toBe(true);
 

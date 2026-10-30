@@ -3,3 +3,9 @@ dist
 .DS_Store
 *.local
 verification-evidence/
+release/
+.env
+.env.*
+!.env.example
+.runtime/
+.vercel/

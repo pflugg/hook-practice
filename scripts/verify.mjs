@@ -6,6 +6,7 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { findChrome } from "./browser.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const runtimeDir = "/tmp/hook-practice-verify";
@@ -111,7 +112,7 @@ async function driveTutorial() {
   const runDir = path.join(evidenceRoot, "tutorial-move");
   rmSync(runDir, { recursive: true, force: true });
   mkdirSync(runDir, { recursive: true });
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, executablePath: findChrome() });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   try {
     await page.goto(state.url, { waitUntil: "domcontentloaded" });
