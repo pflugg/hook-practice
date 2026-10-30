@@ -4,6 +4,16 @@ A browser practice tool for the **captain’s objective chain**. You play the ca
 
 This is an unofficial personal practice aid with original UI and paraphrased mechanical descriptions. See [LEGAL.md](LEGAL.md).
 
+## Learn, practise, then play
+
+Start with **Tutorial** for six guided lessons. Each lesson explains the rule behind the click. Then use the three **Practice drills** on the title screen: equal-Strength combat, Peter’s final escort step, and the ship clash. Drills start with Coach hidden so the player makes the decision; Coach remains available as an optional hint. Completing the real action opens feedback explaining the skill, with retry, library, and Set Sail options.
+
+The **Before you play with people** checklist on the title and Help screens explains the five solo differences that matter at a human table: self-Fate, local-only card placement, rewritten Conditions, the rival clock, and the off-ship Peter loss. This is Captain Hook objective practice, not certification of all Villainous rules. Compare the [published base-game instructions](https://www.ravensburger.org/spielanleitungen/ecm/Spielanleitungen/26295%20anl%202050897.pdf) with the cards in your own edition.
+
+The play screen grows vertically on short windows. The Fate summary has its own grid row outside the board and expands to review revealed cards. Location rows align across the desktop board, while card text and the hand can grow. Desktop teaching remains in the right rail; phone guidance stays with the turn controls.
+
+For a short hackathon demonstration: complete the guided voyage, try **Make the numbers work** without Coach, then start **Set Sail** to show a shuffled game. Open the table-habits checklist to explain how the practice transfers to a human game.
+
 ## Requirements
 
 - Node.js 20+
@@ -42,6 +52,8 @@ npm run verify
 ```
 
 This starts the Vite dev server, opens the title screen, chooses **Tutorial**, moves the captain to Skull Rock, and writes screenshots plus `verification-evidence/tutorial-move/proof.json`. Cleanup stops that server and leaves the proof in place. The recipe for other paths is in `.cursor/skills/verify-hook-practice/`.
+
+For the full learning and layout matrix, run `node scripts/verify.mjs launch`, `node scripts/verify.mjs doctor`, then `node scripts/verify-learning.mjs`. The matrix drives all six lessons, a complete shuffled voyage (win or loss), and all three drills at 1301×692, 1280×720, 1280×800, 1440×900, 1024×768, and 390×844. It asserts 380px minimum shore height, readable teaching, full hand text, aligned content without overlap, visible map, and 44px phone targets. Screenshots and JSON proof are saved in `verification-evidence/learning/`. Use `CHROME_PATH` if Chrome is installed outside the usual macOS/Linux paths. Run `node scripts/verify.mjs cleanup` afterward.
 
 ## Soak
 
@@ -108,20 +120,20 @@ A heuristic advisor (not an LLM) sits beside the prompt and names the next concr
 
 - **Set Sail** uses the title **Coach on/off** toggle (defaults on for a new session) and skips the lesson.
 - During play, the top-bar **Coach** chip or the panel’s **Hide coach** button turns it off without ending the game. The choice persists for the browser tab.
-- Coach lives in the **right teaching rail** with Why this move and the Strategy brief (Coach on top, then Why, then the voyage brief). Each pane keeps the full *do* line and *why* paragraph at readable size and scrolls on its own, so one pane never buries another. The rail sits beside the board — it never covers Gain / Play / Move buttons.
+- Coach lives in the **right teaching rail** with Why this move and the Strategy brief (Coach on top, then Why, then the voyage brief). Each pane keeps the full *do* line and *why* paragraph at readable size; the whole rail scrolls as one document with clear section headers. The rail sits beside the board — it never covers Gain / Play / Move buttons.
 - Coach only *highlights* a recommended legal target more strongly — the suggested action uses a gold CTA; every other legal option stays clickable.
 - It covers the full loop: required move, actions (Gain / Discard / Play / Fate / Vanquish / Move), card and payment choices, Fate acknowledge, and win/loss awareness. It warns about Tick Tock and Heroes covering key actions.
 
 ## Strategy brief
 
-A persistent right-rail pane (default on, especially from **Tutorial**) teaches the voyage instead of only the next click. Coach stays the short “do this” panel; the brief is the longer briefing and updates every render from a pure `strategyBrief(state)` helper. The three teaching panes stack Coach → Why this move → Strategy brief in one parchment/gold rail and each has its own scroll.
+A persistent right-rail pane (default on, especially from **Tutorial**) teaches the voyage instead of only the next click. Coach stays the short “do this” panel; the brief is the longer briefing and updates every render from a pure `strategyBrief(state)` helper. The three teaching panes stack Coach → Why this move → Strategy brief in one dark teal rail with a single scroll.
 
 - **Objective progress** — Map unlock, Peter found, walk to the ship, clash ready — each with a plain-English status.
 - **Where you are** — location, Power, hand pressure, whether the tree is locked, Tick Tock and covering Heroes.
 - **What this moment is** — a phase-aware paragraph (required move, action stretch, targeting, Fate acknowledge) explaining what the rules are asking and why that beat exists.
 - **What we’re setting up for** — two to four sentences tying the current options to the mid/late game (Power engine, digging for the Map, escort, Ally stack at the Jolly Roger).
 
-Hide it with the top-bar **Brief** chip or **Hide brief**. On a laptop the four location columns squish (about 180px minimum). Below about 1100px the three teaching panes tab under the board so type stays at the desktop floor. On a phone the next Coach line sits above the board, and the four shores stay in order inside a sideways scroller.
+Hide it with **Brief** in the Menu or the panel’s **Hide** button. Desktop shores retain their full content height and the page scrolls. Below about 1100px the teaching rail follows the board as one document. On a phone the next Coach line stays with the turn controls, and the four shores remain in order inside a sideways scroller.
 
 ## Move reasons
 
@@ -131,7 +143,7 @@ A **Why this move** pane in the right teaching rail (default on, especially from
 - **Why it helps the plan** — how that click serves Map → unlock Hangman’s Tree → find Peter → walk to the Jolly Roger → vanquish there
 - **What it sets up** — Fate pressure, covered top rows, Power, Tick Tock, the next gate
 
-Cancel softens the panel (nothing committed). Acknowledging computer Fate explains why that card hurts — or, for Peter, why the find actually helps — and what to do about it. The pane stays in the right teaching rail and scrolls independently of Coach and the brief, so it never overlays legal board actions. Hide it with the **Reasons** chip or **Hide**. The choice persists for the browser tab (`nld-reasons`).
+Cancel softens the panel (nothing committed). Acknowledging computer Fate explains why that card hurts — or, for Peter, why the find actually helps — and what to do about it. The pane stays in the right teaching rail and shares its single scroll with Coach and the brief, so it never overlays legal board actions. Hide it with the **Reasons** chip or **Hide**. The choice persists for the browser tab (`nld-reasons`).
 
 ## Captain pawn
 
