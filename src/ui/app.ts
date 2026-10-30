@@ -1190,7 +1190,9 @@ function stagedScene(): GameState | null {
 
 function boxOf(el: HTMLElement): Box {
   const rect = el.getBoundingClientRect();
-  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+  // Page scrolling is camera movement, not card movement. FLIP must compare
+  // document positions or bringing a coached card into view animates it away.
+  return { left: rect.left + window.scrollX, top: rect.top + window.scrollY, width: rect.width, height: rect.height };
 }
 
 function snapshotMovers(root: HTMLElement): Map<string, Box> {
@@ -1205,7 +1207,7 @@ function snapshotMovers(root: HTMLElement): Map<string, Box> {
   return map;
 }
 
-function playTravel(root: HTMLElement, prev: Map<string, Box>): void {
+function playTravel(root: HTMLElement, prev: Map<string, Box>, onSettled: () => void): void {
   if (prev.size === 0 || motionReduced()) return;
   const fly = (el: HTMLElement, key: string) => {
     const before = prev.get(key);
@@ -1231,6 +1233,7 @@ function playTravel(root: HTMLElement, prev: Map<string, Box>): void {
       el.style.transform = "";
       el.classList.remove("is-traveling");
       if (shore) shore.style.overflow = "";
+      if (el.isConnected) onSettled();
     };
     void el.offsetWidth;
     requestAnimationFrame(() => {
@@ -1577,18 +1580,18 @@ export function mount(root: HTMLElement): void {
     bindCardDrag();
     root.querySelector<HTMLElement>("[data-realm-map]")?.addEventListener("scroll", () => markShown(), { passive: true });
     restoreScroll();
+    pinNextClick();
     bringHighlightIntoView();
     bringCoachedCardIntoView();
-    pinNextClick();
     markShown();
     restoreFocus();
     requestAnimationFrame(() => {
       restoreScroll();
+      pinNextClick();
       bringHighlightIntoView();
       bringCoachedCardIntoView();
-      pinNextClick();
       markShown();
-      playTravel(root, movers);
+      playTravel(root, movers, bringCoachedCardIntoView);
       // A coached card can be mid-FLIP here; its scroll target is only correct
       // once the travel settles (~360ms), so re-centre it in its zone then.
       if (coachScrollTimer !== null) window.clearTimeout(coachScrollTimer);
