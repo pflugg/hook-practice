@@ -139,7 +139,8 @@ function renderCard(
   const cardText = spentObsession
     ? "Peter is already in the realm. This hunt is spent — discard it if you want the slot."
     : d.text;
-  return `<button type="button" class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""} ${inspectable ? "is-inspectable" : ""} ${draggable ? "is-draggable" : ""} ${spentObsession ? "is-spent" : ""} ${opts.expanded ? "is-expanded" : ""}" data-card="${card.instanceId}" ${spentObsession ? 'data-spent="obsession"' : ""} title="${esc(d.name)} — ${esc(cardText)}" aria-label="${esc(d.name)}. ${esc(cardText)}">
+  const toggleSelection = opts.legal && (state.pending?.kind === "discardSelect" || state.pending?.kind === "vanquishAllies");
+  return `<button type="button" class="card ${d.type} ${size} ${opts.legal ? "is-legal" : ""} ${opts.selected ? "is-selected" : ""} ${opts.dimmed ? "is-dimmed" : ""} ${opts.coached ? "is-coached" : ""} ${inspectable ? "is-inspectable" : ""} ${draggable ? "is-draggable" : ""} ${spentObsession ? "is-spent" : ""} ${opts.expanded ? "is-expanded" : ""}" data-card="${card.instanceId}" ${spentObsession ? 'data-spent="obsession"' : ""} ${toggleSelection ? `aria-pressed="${opts.selected}"` : ""} title="${esc(d.name)} — ${esc(cardText)}" aria-label="${esc(d.name)}. ${esc(cardText)}">
     ${opts.legal && opts.size === "hand" && (state.pending?.kind === "playChooseCard" || state.pending?.kind === "cunningAlly") ? `<span class="playable-tag">Playable</span>` : ""}
     ${spentObsession ? `<span class="spent-tag">Spent</span>` : ""}
     ${typeBar}
@@ -439,6 +440,7 @@ function overlayFor(
   const p = state.pending;
   if (state.phase === "over") {
     const recap = endgameRecap(state);
+    const tutorialComplete = lessonActive && state.won;
     const lessonHandoff = lessonActive
       ? `<section class="recap-block" data-lesson-handoff>
         <h3>First voyage</h3>
@@ -452,18 +454,18 @@ function overlayFor(
     const lessonActions = lessonActive
       ? `<button type="button" class="btn primary" data-lesson-sail data-initial-focus>Begin a normal voyage</button>
         <button type="button" class="btn" data-again>Replay the first voyage</button>
-        <button type="button" class="btn ghost" data-home>Not now</button>`
+        <button type="button" class="btn ghost" data-home>Return to title &amp; drills</button>`
       : `<button type="button" class="btn primary${coachClass(coached, "btn:again")}" data-again data-initial-focus>Play again</button>
         <button type="button" class="btn ghost" data-home>Return to title</button>`;
     return `<div class="overlay" data-overlay="blocking"><div class="modal wood endgame ${state.won ? "win celebrate" : "lose"}" data-recap ${namedDialog("recap-title")}>
-      <p class="eyebrow">${state.won ? "Captain Hook wins" : "Voyage recap"}</p>
-      <p class="outcome-mark" data-outcome>${state.won ? "Victory" : "Defeat"}</p>
-      <h2 id="recap-title">${esc(recap.headline)}</h2>
+      <p class="eyebrow">${tutorialComplete ? "Six lessons completed" : state.won ? "Captain Hook wins" : "Voyage recap"}</p>
+      <p class="outcome-mark" data-outcome>${tutorialComplete ? "Tutorial complete" : state.won ? "Victory" : "Defeat"}</p>
+      <h2 id="recap-title">${tutorialComplete ? "Ready for your own voyage" : esc(recap.headline)}</h2>
       ${state.loseReason === RIVAL_LOSE_REASON ? rivalMeter(state) : ""}
-      <p class="recap-lead">${esc(recap.lead)}</p>
+      <p class="recap-lead">${tutorialComplete ? "You practiced the objective chain and won the staged ship clash. Next, try the practice drills or put the steps together in a shuffled voyage." : esc(recap.lead)}</p>
       <section class="recap-block" data-recap-steps>
         <h3>The objective</h3>
-        <p>${esc(recap.steps)}</p>
+        <p>${tutorialComplete ? "You played the Map, found Peter, and moved him from Hangman’s Tree to Mermaid Lagoon. The lesson then placed Peter and two Pirate Brutes at the Jolly Roger for the final clash. In a full voyage, you arrange the crew and complete every escort step yourself." : esc(recap.steps)}</p>
       </section>
       <section class="recap-block" data-recap-clash>
         <h3>${state.won ? "Why the clash was legal" : "Why that clash did not win"}</h3>
@@ -920,7 +922,7 @@ function playView(
   }
   const clash = vanquishClashMath(state);
   if (state.pending?.kind === "discardSelect") {
-    promptButtons.push(`<button class="btn primary${coachClass(coached, "btn:confirm")}" data-confirm>Confirm</button>`);
+    promptButtons.push(`<button class="btn primary${coachClass(coached, "btn:confirm")}" data-confirm>Confirm discard (${state.pending.selected.length})</button>`);
   }
   if (state.pending?.kind === "vanquishAllies") {
     promptButtons.push(
@@ -1422,6 +1424,7 @@ export function mount(root: HTMLElement): void {
   // card below the fold can sit hidden. Bring it back into its zone's view, clear
   // of the sticky zone label, so the highlighted card is never covered.
   const bringCoachedCardIntoView = () => {
+    if (typeof window === "undefined" || !root.isConnected) return;
     const desktop = typeof window.matchMedia === "function" && window.matchMedia("(min-width: 1101px)").matches;
     if (!desktop) return;
     const topInset = 14; // clear the sticky zone label at the top of the zone

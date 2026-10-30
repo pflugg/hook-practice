@@ -55,8 +55,11 @@ describe("staged first voyage", () => {
 
     const html = renderPlay(played.state, { lesson: lessonView(played.state, "clash") });
     expect(html).toContain("data-lesson-handoff");
+    expect(html).toContain(">Tutorial complete<");
+    expect(html).toContain("complete every escort step yourself");
+    expect(html).not.toContain("until he stood on the Jolly Roger");
     expect(html).toContain("Begin a normal voyage");
-    expect(html).toContain(">Not now<");
+    expect(html).toContain(">Return to title &amp; drills<");
     expect(html).toContain('role="dialog"');
     expect(html).not.toContain("data-lesson-banner");
   });
